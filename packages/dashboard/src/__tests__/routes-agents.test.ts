@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } 
 import express from "express";
 import http from "node:http";
 import { EventEmitter } from "node:events";
+import { performance } from "node:perf_hooks";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -153,7 +154,7 @@ vi.mock("@fusion/engine", async () => {
   });
 });
 
-import { AgentStore, Database, RoutineStore, isGhAvailable, isGhAuthenticated } from "@fusion/core";
+import { AgentStore, Database, RoutineStore, TaskStore as CoreTaskStore, ApprovalRequestStore, isGhAvailable, isGhAuthenticated } from "@fusion/core";
 import { createFnAgent } from "@fusion/engine";
 
 const mockIsGhAvailable = vi.mocked(isGhAvailable);
@@ -4650,5 +4651,96 @@ describe("remote access auth login-url endpoints", () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toContain("mode must be");
     expect(res.body.details).toEqual({ code: "INVALID_REMOTE_AUTH_MODE" });
+  });
+});
+
+describe("GET /api/agents pending approval count performance", () => {
+  let rootDir: string;
+  let store: TaskStore;
+
+  beforeEach(async () => {
+    rootDir = mkdtempSync(join(tmpdir(), "fusion-routes-agents-perf-"));
+    store = new CoreTaskStore(rootDir);
+    await store.init();
+  });
+
+  afterEach(async () => {
+    if (store) {
+      await store.close();
+    }
+    rmSync(rootDir, { recursive: true, force: true });
+  });
+
+  function buildApp() {
+    const app = express();
+    app.use(express.json());
+    app.use("/api", createApiRoutes(store));
+    return app;
+  }
+
+  it("serves /api/agents quickly on populated approval history without ApprovalRequestStore.list", async () => {
+    const agentStore = new AgentStore({ rootDir: store.getFusionDir() });
+    await agentStore.init();
+    const agents = await Promise.all(
+      Array.from({ length: 10 }, (_, index) => agentStore.createAgent({ name: `perf-agent-${index}`, role: "executor" })),
+    );
+
+    const now = new Date().toISOString();
+    const db = store.getDatabase();
+    const insert = db.prepare(`
+      INSERT INTO approval_requests (
+        id, status,
+        requesterActorId, requesterActorType, requesterActorName,
+        targetActionCategory, targetActionOperation, targetActionSummary,
+        targetResourceType, targetResourceId, targetContext,
+        taskId, runId,
+        requestedAt, decidedAt, completedAt,
+        createdAt, updatedAt
+      ) VALUES (?, ?, ?, 'agent', ?, 'task_mutation', 'write', ?, 'task', ?, '{}', NULL, NULL, ?, NULL, NULL, ?, ?)
+    `);
+
+    for (let index = 0; index < 200; index += 1) {
+      const agent = agents[index % agents.length]!;
+      insert.run(
+        `apr-pending-${index}`,
+        "pending",
+        agent.id,
+        agent.name,
+        `pending-${index}`,
+        `FN-P-${index}`,
+        now,
+        now,
+        now,
+      );
+    }
+
+    for (let index = 0; index < 200; index += 1) {
+      const agent = agents[index % agents.length]!;
+      insert.run(
+        `apr-completed-${index}`,
+        "completed",
+        agent.id,
+        agent.name,
+        `completed-${index}`,
+        `FN-C-${index}`,
+        now,
+        now,
+        now,
+      );
+    }
+
+    const listSpy = vi.spyOn(ApprovalRequestStore.prototype, "list");
+
+    const start = performance.now();
+    const res = await GET(buildApp(), "/api/agents");
+    const elapsedMs = performance.now() - start;
+
+    expect(res.status).toBe(200);
+    expect(elapsedMs).toBeLessThan(500);
+    expect(listSpy).not.toHaveBeenCalled();
+
+    const countsByName = new Map<string, number>(res.body.map((agent: { name: string; pendingApprovalCount: number }) => [agent.name, agent.pendingApprovalCount]));
+    expect(countsByName.get("perf-agent-0")).toBe(20);
+    expect(countsByName.get("perf-agent-9")).toBe(20);
   });
 });
