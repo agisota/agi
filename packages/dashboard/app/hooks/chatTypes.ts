@@ -37,6 +37,7 @@ export interface FailureInfo {
 export interface ChatMessageInfo {
   id: string;
   sessionId: string;
+  roomId?: string;
   role: "user" | "assistant" | "system";
   content: string;
   thinkingOutput?: string | null;
