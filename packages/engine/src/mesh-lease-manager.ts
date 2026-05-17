@@ -8,6 +8,7 @@ import type {
 import type { NodeHealthMonitor } from "./node-health-monitor.js";
 import { decideOwningNodeHandoff } from "./node-routing-policy.js";
 import { createLogger } from "./logger.js";
+import { createRunAuditor, generateSyntheticRunId } from "./run-audit.js";
 
 const meshLeaseManagerLog = createLogger("mesh-lease-manager");
 
@@ -90,25 +91,125 @@ export class MeshLeaseManager {
       return false;
     }
 
-    if ((stale.reason === "owner_node_offline" || stale.reason === "owner_node_error")
-      && task.checkoutNodeId
-      && this.options.nodeHealthMonitor) {
-      const ownerNodeHealth = this.options.nodeHealthMonitor.getNodeHealth(task.checkoutNodeId);
+    const isUnreachableOwnerReason = stale.reason === "owner_node_offline" || stale.reason === "owner_node_error";
+    const ownerNodeId = task.checkoutNodeId;
+    const ownerNodeHealth = stale.reason === "owner_node_error" ? "error" : "offline";
+    const previousOwnerAgentId = task.checkedOutBy;
+    const previousColumn = task.column;
+    const auditor = createRunAuditor(this.options.taskStore, {
+      runId: generateSyntheticRunId("mesh-lease", taskId),
+      agentId: "mesh-lease-manager",
+      taskId,
+      taskLineageId: task.lineageId,
+      phase: "recover-unreachable-owner-lease",
+    });
+
+    const emitNodeUnreachableRecovery = async ({
+      decisionPath,
+      newColumn,
+      leaseEpoch,
+      recoveryReason,
+      handoffPolicy,
+      handoffAction,
+      handoffReason,
+    }: {
+      decisionPath: "lease-parked-by-handoff-policy" | "lease-recovered-in-place" | "lease-recovered-to-todo";
+      newColumn: string;
+      leaseEpoch: number;
+      recoveryReason: string;
+      handoffPolicy: OwningNodeHandoffPolicy | undefined;
+      handoffAction: string;
+      handoffReason: string;
+    }): Promise<void> => {
+      if (!isUnreachableOwnerReason || !ownerNodeId) {
+        return;
+      }
+      try {
+        await auditor.database({
+          type: "task:auto-recover-node-unreachable",
+          target: taskId,
+          metadata: {
+            ownerNodeId,
+            ownerNodeHealth,
+            previousOwnerAgentId,
+            previousColumn,
+            newColumn,
+            leaseEpoch,
+            recoveryReason,
+            handoffPolicy,
+            handoffAction,
+            handoffReason,
+            decisionPath,
+          },
+        });
+      } catch (error) {
+        meshLeaseManagerLog.warn(
+          `mesh-lease: failed to emit node-unreachable auto-recovery audit for taskId=${task.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    };
+
+    if (isUnreachableOwnerReason && task.checkoutNodeId && this.options.nodeHealthMonitor) {
+      const currentOwnerNodeHealth = this.options.nodeHealthMonitor.getNodeHealth(task.checkoutNodeId);
       const handoffPolicy = await this.options.getHandoffPolicy?.();
       const handoffDecision = decideOwningNodeHandoff({
         task,
         ownerNodeId: task.checkoutNodeId,
-        ownerNodeHealth,
+        ownerNodeHealth: currentOwnerNodeHealth,
         localNodeId: this.options.localNodeId ?? "local",
         handoffPolicy,
       });
 
       if (handoffDecision.action === "park") {
+        await emitNodeUnreachableRecovery({
+          decisionPath: "lease-parked-by-handoff-policy",
+          newColumn: task.column,
+          leaseEpoch: task.checkoutLeaseEpoch ?? 0,
+          recoveryReason: "handoff-policy-park",
+          handoffPolicy,
+          handoffAction: handoffDecision.action,
+          handoffReason: handoffDecision.reason,
+        });
         meshLeaseManagerLog.log(
           `mesh-lease: handoff parked taskId=${task.id} reason=${handoffDecision.reason}`,
         );
         return false;
       }
+
+      const nextEpoch = (task.checkoutLeaseEpoch ?? 0) + 1;
+      await this.options.taskStore.updateTask(
+        taskId,
+        {
+          checkedOutBy: null,
+          checkedOutAt: null,
+          checkoutNodeId: null,
+          checkoutRunId: null,
+          checkoutLeaseRenewedAt: null,
+          checkoutLeaseEpoch: nextEpoch,
+        },
+        context.runContext,
+      );
+      await this.options.taskStore.logEntry(
+        taskId,
+        "Recovered abandoned lease",
+        `${reason} (${stale.reason ?? "stale"}); epoch=${nextEpoch}`,
+        context.runContext,
+      );
+      if (task.column !== "todo") {
+        await this.options.taskStore.moveTask(taskId, "todo", {
+          preserveProgress: context.preserveProgress ?? (task.currentStep > 0 || task.steps.some((step) => step.status !== "pending")),
+        });
+      }
+      await emitNodeUnreachableRecovery({
+        decisionPath: task.column === "todo" ? "lease-recovered-in-place" : "lease-recovered-to-todo",
+        newColumn: task.column === "todo" ? task.column : "todo",
+        leaseEpoch: nextEpoch,
+        recoveryReason: reason,
+        handoffPolicy,
+        handoffAction: handoffDecision.action,
+        handoffReason: handoffDecision.reason,
+      });
+      return true;
     }
 
     const nextEpoch = (task.checkoutLeaseEpoch ?? 0) + 1;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AgentStore, Task, TaskStore } from "@fusion/core";
+import type { AgentStore, RunAuditEventInput, Task, TaskStore } from "@fusion/core";
 import { MeshLeaseManager } from "../mesh-lease-manager.js";
 
 function task(overrides: Partial<Task> = {}): Task {
@@ -44,8 +44,9 @@ describe("MeshLeaseManager", () => {
     expect(result).toEqual({ recoverable: true, reason: "owner_node_offline" });
   });
 
-  it("recovers stale lease by bumping epoch and clearing owner fields", async () => {
-    const currentTask = task({ checkoutLeaseRenewedAt: "2026-05-01T00:00:00.000Z" });
+  it("emits unreachable audit for recovered-to-todo path", async () => {
+    const currentTask = task({ column: "in-progress" });
+    const recordRunAuditEvent = vi.fn().mockResolvedValue(undefined);
     const updateTask = vi.fn().mockResolvedValue(currentTask);
     const moveTask = vi.fn().mockResolvedValue(currentTask);
     const logEntry = vi.fn().mockResolvedValue(undefined);
@@ -54,32 +55,142 @@ describe("MeshLeaseManager", () => {
       updateTask,
       moveTask,
       logEntry,
+      recordRunAuditEvent,
+    } as unknown as TaskStore;
+
+    const manager = new MeshLeaseManager({
+      taskStore,
+      nodeHealthMonitor: { getNodeHealth: () => "offline" } as any,
+      getHandoffPolicy: vi.fn().mockResolvedValue("reassign-any-healthy"),
+      localNodeId: "local",
+    });
+
+    const ok = await manager.recoverAbandonedLease("FN-1", "scheduler detected stale todo lease");
+
+    expect(ok).toBe(true);
+    expect(moveTask).toHaveBeenCalledWith("FN-1", "todo", expect.any(Object));
+    const event = recordRunAuditEvent.mock.calls[0]?.[0] as RunAuditEventInput;
+    expect(event.mutationType).toBe("task:auto-recover-node-unreachable");
+    expect(event.metadata).toMatchObject({
+      ownerNodeId: "node-a",
+      ownerNodeHealth: "offline",
+      previousOwnerAgentId: "agent-1",
+      previousColumn: "in-progress",
+      newColumn: "todo",
+      leaseEpoch: 2,
+      recoveryReason: "scheduler detected stale todo lease",
+      handoffPolicy: "reassign-any-healthy",
+      handoffAction: "reassign-any",
+      handoffReason: expect.any(String),
+      decisionPath: "lease-recovered-to-todo",
+    });
+  });
+
+  it("emits ownerNodeHealth=error for owner_node_error recoveries", async () => {
+    const currentTask = task({ column: "todo" });
+    const recordRunAuditEvent = vi.fn().mockResolvedValue(undefined);
+    const taskStore = {
+      getTask: vi.fn().mockResolvedValue(currentTask),
+      updateTask: vi.fn().mockResolvedValue(currentTask),
+      moveTask: vi.fn().mockResolvedValue(currentTask),
+      logEntry: vi.fn().mockResolvedValue(undefined),
+      recordRunAuditEvent,
+    } as unknown as TaskStore;
+
+    const manager = new MeshLeaseManager({
+      taskStore,
+      nodeHealthMonitor: { getNodeHealth: () => "error" } as any,
+      getHandoffPolicy: vi.fn().mockResolvedValue("reassign-any-healthy"),
+      localNodeId: "local",
+    });
+
+    const ok = await manager.recoverAbandonedLease("FN-1", "scheduler detected stale todo lease");
+    expect(ok).toBe(true);
+
+    const event = recordRunAuditEvent.mock.calls[0]?.[0] as RunAuditEventInput;
+    expect(event.metadata).toMatchObject({
+      ownerNodeHealth: "error",
+      decisionPath: "lease-recovered-in-place",
+      newColumn: "todo",
+    });
+  });
+
+  it("emits parked-by-handoff-policy when handoff action parks", async () => {
+    const currentTask = task({ column: "in-progress" });
+    const recordRunAuditEvent = vi.fn().mockResolvedValue(undefined);
+    const taskStore = {
+      getTask: vi.fn().mockResolvedValue(currentTask),
+      updateTask: vi.fn().mockResolvedValue(currentTask),
+      moveTask: vi.fn().mockResolvedValue(currentTask),
+      logEntry: vi.fn().mockResolvedValue(undefined),
+      recordRunAuditEvent,
+    } as unknown as TaskStore;
+
+    const manager = new MeshLeaseManager({
+      taskStore,
+      nodeHealthMonitor: { getNodeHealth: () => "offline" } as any,
+      getHandoffPolicy: vi.fn().mockResolvedValue("block"),
+      localNodeId: "local",
+    });
+
+    const ok = await manager.recoverAbandonedLease("FN-1", "scheduler detected stale todo lease");
+    expect(ok).toBe(false);
+
+    const event = recordRunAuditEvent.mock.calls[0]?.[0] as RunAuditEventInput;
+    expect(event.mutationType).toBe("task:auto-recover-node-unreachable");
+    expect(event.metadata).toMatchObject({
+      decisionPath: "lease-parked-by-handoff-policy",
+      recoveryReason: "handoff-policy-park",
+      handoffPolicy: "block",
+      handoffAction: "park",
+      newColumn: "in-progress",
+      leaseEpoch: 1,
+    });
+  });
+
+  it("does not emit node-unreachable event for non-unreachable recoveries", async () => {
+    const currentTask = task({ checkoutNodeId: undefined });
+    const recordRunAuditEvent = vi.fn().mockResolvedValue(undefined);
+    const taskStore = {
+      getTask: vi.fn().mockResolvedValue(currentTask),
+      updateTask: vi.fn().mockResolvedValue(currentTask),
+      moveTask: vi.fn().mockResolvedValue(currentTask),
+      logEntry: vi.fn().mockResolvedValue(undefined),
+      recordRunAuditEvent,
     } as unknown as TaskStore;
 
     const agentStore = {
       getAgent: vi.fn().mockResolvedValue({
         id: "agent-1",
         runtimeConfig: { heartbeatTimeoutMs: 60_000 },
-        lastHeartbeatAt: "2026-05-01T00:00:00.000Z",
+        lastHeartbeatAt: "2026-04-30T00:00:00.000Z",
       }),
     } as unknown as AgentStore;
 
     const manager = new MeshLeaseManager({ taskStore, agentStore });
     const ok = await manager.recoverAbandonedLease("FN-1", "stale-heartbeat");
-
     expect(ok).toBe(true);
-    expect(updateTask).toHaveBeenCalledWith(
-      "FN-1",
-      expect.objectContaining({
-        checkedOutBy: null,
-        checkedOutAt: null,
-        checkoutNodeId: null,
-        checkoutRunId: null,
-        checkoutLeaseRenewedAt: null,
-        checkoutLeaseEpoch: 2,
-      }),
-      undefined,
-    );
-    expect(moveTask).toHaveBeenCalledWith("FN-1", "todo", expect.any(Object));
+    expect(recordRunAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("swallows audit emission failures and still returns expected result", async () => {
+    const currentTask = task({ column: "todo" });
+    const recordRunAuditEvent = vi.fn().mockRejectedValue(new Error("boom"));
+    const taskStore = {
+      getTask: vi.fn().mockResolvedValue(currentTask),
+      updateTask: vi.fn().mockResolvedValue(currentTask),
+      moveTask: vi.fn().mockResolvedValue(currentTask),
+      logEntry: vi.fn().mockResolvedValue(undefined),
+      recordRunAuditEvent,
+    } as unknown as TaskStore;
+
+    const manager = new MeshLeaseManager({
+      taskStore,
+      nodeHealthMonitor: { getNodeHealth: () => "offline" } as any,
+      getHandoffPolicy: vi.fn().mockResolvedValue("reassign-any-healthy"),
+      localNodeId: "local",
+    });
+
+    await expect(manager.recoverAbandonedLease("FN-1", "scheduler detected stale todo lease")).resolves.toBe(true);
   });
 });
