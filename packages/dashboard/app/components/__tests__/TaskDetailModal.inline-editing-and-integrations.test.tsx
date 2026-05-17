@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Task } from "@fusion/core";
+import type { Task, TaskDetail } from "@fusion/core";
 import {
   makeTask,
   noop,
@@ -2695,6 +2695,80 @@ describe("TaskDetailModal", () => {
       await waitFor(() => {
         expect(mockUpdate).toHaveBeenCalledWith("FN-001", { githubTracking: { enabled: false } }, undefined);
       });
+    });
+
+    it("keeps disabled githubTracking state sticky across follow-up sparse task prop updates", async () => {
+      const { updateTask, fetchTaskDetail } = await import("../../api");
+      const mockUpdate = vi.mocked(updateTask);
+      const mockFetchTaskDetail = vi.mocked(fetchTaskDetail);
+      const baseTask = makeTask({
+        id: "FN-001",
+        title: "Tracking task",
+        column: "in-progress",
+        githubTracking: {
+          enabled: true,
+          repoOverride: "runfusion/fusion",
+          issue: {
+            owner: "runfusion",
+            repo: "fusion",
+            number: 200,
+            url: "https://github.com/runfusion/fusion/issues/200",
+            createdAt: "2026-01-01T00:00:00Z",
+          },
+        },
+      });
+
+      mockFetchTaskDetail.mockResolvedValue(baseTask);
+      mockUpdate.mockResolvedValueOnce({
+        ...baseTask,
+        githubTracking: {
+          enabled: false,
+          repoOverride: "runfusion/fusion",
+        },
+      } as Task);
+
+      function Harness(): JSX.Element {
+        const [taskState, setTaskState] = useState(baseTask);
+
+        return (
+          <TaskDetailModal
+            task={taskState}
+            onClose={noop}
+            onOpenDetail={noopOpenDetail}
+            onMoveTask={noopMove}
+            onDeleteTask={noopDelete}
+            onMergeTask={noopMerge}
+            onTaskUpdated={(nextTask) => {
+              setTaskState(nextTask as TaskDetail);
+              setTimeout(() => {
+                setTaskState((current) => ({
+                  ...current,
+                  githubTracking: undefined,
+                }));
+              }, 0);
+            }}
+            addToast={noop}
+          />
+        );
+      }
+
+      render(<Harness />);
+
+      expandGithubTracking();
+      const toggle = screen.getByRole("checkbox", { name: "Enable GitHub tracking" }) as HTMLInputElement;
+      expect(toggle.checked).toBe(true);
+
+      fireEvent.click(toggle);
+
+      await waitFor(() => {
+        expect(mockUpdate).toHaveBeenCalledWith("FN-001", { githubTracking: { enabled: false } }, undefined);
+      });
+
+      await waitFor(() => {
+        expect((screen.getByRole("checkbox", { name: "Enable GitHub tracking" }) as HTMLInputElement).checked).toBe(false);
+      });
+
+      expect(screen.queryByRole("button", { name: /create tracking issue/i })).not.toBeInTheDocument();
     });
 
     it("sends repo override updates and null when cleared", async () => {

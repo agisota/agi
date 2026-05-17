@@ -2040,8 +2040,14 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
         validatedGithubTracking !== null &&
         typeof validatedGithubTracking === "object" &&
         validatedGithubTracking.issue === null;
+      const disableRequested =
+        hasBodyField("githubTracking") &&
+        validatedGithubTracking !== null &&
+        typeof validatedGithubTracking === "object" &&
+        validatedGithubTracking.enabled === false;
       const shouldAttemptTrackingIssueCreate =
         !manualUnlinkRequested &&
+        !disableRequested &&
         task.githubTracking?.enabled === true &&
         !task.githubTracking?.issue;
 

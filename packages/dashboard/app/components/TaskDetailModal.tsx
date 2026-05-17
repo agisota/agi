@@ -930,6 +930,9 @@ export function TaskDetailContent({
           enabled: nextEnabled,
         },
       }, projectId);
+      setFullDetail((prev) => prev
+        ? ({ ...prev, ...updatedTask, githubTracking: updatedTask.githubTracking } as TaskDetail)
+        : (updatedTask as TaskDetail));
       onTaskUpdated?.(updatedTask);
     } catch (err) {
       setGithubTrackingEnabledDraft(workingTask.githubTracking?.enabled === true);
@@ -953,6 +956,9 @@ export function TaskDetailContent({
           repoOverride: githubRepoOverrideTrimmed.length > 0 ? githubRepoOverrideTrimmed : null,
         },
       }, projectId);
+      setFullDetail((prev) => prev
+        ? ({ ...prev, ...updatedTask, githubTracking: updatedTask.githubTracking } as TaskDetail)
+        : (updatedTask as TaskDetail));
       onTaskUpdated?.(updatedTask);
     } catch (err) {
       addToast(`Failed to update ${task.id}: ${getErrorMessage(err)}`, "error");
@@ -974,6 +980,9 @@ export function TaskDetailContent({
           enabled: true,
         },
       }, projectId);
+      setFullDetail((prev) => prev
+        ? ({ ...prev, ...updatedTask, githubTracking: updatedTask.githubTracking } as TaskDetail)
+        : (updatedTask as TaskDetail));
       onTaskUpdated?.(updatedTask);
       addToast("Requested GitHub tracking issue creation", "info");
     } catch (err) {

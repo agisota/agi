@@ -245,6 +245,7 @@ const TASK_TOKEN_USAGE_FIXTURE = {
 
 const FAKE_TASK_DETAIL: TaskDetail = {
   id: "FN-001",
+  title: "Test task",
   description: "Test task",
   column: "in-progress",
   dependencies: [],
@@ -2035,6 +2036,61 @@ describe("PATCH /tasks/:id", () => {
       const persisted = await realStore.getTask(created.id);
       expect(persisted.githubTracking?.enabled).toBe(true);
       expect(persisted.githubTracking?.issue?.number).toBe(74);
+    } finally {
+      createIssueSpy.mockRestore();
+      realStore.close();
+      rmSync(rootDir, { recursive: true, force: true });
+      rmSync(globalDir, { recursive: true, force: true });
+    }
+  });
+
+  it("PATCH disable unlinks and persists disabled githubTracking without recreating issue", async () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "kb-routes-disable-github-tracking-"));
+    const globalDir = mkdtempSync(join(tmpdir(), "kb-routes-disable-github-tracking-global-"));
+    const realStore = new CoreTaskStore(rootDir, globalDir, { inMemoryDb: true });
+    await realStore.init();
+
+    const createIssueSpy = vi.spyOn(GitHubClient.prototype, "createIssue").mockResolvedValue({
+      owner: "runfusion",
+      repo: "fusion",
+      number: 99,
+      htmlUrl: "https://github.com/runfusion/fusion/issues/99",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    try {
+      const created = await realStore.createTask({ description: "route disable flow", column: "todo" });
+      await realStore.updateGithubTracking(created.id, {
+        enabled: true,
+        repoOverride: "runfusion/fusion",
+        issue: {
+          owner: "runfusion",
+          repo: "fusion",
+          number: 12,
+          url: "https://github.com/runfusion/fusion/issues/12",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      });
+
+      const app = express();
+      app.use(express.json());
+      app.use("/api", createApiRoutes(realStore));
+
+      const patchRes = await REQUEST(app, "PATCH", `/api/tasks/${created.id}`, JSON.stringify({
+        githubTracking: { enabled: false },
+      }), {
+        "Content-Type": "application/json",
+      });
+
+      expect(patchRes.status).toBe(200);
+      expect(patchRes.body.githubTracking?.enabled).toBe(false);
+      expect(patchRes.body.githubTracking?.issue).toBeUndefined();
+      expect(createIssueSpy).not.toHaveBeenCalled();
+
+      const getRes = await REQUEST(app, "GET", `/api/tasks/${created.id}`);
+      expect(getRes.status).toBe(200);
+      expect(getRes.body.githubTracking?.enabled).toBe(false);
+      expect(getRes.body.githubTracking?.issue).toBeUndefined();
     } finally {
       createIssueSpy.mockRestore();
       realStore.close();
