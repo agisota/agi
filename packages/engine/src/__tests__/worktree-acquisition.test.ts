@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { promisify } from "node:util";
 import { acquireTaskWorktree } from "../worktree-acquisition.js";
+import { classifyTaskWorktree } from "../worktree-pool.js";
 
 vi.mock("../worktree-pool.js", async () => {
   const actual = await vi.importActual<any>("../worktree-pool.js");
-  return { ...actual, isUsableTaskWorktree: vi.fn().mockResolvedValue(true) };
+  return {
+    ...actual,
+    classifyTaskWorktree: vi.fn().mockResolvedValue({ ok: true }),
+    isInsideWorktreesDir: vi.fn().mockReturnValue(true),
+  };
 });
 
 vi.mock("../worktree-db-hydrate.js", () => ({
@@ -88,6 +93,57 @@ describe("acquireTaskWorktree", () => {
     });
 
     expect(release).toHaveBeenCalledWith("/tmp/pooled");
+  });
+
+  it("falls through to fresh creation when pooled worktree is incomplete and emits detection audit", async () => {
+    vi.mocked(classifyTaskWorktree).mockResolvedValueOnce({ ok: false, classification: "incomplete", reason: "missing or invalid .git metadata" });
+    const createWorktree = vi.fn().mockResolvedValue({ path: "/tmp/new", branch: "fusion/fn-1" });
+    const auditGit = vi.fn().mockResolvedValue(undefined);
+    const remove = vi.fn().mockResolvedValue(undefined);
+
+    const result = await acquireTaskWorktree({
+      task,
+      rootDir: process.cwd(),
+      store,
+      settings: { recycleWorktrees: true } as any,
+      pool: {
+        acquire: () => "/tmp/pooled",
+        prepareForTask: vi.fn().mockResolvedValue({ branch: "fusion/fn-1", worktreePath: "/tmp/pooled", reclaimed: false }),
+        release: vi.fn(),
+      } as any,
+      createWorktree,
+      audit: { git: auditGit } as any,
+      backend: { kind: "native", create: vi.fn(), remove } as any,
+    });
+
+    expect(result.source).toBe("fresh");
+    expect(auditGit).toHaveBeenCalledWith(expect.objectContaining({
+      type: "worktree:incomplete-detected",
+      metadata: expect.objectContaining({ classification: "incomplete", source: "pool-acquire" }),
+    }));
+    expect(store.logEntry).toHaveBeenCalledWith("FN-1", expect.stringContaining("Pool returned incomplete worktree"), undefined, undefined);
+    expect(store.logEntry).not.toHaveBeenCalledWith("FN-1", expect.stringMatching(/Refusing to start coding agent/), expect.anything(), expect.anything());
+  });
+
+  it("emits resume detection audit and clears session file when assigned worktree is unregistered", async () => {
+    vi.mocked(classifyTaskWorktree).mockResolvedValueOnce({ ok: false, classification: "unregistered", reason: "not registered in git worktree list" });
+    const createWorktree = vi.fn().mockResolvedValue({ path: "/tmp/new", branch: "fusion/fn-1" });
+    const auditGit = vi.fn().mockResolvedValue(undefined);
+
+    await acquireTaskWorktree({
+      task: { ...task, worktree: process.cwd(), branch: "fusion/fn-1", sessionFile: "/tmp/session.json" },
+      rootDir: process.cwd(),
+      store,
+      settings: {} as any,
+      createWorktree,
+      audit: { git: auditGit } as any,
+    });
+
+    expect(auditGit).toHaveBeenCalledWith(expect.objectContaining({
+      type: "worktree:incomplete-detected",
+      metadata: expect.objectContaining({ classification: "unregistered", source: "resume" }),
+    }));
+    expect(store.updateTask).toHaveBeenCalledWith("FN-1", { worktree: null, branch: null, sessionFile: null });
   });
 
   it("creates fresh when pool disabled", async () => {

@@ -7,7 +7,11 @@ import { resolveTaskWorktreePathForBackend } from "./worktree-paths.js";
 import { hydrateWorktreeDb } from "./worktree-db-hydrate.js";
 import { formatError } from "./logger.js";
 import { isBranchConflictError } from "./branch-conflicts.js";
-import { type WorktreePool, isUsableTaskWorktree } from "./worktree-pool.js";
+import {
+  type WorktreePool,
+  classifyTaskWorktree,
+  isInsideWorktreesDir,
+} from "./worktree-pool.js";
 import {
   NativeWorktreeBackend,
   WorktrunkOperationError,
@@ -208,13 +212,21 @@ export async function acquireTaskWorktree(opts: AcquireTaskWorktreeOptions): Pro
   }
 
   let isResume = Boolean(task.worktree && existsSync(worktreePath));
-  if (task.worktree && isResume && !await isUsableTaskWorktree(rootDir, worktreePath)) {
-    logger?.log(`${task.id}: assigned worktree is not usable; creating a fresh worktree instead: ${worktreePath}`);
-    await store.logEntry(task.id, "Assigned worktree is not a registered, usable git worktree; creating a fresh worktree instead", worktreePath, runContext);
-    await store.updateTask(task.id, { worktree: null, branch: null });
-    const fallbackName = generateWorktreeName(rootDir, settings);
-    worktreePath = await resolveTaskWorktreePathForBackend(rootDir, fallbackName, settings, backend, branchName);
-    isResume = false;
+  if (task.worktree && isResume) {
+    const resumeClassification = await classifyTaskWorktree(rootDir, worktreePath);
+    if (!resumeClassification.ok) {
+      await audit?.git({
+        type: "worktree:incomplete-detected",
+        target: worktreePath,
+        metadata: { classification: resumeClassification.classification, reason: resumeClassification.reason, source: "resume", taskId: task.id },
+      });
+      logger?.log(`${task.id}: assigned worktree is not usable; creating a fresh worktree instead: ${worktreePath}`);
+      await store.logEntry(task.id, "Assigned worktree is not a registered, usable git worktree; creating a fresh worktree instead", worktreePath, runContext);
+      await store.updateTask(task.id, { worktree: null, branch: null, sessionFile: null });
+      const fallbackName = generateWorktreeName(rootDir, settings);
+      worktreePath = await resolveTaskWorktreePathForBackend(rootDir, fallbackName, settings, backend, branchName);
+      isResume = false;
+    }
   }
 
   const hydrate = async (path: string): Promise<boolean> => {
@@ -259,41 +271,66 @@ export async function acquireTaskWorktree(opts: AcquireTaskWorktreeOptions): Pro
         }
         worktreePath = prepared.worktreePath;
         branch = prepared.branch;
-        acquiredFromPool = true;
-        logger?.log(`Acquired worktree from pool: ${worktreePath}`);
-        await store.updateTask(task.id, { worktree: worktreePath, branch });
-        await audit?.git({ type: "worktree:reuse", target: worktreePath, metadata: { branch, reclaimed: prepared.reclaimed } });
-        if (prepared.reclaimed) {
-          await store.logEntry(task.id, `Acquired reclaimed worktree from pool: ${worktreePath} (${prepared.strandedCommitCount ?? 0} commits preserved)`, undefined, runContext);
-        } else if (branch !== branchName) {
-          logger?.log(`Branch conflict resolved: using ${branch} instead of ${branchName}`);
-          await store.logEntry(task.id, `Acquired worktree from pool: ${worktreePath} (branch conflict: using ${branch})`, undefined, runContext);
+        const pooledClassification = await classifyTaskWorktree(rootDir, worktreePath);
+        if (!pooledClassification.ok) {
+          await audit?.git({
+            type: "worktree:incomplete-detected",
+            target: worktreePath,
+            metadata: {
+              classification: pooledClassification.classification,
+              reason: pooledClassification.reason,
+              source: "pool-acquire",
+              taskId: task.id,
+            },
+          });
+          await store.logEntry(task.id, `Pool returned ${pooledClassification.classification} worktree (${pooledClassification.reason}); creating fresh worktree`, undefined, runContext);
+          if (isInsideWorktreesDir(rootDir, worktreePath, settings)) {
+            try {
+              await backend.remove(worktreePath, { rootDir, force: true, reason: RemovalReason.PoolCleanup, taskId: task.id });
+            } catch (removeErr) {
+              logger?.warn(`${task.id}: failed to remove unusable pooled worktree ${worktreePath}: ${formatError(removeErr)}`);
+            }
+          }
+          const fallbackName = generateWorktreeName(rootDir, settings);
+          worktreePath = await resolveTaskWorktreePathForBackend(rootDir, fallbackName, settings, backend, branchName);
+          branch = branchName;
         } else {
-          await store.logEntry(task.id, `Acquired worktree from pool: ${worktreePath}`, undefined, runContext);
+          acquiredFromPool = true;
+          logger?.log(`Acquired worktree from pool: ${worktreePath}`);
+          await store.updateTask(task.id, { worktree: worktreePath, branch });
+          await audit?.git({ type: "worktree:reuse", target: worktreePath, metadata: { branch, reclaimed: prepared.reclaimed } });
+          if (prepared.reclaimed) {
+            await store.logEntry(task.id, `Acquired reclaimed worktree from pool: ${worktreePath} (${prepared.strandedCommitCount ?? 0} commits preserved)`, undefined, runContext);
+          } else if (branch !== branchName) {
+            logger?.log(`Branch conflict resolved: using ${branch} instead of ${branchName}`);
+            await store.logEntry(task.id, `Acquired worktree from pool: ${worktreePath} (branch conflict: using ${branch})`, undefined, runContext);
+          } else {
+            await store.logEntry(task.id, `Acquired worktree from pool: ${worktreePath}`, undefined, runContext);
+          }
+          await maybeWarnForeignTaskStartPoint({
+            baseBranch,
+            rootDir,
+            worktreePath,
+            taskId: task.id,
+            logger,
+            store,
+            runContext,
+          });
+          const hydrated = await hydrate(worktreePath);
+          return {
+            worktreePath,
+            branch,
+            source: "pool",
+            hydrated,
+            isResume: false,
+            reclaimed: prepared.reclaimed
+              ? {
+                  existingTipSha: prepared.existingTipSha,
+                  strandedCommitCount: prepared.strandedCommitCount,
+                }
+              : undefined,
+          };
         }
-        await maybeWarnForeignTaskStartPoint({
-          baseBranch,
-          rootDir,
-          worktreePath,
-          taskId: task.id,
-          logger,
-          store,
-          runContext,
-        });
-        const hydrated = await hydrate(worktreePath);
-        return {
-          worktreePath,
-          branch,
-          source: "pool",
-          hydrated,
-          isResume: false,
-          reclaimed: prepared.reclaimed
-            ? {
-                existingTipSha: prepared.existingTipSha,
-                strandedCommitCount: prepared.strandedCommitCount,
-              }
-            : undefined,
-        };
       } catch (poolErr) {
         pool.release(pooled);
         if (isBranchConflictError(poolErr)) throw poolErr;
