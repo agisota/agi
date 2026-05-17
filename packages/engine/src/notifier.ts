@@ -313,6 +313,7 @@ export class NtfyNotifier {
   private readonly projectId?: string;
   private abortController: AbortController | null = null;
   private lastGridlockNotificationAt: number | null = null;
+  private lastBoardStallNotificationAt: number | null = null;
 
   constructor(
     private store: NtfyNotifierStore,
@@ -414,6 +415,28 @@ export class NtfyNotifier {
 
   private isEventEnabled(event: AnyNotificationEvent): boolean {
     return isNtfyEventEnabled(this.config.events, event);
+  }
+
+  async notifyBoardStallUnrecovered(input: { holderIds: string[]; followerCount: number; projectId?: string }): Promise<void> {
+    if (!this.config.enabled || !this.config.topic || !this.isEventEnabled("board-stall-unrecovered")) return;
+    const now = Date.now();
+    if (this.lastBoardStallNotificationAt !== null && now - this.lastBoardStallNotificationAt < GRIDLOCK_NOTIFICATION_COOLDOWN_MS) {
+      return;
+    }
+    const clickUrl = buildNtfyClickUrl({
+      dashboardHost: this.config.dashboardHost,
+      projectId: input.projectId ?? this.projectId,
+    });
+    this.lastBoardStallNotificationAt = now;
+    await sendNtfyNotification({
+      ntfyBaseUrl: this.ntfyBaseUrl,
+      topic: this.config.topic,
+      title: "Board stall unrecovered",
+      message: `Auto-recovery could not clear board stall. Holders: ${input.holderIds.join(", ") || "none"}. Followers blocked: ${input.followerCount}.`,
+      priority: "high",
+      clickUrl,
+      signal: this.abortController?.signal,
+    });
   }
 
   getConfig(): NtfyConfig {

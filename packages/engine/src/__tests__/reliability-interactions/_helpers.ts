@@ -28,6 +28,9 @@ export type ReliabilityFixture = {
     recoverMisclassifiedFailures: () => Promise<number>;
     clearStaleBlockedBy: () => Promise<number>;
     autoReboundPausedScopeDecay: (opts?: { ignoreAgeGate?: boolean }) => Promise<number>;
+    autoArchiveResolvedMetaTasks: () => Promise<number>;
+    autoArchiveStalledMetaTasks: () => Promise<number>;
+    runBoardStallAutoRecoverySweep: () => Promise<{ holders: string[]; recovered: number; unrecovered: boolean }>;
     reconcileDoneTaskIntegrity: () => Promise<number>;
   };
 };
@@ -105,6 +108,9 @@ export async function makeReliabilityFixture(input: {
       recoverMisclassifiedFailures: async () => manager.recoverMisclassifiedFailures(),
       clearStaleBlockedBy: async () => manager.clearStaleBlockedBy(),
       autoReboundPausedScopeDecay: async (opts) => manager.autoReboundPausedScopeDecay(opts),
+      autoArchiveResolvedMetaTasks: async () => manager.autoArchiveResolvedMetaTasks(),
+      autoArchiveStalledMetaTasks: async () => manager.autoArchiveStalledMetaTasks(),
+      runBoardStallAutoRecoverySweep: async () => manager.runBoardStallAutoRecoverySweep(),
       reconcileDoneTaskIntegrity: async () => manager.reconcileDoneTaskIntegrity(),
     },
   };

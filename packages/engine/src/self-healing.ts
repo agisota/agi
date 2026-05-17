@@ -24,7 +24,7 @@
 
 import { exec, execSync } from "node:child_process";
 import { promisify } from "node:util";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { IN_REVIEW_STALL_DEADLOCK_LOG_PREFIX, IN_REVIEW_STALL_LOG_PREFIX, countRecentIdenticalStallEntries, detectSelfDefeatingDependency, getInReviewStallReason, getStalePausedReviewSignal, getTaskHardMergeBlocker, getTaskMergeBlocker, isEphemeralAgent, type AgentStore, type ChatStore, type MessageStore, type TaskStore, type Settings, type Task, type MergeDetails, type TaskPriority } from "@fusion/core";
 import type { MeshLeaseManager } from "./mesh-lease-manager.js";
@@ -479,6 +479,14 @@ export class SelfHealingManager {
   private mergeStarvationDrops: Map<string, number> = new Map();
   private orphanArchivedAcknowledged = new Set<string>();
   private finalizeUnprovenWarned = new Set<string>();
+  private maintenanceTickCounter = 0;
+  private boardStallWindow: {
+    windowStartMs: number;
+    windowStartBlockedDepth: number;
+    transitionsOutOfInProgressInWindow: number;
+    pendingVerification: { holderIds: string[]; followerCount: number; startedAt: number; tick: number } | null;
+    lastNtfyAt: number | null;
+  } | null = null;
 
   private static readonly PAUSED_SCOPE_DECAY_EXCLUDED_REASONS = new Set([
     "branch-conflict-unrecoverable",
@@ -501,6 +509,14 @@ export class SelfHealingManager {
     this.store.on("settings:updated", this.settingsListener);
 
     this.taskMovedFanoutListener = ({ task, from, to }) => {
+      if (
+        from === "in-progress"
+        && (to === "todo" || to === "in-review" || to === "done" || to === "archived")
+        && this.boardStallWindow
+      ) {
+        // In-memory only counter; resets on engine restart.
+        this.boardStallWindow.transitionsOutOfInProgressInWindow++;
+      }
       const shouldReconcile =
         (from === "in-review" && to === "done") ||
         (from === "done" && to === "archived");
@@ -1047,6 +1063,7 @@ export class SelfHealingManager {
 
     this.maintenanceRunning = true;
     const startMs = Date.now();
+    this.maintenanceTickCounter++;
     log.log("Maintenance cycle starting");
 
     try {
@@ -1142,6 +1159,9 @@ export class SelfHealingManager {
           { name: "recover-drifted-agent-task-links", fn: () => this.recoverDriftedAgentTaskLinks() },
           { name: "clear-stale-blocked-by", fn: () => this.clearStaleBlockedBy() },
           { name: "auto-rebound-paused-scope-decay", fn: () => this.autoReboundPausedScopeDecay() },
+          { name: "auto-archive-meta-resolved", fn: () => this.autoArchiveResolvedMetaTasks() },
+          { name: "auto-archive-meta-stalled", fn: () => this.autoArchiveStalledMetaTasks() },
+          { name: "board-stall-auto-recovery", fn: () => this.runBoardStallAutoRecoverySweep() },
           { name: "reconcile-self-defeating-deps", fn: () => this.reconcileSelfDefeatingDependencies() },
           { name: "reclaim-pr-conflicts", fn: () => this.reclaimPrConflicts() },
           { name: "reclaim-self-owned-branch-conflicts", fn: () => this.reclaimSelfOwnedBranchConflicts() },
@@ -2411,7 +2431,7 @@ export class SelfHealingManager {
   async reconcileTaskWorktreeMetadata(options?: { includeTaskIds?: Set<string> }): Promise<number> {
     try {
       const settings = await this.store.getSettings();
-      if (settings.globalPause || settings.enginePaused) return 0;
+      if (settings.globalPause || settings.enginePaused) return { count: 0, reboundedIds: [] };
 
       const allTasks = await this.store.listTasks({ slim: true, includeArchived: false });
       const branchMap = await getRegisteredWorktreeBranchMap(this.options.rootDir);
@@ -2475,6 +2495,127 @@ export class SelfHealingManager {
       worktreeMetadataReconcileLog.error(`reconcileTaskWorktreeMetadata failed: ${errorMessage}`);
       return 0;
     }
+  }
+
+  async autoReboundPausedScopeDecay(options?: { ignoreAgeGate?: boolean }): Promise<number> {
+    const result = await this.autoReboundPausedScopeDecayDetailed(options);
+    return result.count;
+  }
+
+  async autoArchiveResolvedMetaTasks(reboundedTargets?: Set<string>): Promise<number> {
+    const tasks = await this.store.listTasks({ slim: true, includeArchived: false });
+    const byId = new Map(tasks.map((task) => [task.id.toUpperCase(), task]));
+    let archived = 0;
+    for (const task of tasks) {
+      const classified = this.classifyMetaTask(task);
+      if (!classified.isMeta || !classified.targetTaskId) continue;
+      const chainDepth = this.computeMetaChainDepth(byId, classified.targetTaskId);
+      const target = byId.get(classified.targetTaskId.toUpperCase());
+      const resolved = Boolean(target && (target.column === "done" || target.column === "archived"));
+      const rebounded = Boolean(reboundedTargets?.has(classified.targetTaskId));
+      if (!resolved && !rebounded && chainDepth < 2) continue;
+      try {
+        await this.archiveMetaTask(task.id);
+        await this.store.logEntry(task.id, `Auto-archived meta-task (FN-4890): target ${classified.targetTaskId} resolved/superseded.`);
+        const auditor = createRunAuditor(this.store, { runId: generateSyntheticRunId("fn4890-meta", task.id), agentId: "self-healing", taskId: task.id, phase: "auto-archive-meta-resolved" });
+        await auditor.database({ type: "task:auto-archived-meta-resolved", target: task.id, metadata: { taskId: task.id, targetTaskId: classified.targetTaskId, targetColumn: target?.column ?? "unknown", chainDepth } });
+        archived++;
+      } catch (err: unknown) {
+        log.error(`autoArchiveResolvedMetaTasks failed for ${task.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    return archived;
+  }
+
+  async autoArchiveStalledMetaTasks(): Promise<number> {
+    const settings = await this.store.getSettings();
+    const thresholdMs = Number(settings.metaTaskStallAutoCloseMs ?? 2 * 60 * 60_000);
+    if (thresholdMs === 0) return 0;
+    const tasks = await this.store.listTasks({ slim: true, includeArchived: false });
+    const byId = new Map(tasks.map((task) => [task.id.toUpperCase(), task]));
+    let archived = 0;
+    const now = Date.now();
+    for (const task of tasks) {
+      const classified = this.classifyMetaTask(task);
+      if (!classified.isMeta || !classified.targetTaskId) continue;
+      const chainDepth = this.computeMetaChainDepth(byId, classified.targetTaskId);
+      const ageMs = now - Date.parse(task.columnMovedAt ?? task.updatedAt);
+      if (chainDepth < 2 && (!Number.isFinite(ageMs) || ageMs < thresholdMs)) continue;
+      const target = byId.get(classified.targetTaskId.toUpperCase());
+      const targetMovedAtMs = Date.parse(target?.columnMovedAt ?? target?.updatedAt ?? "");
+      const targetStalled = !Number.isFinite(targetMovedAtMs) || (now - targetMovedAtMs >= thresholdMs);
+      if (chainDepth < 2 && !targetStalled) continue;
+      try {
+        await this.archiveMetaTask(task.id);
+        await this.store.logEntry(task.id, `Auto-archived meta-task (FN-4890): superseded — not spawning further meta; rely on self-heal on target ${classified.targetTaskId}`);
+        const auditor = createRunAuditor(this.store, { runId: generateSyntheticRunId("fn4890-meta", task.id), agentId: "self-healing", taskId: task.id, phase: "auto-archive-meta-stalled" });
+        await auditor.database({ type: "task:auto-archived-meta-stalled", target: task.id, metadata: { taskId: task.id, targetTaskId: classified.targetTaskId, chainDepth, stalledMs: Math.max(ageMs, 0) } });
+        archived++;
+      } catch (err: unknown) {
+        log.error(`autoArchiveStalledMetaTasks failed for ${task.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    return archived;
+  }
+
+  async runBoardStallAutoRecoverySweep(): Promise<{ holders: string[]; recovered: number; unrecovered: boolean }> {
+    const settings = await this.store.getSettings();
+    const windowMs = Number(settings.boardStallSweepWindowMs ?? 2 * 60 * 60_000);
+    const growthThreshold = Number(settings.boardStallBlockedGrowthThreshold ?? 3);
+    const now = Date.now();
+    const allTasks = await this.store.listTasks({ slim: true, includeArchived: false });
+    const blockedDepth = this.countBlockedDepth(allTasks);
+
+    if (!this.boardStallWindow || now - this.boardStallWindow.windowStartMs >= windowMs) {
+      this.boardStallWindow = {
+        windowStartMs: now,
+        windowStartBlockedDepth: blockedDepth,
+        transitionsOutOfInProgressInWindow: 0,
+        pendingVerification: null,
+        lastNtfyAt: this.boardStallWindow?.lastNtfyAt ?? null,
+      };
+    }
+
+    const window = this.boardStallWindow;
+    if (window.pendingVerification && this.maintenanceTickCounter > window.pendingVerification.tick) {
+      const noProgress = window.transitionsOutOfInProgressInWindow === 0;
+      if (noProgress) {
+        const ntfyAllowed = window.lastNtfyAt === null || now - window.lastNtfyAt >= 15 * 60_000;
+        let ntfyDispatched = false;
+        if (ntfyAllowed) {
+          try {
+            await getActiveNotificationService()?.dispatch("board-stall-unrecovered", {
+              event: "board-stall-unrecovered",
+              metadata: {
+                holderIds: window.pendingVerification.holderIds,
+                followerCount: window.pendingVerification.followerCount,
+              },
+            } as any);
+            window.lastNtfyAt = now;
+            ntfyDispatched = true;
+          } catch {
+            ntfyDispatched = false;
+          }
+        }
+        const auditor = createRunAuditor(this.store, { runId: generateSyntheticRunId("fn4890-board-stall", "global"), agentId: "self-healing", phase: "board-stall-unrecovered" });
+        await auditor.database({ type: "task:auto-board-stall-unrecovered", target: "board", metadata: { holderIds: window.pendingVerification.holderIds, followerCount: window.pendingVerification.followerCount, windowMs, ntfyDispatched } });
+        window.pendingVerification = null;
+        return { holders: [], recovered: 0, unrecovered: true };
+      }
+      window.pendingVerification = null;
+    }
+
+    const blockedGrowth = blockedDepth - window.windowStartBlockedDepth;
+    if (window.transitionsOutOfInProgressInWindow === 0 && blockedGrowth >= growthThreshold) {
+      const rebound = await this.autoReboundPausedScopeDecayDetailed({ ignoreAgeGate: true });
+      const followerCount = blockedDepth;
+      const auditor = createRunAuditor(this.store, { runId: generateSyntheticRunId("fn4890-board-stall", "global"), agentId: "self-healing", phase: "board-stall-broken" });
+      await auditor.database({ type: "task:auto-board-stall-broken", target: "board", metadata: { holderIds: rebound.reboundedIds, followerCount, windowMs, blockedGrowth } });
+      window.pendingVerification = { holderIds: rebound.reboundedIds, followerCount, startedAt: now, tick: this.maintenanceTickCounter };
+      return { holders: rebound.reboundedIds, recovered: rebound.count, unrecovered: false };
+    }
+
+    return { holders: [], recovered: 0, unrecovered: false };
   }
 
   async clearStaleBlockedBy(): Promise<number> {
