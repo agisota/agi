@@ -1908,7 +1908,7 @@ describe("SelfHealingManager", () => {
       );
       expect(store.logEntry).toHaveBeenCalledWith(
         "FN-3900",
-        expect.stringContaining("Refusing to start coding agent in missing worktree"),
+        expect.stringContaining("session-start unusable-worktree assertion"),
       );
       expect(store.moveTask).toHaveBeenCalledWith("FN-3900", "todo", { preserveProgress: true });
 
@@ -1952,7 +1952,7 @@ describe("SelfHealingManager", () => {
       );
       expect(store.logEntry).toHaveBeenCalledWith(
         "FN-4559",
-        expect.stringContaining("incomplete worktree"),
+        expect.stringContaining("session-start unusable-worktree assertion"),
       );
       expect(store.moveTask).toHaveBeenCalledWith("FN-4559", "todo", { preserveProgress: true });
 
@@ -1984,7 +1984,7 @@ describe("SelfHealingManager", () => {
       expect(result).toBe(1);
       expect(store.logEntry).toHaveBeenCalledWith(
         "FN-4560",
-        expect.stringContaining("unregistered git worktree"),
+        expect.stringContaining("session-start unusable-worktree assertion"),
       );
       expect(store.moveTask).toHaveBeenCalledWith("FN-4560", "todo", { preserveProgress: true });
 

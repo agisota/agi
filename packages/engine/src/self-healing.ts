@@ -329,11 +329,14 @@ export async function autoRecoverWorktreeSessionStartFailure(
     sessionFile: null,
   });
 
-  const failureExcerpt = typeof task.error === "string"
+  const rawFailureExcerpt = typeof task.error === "string"
     ? task.error.slice(0, 200)
     : opts.failure instanceof Error
       ? opts.failure.message.slice(0, 200)
       : String(opts.failure).slice(0, 200);
+  const failureExcerpt = isMissingWorktreeSessionStartFailure(rawFailureExcerpt)
+    ? "session-start unusable-worktree assertion"
+    : rawFailureExcerpt;
   await store.logEntry(
     task.id,
     noProgress
