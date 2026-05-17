@@ -30,7 +30,7 @@ const PASSING_STATES = new Set<PrCheckState>(["success", "neutral", "skipped"]);
 const FAILING_STATES = new Set<PrCheckState>(["failure", "error", "cancelled", "timed_out", "action_required", "startup_failure"]);
 const PENDING_STATES = new Set<PrCheckState>(["pending", "stale"]);
 
-function getCheckStateTone(state: PrCheckState): "success" | "error" | "warning" | "muted" {
+function getCheckStateTone(state: PrCheckState | string): "success" | "error" | "warning" | "muted" {
   if (PASSING_STATES.has(state)) return "success";
   if (FAILING_STATES.has(state)) return "error";
   if (PENDING_STATES.has(state)) return "warning";
@@ -182,7 +182,7 @@ export function PrPanel({
               <details className="pr-panel-checks-details">
                 <summary>Recent checks</summary>
                 <ul className="pr-panel-check-list">
-                  {(checks ?? []).map((check: PrCheckStatus) => (
+                  {(checks ?? []).map((check: PrCheckStatus | { name: string; required: boolean; state: string }) => (
                     <li key={`${check.name}-${check.state}`} className="pr-panel-check-item">
                       <span className={`status-dot pr-panel-check-dot status-dot--${getCheckStateTone(check.state) === "success" ? "online" : getCheckStateTone(check.state) === "error" ? "error" : "pending"}`} />
                       <span className="pr-panel-check-name">{check.name}</span>
