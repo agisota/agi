@@ -7973,16 +7973,24 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
     }
   }
 
-  private async emitStaleLockAudit(taskId: string, event: string, targetPath: string, metadata: Record<string, unknown>): Promise<void> {
+  private async emitStaleLockAudit(
+    taskId: string,
+    event:
+      | "worktree:stale-lock-detected"
+      | "worktree:stale-lock-recovered"
+      | "worktree:stale-lock-recovery-failed"
+      | "worktree:stale-lock-refused",
+    targetPath: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
     if (!this.currentRunContext?.runId || !this.currentRunContext.agentId) return;
     const auditor = createRunAuditor(this.store, {
       runId: this.currentRunContext.runId,
       agentId: this.currentRunContext.agentId,
       taskId,
-      phase: this.currentRunContext.phase,
-      source: this.currentRunContext.source,
+      phase: "execute",
     });
-    await auditor.git({ type: event as any, target: targetPath, metadata });
+    await auditor.git({ type: event, target: targetPath, metadata });
   }
 
   private async recoverIndexLockIfStale(taskId: string, path: string, conflictInfo: { lockPath?: string; message?: string }): Promise<boolean> {

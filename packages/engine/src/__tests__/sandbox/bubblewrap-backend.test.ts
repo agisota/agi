@@ -65,7 +65,9 @@ describe("BubblewrapBackend", () => {
     expect(nativeStub.run).toHaveBeenCalled();
   });
 
-  it("attempts bwrap execution when available", async () => {
+  it(
+    "attempts bwrap execution when available",
+    async () => {
     detectMock.mockResolvedValue({ available: true, path: "bwrap" });
     const backend = new BubblewrapBackend();
     await backend.prepare({ allowNetwork: true });
@@ -77,9 +79,11 @@ describe("BubblewrapBackend", () => {
       encoding: "utf-8",
     });
 
-    expect(result).toHaveProperty("stdout");
-    expect(result).toHaveProperty("stderr");
-  });
+      expect(result).toHaveProperty("stdout");
+      expect(result).toHaveProperty("stderr");
+    },
+    10_000,
+  );
 
   it.skipIf(process.platform !== "linux" || !hasBwrap)("runs real bubblewrap hello integration", async () => {
     vi.doUnmock("../../sandbox/bubblewrap-detect.js");

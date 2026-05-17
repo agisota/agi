@@ -1473,6 +1473,13 @@ The GitHub tracking state listener now attaches to every registered project stor
 - Self-healing is worktrunk-aware for failure recovery: tasks paused with `pausedReason: "worktrunk_operation_failed"` are explicitly skipped in reclaim sweeps (`self-healing.ts`) until operator intervention.
 - Failure contract: delegated worktrunk errors preserve stderr context (`WorktrunkOperationError`) and are handled by `worktrunk.onFailure` — `"fail"` pauses the task, while `"fallback-native"` retries on the native backend and emits one-shot fallback telemetry.
 
+#### Stale `index.lock` recovery on worktree create
+- Native worktree create paths now classify `git worktree add` failures containing `.../index.lock: File exists` before falling back to generic branch-conflict handling.
+- Classifier gates are deterministic: the lock must exist, be older than the stale threshold (default 30s), not be owned by a live `activeSessionRegistry` session, and resolve to a normalized lock/worktree path.
+- If classified `stale`, Fusion removes the lock and retries create exactly once.
+- If staleness cannot be proven, lock removal is refused and the flow raises `StaleWorktreeIndexLockError` so task failure messaging can escalate with manual remediation guidance.
+- Run-audit events emitted by the create path: `worktree:stale-lock-detected`, `worktree:stale-lock-recovered`, `worktree:stale-lock-recovery-failed`, `worktree:stale-lock-refused`.
+
 #### Branch-conflict inspection and auto-reclaim
 - `inspectBranchConflict` classifies branch collisions as `stale`, `stale-resolved`, `reclaimable`, or `live-foreign`.
 - Dispatch preflight (`acquireTaskWorktree`/executor) now auto-reclaims `reclaimable` self-owned conflicts and emits `branch:auto-reclaim` run-audit events with task/branch/worktree/tip/stranded-commit metadata.
