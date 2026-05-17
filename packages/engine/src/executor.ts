@@ -44,7 +44,7 @@ import type { SandboxBackend } from "./sandbox/types.js";
 import { ModelRegistry, SessionManager, type ToolDefinition, type AgentSession } from "@mariozechner/pi-coding-agent";
 import { PRIORITY_EXECUTE, type AgentSemaphore } from "./concurrency.js";
 import { RemovalReason, getRegisteredWorktreePaths, isGitRepository, isInsideWorktreesDir, isRegisteredGitWorktree, isUsableTaskWorktree, removeWorktree, type WorktreePool } from "./worktree-pool.js";
-import { activeSessionRegistry } from "./active-session-registry.js";
+import { activeSessionRegistry, executingTaskLock } from "./active-session-registry.js";
 import {
   StaleWorktreeIndexLockError,
   classifyStaleLock,
@@ -2573,17 +2573,21 @@ export class TaskExecutor {
    * as-is. Branches remain task-scoped (`fusion/{task-id}`).
    */
   async execute(task: Task): Promise<void> {
-    executorLog.log(`execute() called for ${task.id} (already executing=${this.executing.has(task.id)})`);
-    if (this.executing.has(task.id)) return;
+    // FN-4811 follow-up (FN-4809/FN-4814/FN-4811 production failure): claim a
+    // PROCESS-WIDE lock synchronously before any other work. Per-instance
+    // `this.executing` was insufficient in production because two execute()
+    // invocations for the same task ID still both reached "Executor detected
+    // stale merge state" (executor.ts:2661) and both generated runIds — the only
+    // viable explanation is multiple TaskExecutor instances in the same process
+    // (engine restart race, multi-project hybrid runtime, etc.). The only
+    // fully-reliable guard is a singleton lock shared across all instances.
+    const claimed = executingTaskLock.tryClaim(task.id);
+    executorLog.log(`execute() called for ${task.id} (claimed=${claimed}, perInstanceExecuting=${this.executing.has(task.id)})`);
+    if (!claimed) return;
 
-    // FN-4811 follow-up (FN-4814/FN-4811 production failure): claim the executing slot
-    // SYNCHRONOUSLY before any await. Without this, two concurrent execute() calls
-    // (e.g., scheduler dispatch + restart-recovery + task:moved event) both pass the
-    // `has()` check, both await `shouldDeferForHeartbeat`, both proceed past it, and
-    // both end up creating the same worktree path — producing two parallel runs for
-    // the same task with duplicate "Worktree created at /..." log entries within the
-    // same second. This is the canonical source of FN-4781/FN-4804/FN-4814/FN-4811
-    // mid-task worktree disappearance and cross-task contamination.
+    // Maintain the per-instance Set too, for back-compat with all the existing
+    // `this.executing.has()` checks throughout the file (handler gates,
+    // stuck-detector, resumeTaskForAgent, etc.).
     this.executing.add(task.id);
 
     const assignedAgentId = task.assignedAgentId;
@@ -2591,6 +2595,7 @@ export class TaskExecutor {
       executorLog.log(`${task.id}: skipping execute — agent ${assignedAgentId} has active heartbeat run (allowParallelExecution=false)`);
       // Release the slot we just claimed — we never actually ran.
       this.executing.delete(task.id);
+      executingTaskLock.release(task.id);
       return;
     }
 
@@ -3306,6 +3311,7 @@ export class TaskExecutor {
           }
         } finally {
           this.executing.delete(task.id);
+          executingTaskLock.release(task.id);
           this.loopRecoveryState.delete(task.id);
           // Wrap cleanup in try/catch so activeStepExecutors.delete() always runs.
           // If cleanup() throws, the executor continues to clean up the in-memory map
@@ -4652,6 +4658,7 @@ export class TaskExecutor {
       }
 
       this.executing.delete(task.id);
+      executingTaskLock.release(task.id);
       // Clear run context at end of execute() lifecycle
       this.currentRunContext = undefined;
 
@@ -8990,6 +8997,7 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
             `${taskId} force-requeue skipped — task is now in '${latestColumn}' (recovered concurrently)`,
           );
           this.executing.delete(taskId);
+          executingTaskLock.release(taskId);
           this.stuckAborted.delete(taskId);
           return;
         }
@@ -9010,6 +9018,7 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
           // The old Promise is still running but the executing guard is cleared so
           // a fresh execute() call won't be blocked.
           this.executing.delete(taskId);
+          executingTaskLock.release(taskId);
           this.stuckAborted.delete(taskId);
           executorLog.log(`${taskId} force-requeued to todo`);
         } catch (err: unknown) {

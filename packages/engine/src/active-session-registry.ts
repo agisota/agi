@@ -51,3 +51,41 @@ class ActiveSessionRegistry {
 }
 
 export const activeSessionRegistry = new ActiveSessionRegistry();
+
+/**
+ * FN-4811 follow-up: process-wide "executing" lock for `TaskExecutor.execute()`.
+ *
+ * Per-instance `executing: Set<string>` is insufficient when there can be more than
+ * one TaskExecutor instance in the same Node process (e.g., multi-project setups,
+ * engine restarts that race with old instance teardown, hybrid-executor path).
+ * Production failure shape: two execute() invocations for the same task ID both
+ * generated runIds (y2nb + 9gde for FN-4809), both reached "Executor detected stale
+ * merge state" (executor.ts:2661), both attempted worktree creation — producing
+ * duplicate "Worktree created at /..." log entries within the same second
+ * (FN-4809, FN-4814, FN-4781, FN-4804, FN-4811).
+ *
+ * This module-level Set is shared across all TaskExecutor instances in the process,
+ * providing a process-wide claim. Values are taskId strings; presence means
+ * "someone is actively executing this task". Callers MUST claim synchronously
+ * via `tryClaim()` and MUST release on every exit path.
+ */
+const executingTasks = new Set<string>();
+
+export const executingTaskLock = {
+  has(taskId: string): boolean {
+    return executingTasks.has(taskId);
+  },
+  /** Synchronously claim the lock. Returns true if claimed, false if already held. */
+  tryClaim(taskId: string): boolean {
+    if (executingTasks.has(taskId)) return false;
+    executingTasks.add(taskId);
+    return true;
+  },
+  release(taskId: string): void {
+    executingTasks.delete(taskId);
+  },
+  /** Test-only: clear all entries. */
+  _clearForTest(): void {
+    executingTasks.clear();
+  },
+};

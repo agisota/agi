@@ -248,6 +248,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { hydrateWorktreeDb } from "../worktree-db-hydrate.js";
 import { isUsableTaskWorktree } from "../worktree-pool.js";
 import { classifyStaleLock, tryRemoveStaleLock } from "../worktree-stale-lock.js";
+import { executingTaskLock } from "../active-session-registry.js";
 
 export const mockedCreateFnAgent = vi.mocked(createFnAgent);
 export const mockedSessionManager = vi.mocked(SessionManager);
@@ -343,4 +344,9 @@ export function resetExecutorMocks() {
   mockExecuteAll.mockResolvedValue([]);
   mockTerminateAllSessions.mockResolvedValue(undefined);
   mockCleanup.mockResolvedValue(undefined);
+  // FN-4811 follow-up: the executingTaskLock is process-wide module state, so it must
+  // be cleared between tests or earlier tests' claims will block later tests' execute()
+  // calls ("expected at least 2 createFnAgent calls but got 0" / "expected not called
+  // but called 3 times" symptoms in executor-pause / executor-prompt tests).
+  executingTaskLock._clearForTest();
 }
