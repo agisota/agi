@@ -86,6 +86,25 @@ describe("NativeWorktreeBackend", () => {
     expect(installGuardMock).toHaveBeenCalledWith({ worktreePath: "/repo/.worktrees/fn-1", taskId: "FN-1" });
   });
 
+  it("propagates installer failure after cleanup", async () => {
+    execMock.mockResolvedValue({ stdout: "", stderr: "" });
+    installGuardMock.mockRejectedValueOnce(new Error("guard failed"));
+
+    await expect(
+      new NativeWorktreeBackend().create({
+        rootDir: "/repo",
+        worktreePath: "/repo/.worktrees/fn-1",
+        branch: "fusion/fn-1",
+        taskId: "FN-1",
+      }),
+    ).rejects.toThrow("guard failed");
+
+    expect(execMock).toHaveBeenCalledWith(
+      'rm -rf "/repo/.worktrees/fn-1"',
+      expect.objectContaining({ cwd: "/repo", timeout: 60000, maxBuffer: 10485760 }),
+    );
+  });
+
   it("retries with suffix and resolves", async () => {
     execMock.mockRejectedValueOnce(new Error("exists")).mockResolvedValueOnce({ stdout: "", stderr: "" });
 

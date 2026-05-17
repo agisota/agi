@@ -9,6 +9,7 @@ import {
 import { AgentLogger } from "../agent-logger.js";
 import * as worktreeBackendModule from "../worktree-backend.js";
 import type { TaskDetail, Settings, TaskStore } from "@fusion/core";
+import { installTaskWorktreeIdentityGuard } from "../worktree-hooks.js";
 
 vi.mock("../worktree-hooks.js", () => ({
   installTaskWorktreeIdentityGuard: vi.fn().mockResolvedValue(undefined),
@@ -692,6 +693,7 @@ import { createLogger } from "../logger.js";
 
 const mockedCreateFnAgent = vi.mocked(createFnAgent);
 const mockedExecSync = vi.mocked(execSync);
+const mockedInstallTaskWorktreeIdentityGuard = vi.mocked(installTaskWorktreeIdentityGuard);
 const mockedGenerateWorktreeName = vi.mocked(generateWorktreeName);
 const mockedCreateLogger = vi.mocked(createLogger);
 
@@ -1171,6 +1173,7 @@ describe("StepSessionExecutor", () => {
         expect.stringContaining("git worktree add"),
         expect.anything(),
       );
+      expect(mockedInstallTaskWorktreeIdentityGuard).toHaveBeenCalled();
     });
 
     it("handles parallel step failure: successful step cherry-picked, failed cleaned up", async () => {

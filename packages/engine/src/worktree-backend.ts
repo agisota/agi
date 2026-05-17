@@ -177,6 +177,19 @@ export class NativeWorktreeBackend implements WorktreeBackend {
 
   async create(input: WorktreeCreateInput): Promise<WorktreeCreateResult> {
     const startArg = input.startPoint ? ` ${quoteShellArg(input.startPoint)}` : "";
+    const installGuardOrCleanup = async (worktreePath: string) => {
+      try {
+        await installTaskWorktreeIdentityGuard({ worktreePath, taskId: input.taskId });
+      } catch (error) {
+        await execAsync(`rm -rf ${quoteShellArg(worktreePath)}`, {
+          cwd: input.rootDir,
+          encoding: "utf-8",
+          timeout: REMOVE_TIMEOUT_MS,
+          maxBuffer: MAX_BUFFER,
+        }).catch(() => undefined);
+        throw error;
+      }
+    };
     const createWithBranch = async (branchName: string): Promise<WorktreeCreateResult> => {
       await execAsync(
         `git worktree add -b ${quoteShellArg(branchName)} ${quoteShellArg(input.worktreePath)}${startArg}`,
@@ -193,7 +206,7 @@ export class NativeWorktreeBackend implements WorktreeBackend {
     let staleLockRecoveryAttempted = false;
     try {
       const created = await createWithBranch(input.branch);
-      await installTaskWorktreeIdentityGuard({ worktreePath: created.path, taskId: input.taskId });
+      await installGuardOrCleanup(created.path);
       return created;
     } catch (error) {
       const lockPath = parseIndexLockPath(`${(error as { message?: string })?.message ?? ""}\n${getErrorStderr(error) ?? ""}`);
@@ -225,7 +238,7 @@ export class NativeWorktreeBackend implements WorktreeBackend {
                 metadata: { lockPath },
               });
               const created = await createWithBranch(input.branch);
-              await installTaskWorktreeIdentityGuard({ worktreePath: created.path, taskId: input.taskId });
+              await installGuardOrCleanup(created.path);
               return created;
             }
             await this.deps.audit?.git({
@@ -269,7 +282,7 @@ export class NativeWorktreeBackend implements WorktreeBackend {
         const candidateBranch = `${input.branch}-${suffix}`;
         try {
           const created = await createWithBranch(candidateBranch);
-          await installTaskWorktreeIdentityGuard({ worktreePath: created.path, taskId: input.taskId });
+          await installGuardOrCleanup(created.path);
           return created;
         } catch {
           // continue probing suffixes
@@ -453,7 +466,17 @@ export class WorktrunkWorktreeBackend implements WorktreeBackend {
       );
     }
 
-    await installTaskWorktreeIdentityGuard({ worktreePath: resolvedPath, taskId: input.taskId });
+    try {
+      await installTaskWorktreeIdentityGuard({ worktreePath: resolvedPath, taskId: input.taskId });
+    } catch (error) {
+      await execAsync(`rm -rf ${quoteShellArg(resolvedPath)}`, {
+        cwd: input.rootDir,
+        encoding: "utf-8",
+        timeout: REMOVE_TIMEOUT_MS,
+        maxBuffer: MAX_BUFFER,
+      }).catch(() => undefined);
+      throw error;
+    }
     return { path: resolvedPath, branch: input.branch };
   }
 

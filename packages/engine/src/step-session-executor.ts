@@ -1346,10 +1346,19 @@ Follow instructions precisely and avoid unrelated changes.`,
       throw err;
     }
 
-    await installTaskWorktreeIdentityGuard({
-      worktreePath,
-      taskId: this.options.taskDetail.id,
-    });
+    try {
+      await installTaskWorktreeIdentityGuard({
+        worktreePath,
+        taskId: this.options.taskDetail.id,
+      });
+    } catch (err) {
+      try {
+        await execAsync(`rm -rf "${worktreePath}"`, { cwd: rootDir, env: this.options.taskEnv });
+      } catch {
+        stepExecLog.log(`Warning: failed to remove worktree after identity-guard install failure: ${worktreePath}`);
+      }
+      throw err;
+    }
 
     this.registerParallelWorktree(stepIndex, worktreePath);
     this.parallelBranches.set(stepIndex, branchName);

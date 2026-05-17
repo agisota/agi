@@ -8411,7 +8411,7 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
         }
       } else {
         executorLog.log(`Worktree already exists: ${path}`);
-        await installTaskWorktreeIdentityGuard({ worktreePath: path, taskId });
+        await installGuardOrCleanup();
         return { path, branch };
       }
     }
@@ -8451,6 +8451,19 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
       }
     };
 
+    const installGuardOrCleanup = async () => {
+      try {
+        await installTaskWorktreeIdentityGuard({ worktreePath: path, taskId });
+      } catch (error) {
+        try {
+          await execAsync(`rm -rf "${path}"`, { cwd: this.rootDir });
+        } catch {
+          executorLog.log(`Warning: failed to remove worktree after identity-guard install failure: ${path}`);
+        }
+        throw error;
+      }
+    };
+
     let staleLockRecoveryAttempted = false;
     try {
       await createWithBranch(branch);
@@ -8458,7 +8471,7 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
       if (attemptNumber > 0) {
         await this.store.logEntry(taskId, `Worktree created on attempt ${attemptNumber + 1}`, path);
       }
-      await installTaskWorktreeIdentityGuard({ worktreePath: path, taskId });
+      await installGuardOrCleanup();
       return { path, branch };
     } catch (initialError: unknown) {
       const conflictInfo = this.extractWorktreeConflictInfo(initialError);
@@ -8469,7 +8482,7 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
         if (recovered) {
           await createWithBranch(branch);
           executorLog.log(`Worktree created after stale lock recovery: ${path}`);
-          await installTaskWorktreeIdentityGuard({ worktreePath: path, taskId });
+          await installGuardOrCleanup();
           return { path, branch };
         }
       }
@@ -8529,7 +8542,7 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
       try {
         await createFromExistingBranch();
         executorLog.log(`Worktree created from existing branch: ${path}`);
-        await installTaskWorktreeIdentityGuard({ worktreePath: path, taskId });
+        await installGuardOrCleanup();
         return { path, branch };
       } catch (fallbackError: unknown) {
         const fallbackErrorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
@@ -8541,7 +8554,7 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
           if (recovered) {
             await createFromExistingBranch();
             executorLog.log(`Worktree created from existing branch after stale lock recovery: ${path}`);
-            await installTaskWorktreeIdentityGuard({ worktreePath: path, taskId });
+            await installGuardOrCleanup();
             return { path, branch };
           }
         }
