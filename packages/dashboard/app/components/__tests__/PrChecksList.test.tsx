@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { PrChecksList } from "../PrChecksList";
+import { loadAllAppCss } from "../../test/cssFixture";
 
 describe("PrChecksList", () => {
   it("orders failing checks first", () => {
@@ -21,8 +22,44 @@ describe("PrChecksList", () => {
     expect(items[0]).toHaveTextContent("fail");
   });
 
-  it("renders summary and details links", () => {
+  it("FN-5012: no mobile .btn overrides; failing details link uses component classes", () => {
+    const css = loadAllAppCss();
+    const mediaStart = css.indexOf("@media (max-width: 768px)");
+    expect(mediaStart).toBeGreaterThan(-1);
+    const blockStart = css.indexOf("{", mediaStart);
+    let depth = 0;
+    let blockEnd = -1;
+    for (let i = blockStart; i < css.length; i += 1) {
+      if (css[i] === "{") depth += 1;
+      if (css[i] === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          blockEnd = i;
+          break;
+        }
+      }
+    }
+    expect(blockEnd).toBeGreaterThan(blockStart);
+    const mobileBlock = css.slice(blockStart + 1, blockEnd);
+    expect(mobileBlock).not.toMatch(/\.(btn(?:-[a-z]+)?|modal-close)\b/);
+
     render(
+      <PrChecksList
+        checks={[{ name: "fail", required: true, state: "failure", detailsUrl: "https://example.com/details" }]}
+        rollup="failure"
+        loading={false}
+        onRefresh={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("0 passing, 1 failing, 0 pending")).toBeInTheDocument();
+    const detailsLink = screen.getByRole("link", { name: /View details/i });
+    expect(detailsLink).toHaveAttribute("href", "https://example.com/details");
+    expect(detailsLink).toHaveClass("pr-checks__details-link", "pr-checks__details-link--failing");
+    expect(detailsLink).not.toHaveClass("btn", "btn-sm");
+  });
+
+  it("renders summary and details links", () => {    render(
       <PrChecksList
         checks={[{ name: "fail", required: true, state: "failure", detailsUrl: "https://example.com/details" }]}
         rollup="failure"
