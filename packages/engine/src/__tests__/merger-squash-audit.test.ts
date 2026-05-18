@@ -154,4 +154,69 @@ describeIfGit("auditSquashMerge", () => {
       file: "shared.txt",
     });
   });
+
+  it("rebase strategy audits overlap across all commits in a multi-commit range", async () => {
+    const repo = setupRepo();
+
+    write(repo, "shared-a.txt", "a0\n");
+    write(repo, "shared-b.txt", "b0\n");
+    git(repo, "git add shared-a.txt shared-b.txt && git commit -m 'chore: seed shared files'");
+
+    git(repo, "git checkout -b feature/multi-range");
+    write(repo, "shared-a.txt", "a0\nfeature-a\n");
+    git(repo, "git add shared-a.txt && git commit -m 'feat: branch overlap a'");
+    write(repo, "shared-b.txt", "b0\nfeature-b\n");
+    git(repo, "git add shared-b.txt && git commit -m 'feat: branch overlap b'");
+    const rangeHeadSha = git(repo, "git rev-parse HEAD");
+
+    git(repo, "git checkout main");
+    write(repo, "shared-a.txt", "a0\nmain-a\n");
+    git(repo, "git add shared-a.txt && git commit -m 'feat: branch overlap a'");
+    write(repo, "shared-b.txt", "b0\nmain-b\n");
+    git(repo, "git add shared-b.txt && git commit -m 'feat: branch overlap b'");
+
+    const rangeBaseSha = git(repo, "git merge-base feature/multi-range main");
+    const findings = await auditSquashMerge({
+      rootDir: repo,
+      strategy: "rebase",
+      rangeBaseSha,
+      rangeHeadSha,
+      lookback: 20,
+    });
+
+    expect(findings.clean).toBe(false);
+    expect(findings.touchedFileOverlaps).toEqual(expect.arrayContaining([
+      expect.objectContaining({ file: "shared-a.txt" }),
+      expect.objectContaining({ file: "shared-b.txt" }),
+    ]));
+  });
+
+  it("single-commit squash fallback on the same multi-commit branch only sees tip subject", async () => {
+    const repo = setupRepo();
+
+    write(repo, "shared-a.txt", "a0\n");
+    write(repo, "shared-b.txt", "b0\n");
+    git(repo, "git add shared-a.txt shared-b.txt && git commit -m 'chore: seed shared files'");
+
+    git(repo, "git checkout -b feature/multi-fallback");
+    write(repo, "shared-a.txt", "a0\nfeature-a\n");
+    git(repo, "git add shared-a.txt && git commit -m 'feat: branch overlap a'");
+    write(repo, "shared-b.txt", "b0\nfeature-b\n");
+    git(repo, "git add shared-b.txt && git commit -m 'feat: branch overlap b'");
+
+    git(repo, "git checkout main");
+    write(repo, "shared-a.txt", "a0\nmain-a\n");
+    git(repo, "git add shared-a.txt && git commit -m 'feat: branch overlap a'");
+    write(repo, "shared-b.txt", "b0\nmain-b\n");
+    git(repo, "git add shared-b.txt && git commit -m 'feat: branch overlap b'");
+
+    write(repo, "shared-b.txt", "b0\nmain-b\nfinal\n");
+    git(repo, "git add shared-b.txt && git commit -m 'feat: squash merge' -m '- feat: branch overlap b'");
+    const squashSha = git(repo, "git rev-parse HEAD");
+
+    const findings = await auditSquashMerge({ rootDir: repo, strategy: "squash", squashSha, lookback: 20 });
+
+    expect(findings.duplicateSubjects).toEqual([{ type: "duplicate-subject", subject: "feat: branch overlap b" }]);
+    expect(findings.duplicateSubjects).not.toContainEqual({ type: "duplicate-subject", subject: "feat: branch overlap a" });
+  });
 });

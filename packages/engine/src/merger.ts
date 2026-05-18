@@ -80,7 +80,13 @@ import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
 import { createRunAuditor, generateSyntheticRunId, type EngineRunContext, type RunAuditor } from "./run-audit.js";
 import { createWebFetchTool } from "./agent-tools.js";
-import { auditSquashMerge, MERGER_MAIN_OVERLAP_LOOKBACK_COMMITS, type PostMergeAuditStrategy, type SquashAuditFindings } from "./merger-squash-audit.js";
+import {
+  auditSquashMerge,
+  MERGER_MAIN_OVERLAP_LOOKBACK_COMMITS,
+  type PostMergeAuditInput,
+  type PostMergeAuditStrategy,
+  type SquashAuditFindings,
+} from "./merger-squash-audit.js";
 import { detectMergeOverlap, restoreBranchWinsFiles } from "./merger-overlap-guard.js";
 import { checkDiffVolume, DiffVolumeRegressionError } from "./merger-diff-volume-gate.js";
 import { ReadonlyViolationError, filterCustomToolsForReadonly } from "./workflow-step-tool-policy.js";
@@ -5061,6 +5067,132 @@ function shouldRunPostMergeAudit(
   return (result.autoResolvedCount ?? 0) > 0 || result.attemptsMade === 3;
 }
 
+export interface ResolvePostMergeAuditInvocationInput {
+  rootDir: string;
+  strategy: PostMergeAuditStrategy;
+  auditSha: string;
+  rebaseMergeBaseSha?: string;
+  diffBaseRef?: string;
+  mergeTargetBranch: string;
+  taskBaseCommitSha?: string;
+  taskId: string;
+  store: Pick<TaskStore, "appendAgentLog">;
+  mergerLog: { warn: (message: string) => void; log: (message: string) => void; };
+}
+
+async function resolveAuditRangeBaseCandidate(opts: {
+  rootDir: string;
+  auditSha: string;
+  candidateRef: string;
+}): Promise<string | undefined> {
+  const candidateRef = opts.candidateRef.trim();
+  if (!candidateRef) return undefined;
+
+  try {
+    const { stdout: resolvedOut } = await execAsync(`git rev-parse --verify ${quoteArg(`${candidateRef}^{commit}`)}`, {
+      cwd: opts.rootDir,
+      encoding: "utf-8",
+    });
+    const resolvedSha = resolvedOut.trim();
+    if (!resolvedSha || resolvedSha === opts.auditSha) {
+      return undefined;
+    }
+
+    await execAsync(`git merge-base --is-ancestor ${quoteArg(resolvedSha)} ${quoteArg(opts.auditSha)}`, {
+      cwd: opts.rootDir,
+      encoding: "utf-8",
+    });
+    return resolvedSha;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function resolvePostMergeAuditInvocation(
+  opts: ResolvePostMergeAuditInvocationInput,
+): Promise<PostMergeAuditInput> {
+  if (opts.strategy === "squash") {
+    return {
+      rootDir: opts.rootDir,
+      strategy: "squash",
+      squashSha: opts.auditSha,
+    };
+  }
+
+  if (opts.rebaseMergeBaseSha && opts.rebaseMergeBaseSha !== opts.auditSha) {
+    return {
+      rootDir: opts.rootDir,
+      strategy: "rebase",
+      rangeBaseSha: opts.rebaseMergeBaseSha,
+      rangeHeadSha: opts.auditSha,
+    };
+  }
+
+  const rangeCandidates: Array<{ source: "diffBaseRef" | "baseCommitSha"; ref?: string }> = [
+    { source: "diffBaseRef", ref: opts.diffBaseRef },
+    { source: "baseCommitSha", ref: opts.taskBaseCommitSha },
+  ];
+
+  for (const candidate of rangeCandidates) {
+    if (!candidate.ref?.trim()) continue;
+    const resolved = await resolveAuditRangeBaseCandidate({
+      rootDir: opts.rootDir,
+      auditSha: opts.auditSha,
+      candidateRef: candidate.ref,
+    });
+    if (!resolved) continue;
+
+    const infoMessage = `${opts.taskId}: post-merge audit using rebase range base from ${candidate.source} (${resolved.slice(0, 8)}..${opts.auditSha.slice(0, 8)})`;
+    opts.mergerLog.log(infoMessage);
+    await opts.store.appendAgentLog(opts.taskId, infoMessage, "text", undefined, "merger");
+    return {
+      rootDir: opts.rootDir,
+      strategy: "rebase",
+      rangeBaseSha: resolved,
+      rangeHeadSha: opts.auditSha,
+    };
+  }
+
+  let mergeBaseSha: string | undefined;
+  try {
+    const { stdout } = await execAsync(`git merge-base ${quoteArg(opts.auditSha)} ${quoteArg(opts.mergeTargetBranch)}`, {
+      cwd: opts.rootDir,
+      encoding: "utf-8",
+    });
+    const mergeBaseRef = stdout.trim();
+    if (mergeBaseRef) {
+      mergeBaseSha = await resolveAuditRangeBaseCandidate({
+        rootDir: opts.rootDir,
+        auditSha: opts.auditSha,
+        candidateRef: mergeBaseRef,
+      });
+    }
+  } catch {
+    mergeBaseSha = undefined;
+  }
+
+  if (mergeBaseSha) {
+    const infoMessage = `${opts.taskId}: post-merge audit using rebase range base from merge-base (${mergeBaseSha.slice(0, 8)}..${opts.auditSha.slice(0, 8)})`;
+    opts.mergerLog.log(infoMessage);
+    await opts.store.appendAgentLog(opts.taskId, infoMessage, "text", undefined, "merger");
+    return {
+      rootDir: opts.rootDir,
+      strategy: "rebase",
+      rangeBaseSha: mergeBaseSha,
+      rangeHeadSha: opts.auditSha,
+    };
+  }
+
+  const degradedMessage = `${opts.taskId}: post-merge audit degraded to single-commit squash fallback (multi-commit branch, no usable rangeBase)`;
+  opts.mergerLog.warn(degradedMessage);
+  await opts.store.appendAgentLog(opts.taskId, degradedMessage, "text", undefined, "merger");
+  return {
+    rootDir: opts.rootDir,
+    strategy: "squash",
+    squashSha: opts.auditSha,
+  };
+}
+
 /**
  * Decide what to do with a dirty post-merge audit (FN-4333 hot-fix).
  *
@@ -7414,18 +7546,19 @@ export async function aiMergeTask(
       && postMergeAuditMode !== "off"
       && shouldRunPostMergeAudit(selectedPostMergeAuditStrategy, result, mergeWasEmpty, isEmptyCommit, auditSha)
     ) {
-      const auditFindings = selectedPostMergeAuditStrategy === "rebase" && rebaseMergeBaseSha
-        ? await auditSquashMerge({
-          rootDir,
-          strategy: "rebase",
-          rangeBaseSha: rebaseMergeBaseSha,
-          rangeHeadSha: auditSha,
-        })
-        : await auditSquashMerge({
-          rootDir,
-          strategy: "squash",
-          squashSha: auditSha,
-        });
+      const auditInvocation = await resolvePostMergeAuditInvocation({
+        rootDir,
+        strategy: selectedPostMergeAuditStrategy,
+        auditSha,
+        rebaseMergeBaseSha,
+        diffBaseRef,
+        mergeTargetBranch: mergeTarget.branch,
+        taskBaseCommitSha: task.baseCommitSha,
+        taskId,
+        store,
+        mergerLog,
+      });
+      const auditFindings = await auditSquashMerge(auditInvocation);
       if (!auditFindings.clean) {
         // FN-4333/FN-4344: rebase overlap-only findings can be auto-cleared
         // when deterministic verification already proved the merged tree,

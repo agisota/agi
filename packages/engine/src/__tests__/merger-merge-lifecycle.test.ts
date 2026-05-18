@@ -2583,6 +2583,98 @@ describe("aiMergeTask post-squash audit gate", () => {
     expect(store.appendAgentLog).toHaveBeenCalledWith("FN-050", "post-rebase range audit clean", "text", undefined, "merger");
   });
 
+  it("degrades to squash fallback when no usable base can be resolved on the rebase route", async () => {
+    setupRebaseRouteExecSync();
+    const baseImpl = mockedExecSync.getMockImplementation();
+    mockedExecSync.mockImplementation((cmd: any) => {
+      const cmdStr = String(cmd);
+      if (cmdStr.includes('git rev-parse "main"')) return "" as any;
+      if (cmdStr.includes('git rev-parse --verify "abc123^{commit}"')) return "abc123\n" as any;
+      if (cmdStr.includes('git merge-base --is-ancestor "abc123" "landedcommit002"')) return "" as any;
+      if (cmdStr.includes('git rev-list --reverse "..fusion/fn-050"')) return "commit-a\ncommit-b\ncommit-c\n" as any;
+      if (cmdStr.includes('git diff --shortstat "..HEAD"')) return "2 files changed, 6 insertions(+), 1 deletion(-)" as any;
+      if (cmdStr.includes("git show --shortstat --format= HEAD")) return "2 files changed, 6 insertions(+), 1 deletion(-)" as any;
+      return baseImpl ? baseImpl(cmd) : Buffer.from("");
+    });
+    mockedAuditSquashMerge.mockResolvedValue({
+      strategy: "rebase",
+      rangeBaseSha: "basehead123",
+      rangeHeadSha: "landedcommit002",
+      parentSha: "basehead123",
+      auditTargetLabel: "basehead123..landedcommit002",
+      lookback: 30,
+      branchSubjects: ["fix: substantive one", "feat: substantive two"],
+      recentMainSubjects: [],
+      duplicateSubjects: [],
+      touchedFiles: [],
+      touchedFileOverlaps: [],
+      findings: [],
+      issueCount: 0,
+      clean: true,
+    });
+    const store = createAuditStore({}, { prompt: "**Direct Merge Commit Strategy:** always-rebase" });
+
+    await aiMergeTask(store, "/tmp/root", "FN-050");
+
+    expect(mockedAuditSquashMerge).toHaveBeenCalledWith(expect.objectContaining({
+      strategy: "squash",
+      squashSha: "landedcommit002",
+    }));
+    expect(store.appendAgentLog).toHaveBeenCalledWith(
+      "FN-050",
+      expect.stringContaining("post-merge audit degraded to single-commit squash fallback"),
+      "text",
+      undefined,
+      "merger",
+    );
+  });
+
+  it("logs degraded squash fallback when no rebase range base can be resolved", async () => {
+    setupRebaseRouteExecSync();
+    const baseImpl = mockedExecSync.getMockImplementation();
+    mockedExecSync.mockImplementation((cmd: any) => {
+      const cmdStr = String(cmd);
+      if (cmdStr.includes('git rev-parse "main"')) return "" as any;
+      if (cmdStr.includes("git rev-parse --verify") && cmdStr.includes("^{commit}")) return "landedcommit002\n" as any;
+      if (cmdStr.includes("git merge-base") && cmdStr.includes("landedcommit002") && cmdStr.includes("main")) return "landedcommit002\n" as any;
+      if (cmdStr.includes('git rev-list --reverse "..fusion/fn-050"')) return "commit-a\ncommit-b\ncommit-c\n" as any;
+      if (cmdStr.includes('git diff --shortstat "..HEAD"')) return "2 files changed, 6 insertions(+), 1 deletion(-)" as any;
+      if (cmdStr.includes("git show --shortstat --format= HEAD")) return "2 files changed, 6 insertions(+), 1 deletion(-)" as any;
+      return baseImpl ? baseImpl(cmd) : Buffer.from("");
+    });
+    mockedAuditSquashMerge.mockResolvedValue({
+      strategy: "squash",
+      squashSha: "landedcommit002",
+      parentSha: "basehead123",
+      auditTargetLabel: "landedcommit002",
+      squashSubject: "feat: squash merge",
+      lookback: 30,
+      branchSubjects: ["feat: substantive two"],
+      recentMainSubjects: [],
+      duplicateSubjects: [],
+      touchedFiles: ["src/feature-b.ts"],
+      touchedFileOverlaps: [],
+      findings: [],
+      issueCount: 0,
+      clean: true,
+    });
+    const store = createAuditStore({}, { prompt: "**Direct Merge Commit Strategy:** always-rebase" });
+
+    await aiMergeTask(store, "/tmp/root", "FN-050");
+
+    expect(mockedAuditSquashMerge).toHaveBeenCalledWith(expect.objectContaining({
+      strategy: "squash",
+      squashSha: "landedcommit002",
+    }));
+    expect(store.appendAgentLog).toHaveBeenCalledWith(
+      "FN-050",
+      expect.stringContaining("post-merge audit degraded to single-commit squash fallback"),
+      "text",
+      undefined,
+      "merger",
+    );
+  });
+
   it("honors the per-task always-rebase override", async () => {
     setupRebaseRouteExecSync();
     mockedAuditSquashMerge.mockResolvedValue({
