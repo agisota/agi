@@ -626,10 +626,12 @@ export function useQuickChat(
     });
 
     setIsStreaming(false);
+    isStreamingRef.current = false;
     setStreamingText("");
     setStreamingThinking("");
     setStreamingToolCalls([]);
-  }, [activeSession, projectId]);
+    void flushPendingMessage();
+  }, [activeSession, projectId, flushPendingMessage]);
 
   const sendMessageRef = useRef<(content: string, attachments?: File[]) => Promise<void>>(() => Promise.resolve());
   const visibilitySuspension = useTabVisibilitySuspension();

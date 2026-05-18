@@ -569,6 +569,68 @@ describe("useQuickChat", () => {
       expect(result.current.isStreaming).toBe(false);
       expect(result.current.streamingText).toBe("");
       expect(result.current.streamingThinking).toBe("");
+      expect(mockStreamChatResponse).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("stopStreaming sends queued pendingMessage after cancelling the stream", async () => {
+    const existingSession = makeSession({ id: "session-existing", agentId: "agent-001" });
+    const closeFn = vi.fn();
+
+    mockFetchResumeChatSession.mockResolvedValueOnce({ session: existingSession });
+    mockFetchChatMessages.mockResolvedValue({ messages: [] });
+    mockStreamChatResponse.mockReturnValue({ close: closeFn, isConnected: () => true });
+
+    const { result } = renderHook(() => useQuickChat("proj-123"));
+
+    await act(async () => {
+      await result.current.switchSession("agent-001");
+    });
+
+    act(() => {
+      result.current.sendMessage("Hello");
+    });
+
+    await waitFor(() => {
+      expect(result.current.isStreaming).toBe(true);
+    });
+
+    act(() => {
+      void result.current.sendMessage("Queued follow-up");
+      result.current.stopStreaming();
+    });
+
+    await waitFor(() => {
+      expect(closeFn).toHaveBeenCalled();
+      expect(mockStreamChatResponse).toHaveBeenCalledTimes(2);
+      expect(mockStreamChatResponse.mock.calls[1]?.[1]).toBe("Queued follow-up");
+      expect(result.current.pendingMessage).toBe("");
+    });
+  });
+
+  it("stopStreaming with no pendingMessage cancels stream without sending anything", async () => {
+    const existingSession = makeSession({ id: "session-existing", agentId: "agent-001" });
+    const closeFn = vi.fn();
+
+    mockFetchResumeChatSession.mockResolvedValueOnce({ session: existingSession });
+    mockFetchChatMessages.mockResolvedValue({ messages: [] });
+    mockStreamChatResponse.mockReturnValue({ close: closeFn, isConnected: () => true });
+
+    const { result } = renderHook(() => useQuickChat("proj-123"));
+
+    await act(async () => {
+      await result.current.switchSession("agent-001");
+    });
+
+    act(() => {
+      result.current.sendMessage("Hello");
+      result.current.stopStreaming();
+    });
+
+    await waitFor(() => {
+      expect(closeFn).toHaveBeenCalled();
+      expect(result.current.pendingMessage).toBe("");
+      expect(mockStreamChatResponse).toHaveBeenCalledTimes(1);
     });
   });
 
