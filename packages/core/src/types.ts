@@ -742,6 +742,12 @@ Do NOT spend time on nits when no real issues exist.`,
 
 export type PrConflictState = "clean" | "conflicting" | "behind" | "blocked" | "unknown";
 
+export interface PrConflictDiagnostics {
+  conflictingFiles: string[];
+  suggestedCommands: string[];
+  capturedAt: string;
+}
+
 export interface PrInfo {
   url: string;
   number: number;
@@ -758,6 +764,7 @@ export interface PrInfo {
   lastMergeErrorAt?: string;
   checkRollup?: "success" | "failure" | "pending" | "none";
   mergeable?: PrConflictState;
+  conflictDiagnostics?: PrConflictDiagnostics;
   lastCommentAt?: string;
   lastCheckedAt?: string;
   lastReviewDecision?: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
