@@ -5461,6 +5461,55 @@ export class TaskExecutor {
     return { blocked: false };
   }
 
+  private async handleImplicitTaskDoneRefusal(
+    task: Task,
+    worktreePath: string,
+    refusal: Extract<ReturnType<typeof evaluateTaskDoneRefusal>, { ok: false }>,
+  ): Promise<void> {
+    void worktreePath;
+
+    await this.store.logEntry(task.id, refusal.message, undefined, this.currentRunContext);
+    executorLog.error(`${task.id}: fn_task_done refused (${refusal.refusalClass}) — ${refusal.reason} (implicit completion)`);
+
+    const priorRequeues = task.taskDoneRetryCount ?? 0;
+    const nextRequeueCount = priorRequeues + 1;
+    if (priorRequeues < MAX_TASK_DONE_REQUEUE_RETRIES) {
+      await this.store.updateTask(task.id, {
+        status: "failed",
+        error: refusal.message,
+        taskDoneRetryCount: nextRequeueCount,
+        paused: false,
+        pausedByAgentId: null,
+        worktree: null,
+        branch: null,
+        sessionFile: null,
+      });
+      await this.store.logEntry(
+        task.id,
+        `${refusal.message} — requeued to todo immediately (${nextRequeueCount}/${MAX_TASK_DONE_REQUEUE_RETRIES})`,
+        undefined,
+        this.currentRunContext,
+      );
+      await this.store.moveTask(task.id, "todo", { preserveProgress: true });
+    } else {
+      await this.store.updateTask(task.id, {
+        status: "failed",
+        error: refusal.message,
+        paused: false,
+        pausedByAgentId: null,
+        worktree: null,
+        branch: null,
+        sessionFile: null,
+      });
+      await this.store.logEntry(task.id, `${refusal.message} — moved to in-review for inspection`, undefined, this.currentRunContext);
+      await this.persistTokenUsage(task.id);
+      await this.store.moveTask(task.id, "in-review");
+    }
+
+    this.deleteActiveSession(task.id);
+    this.tokenUsageBaselines.delete(task.id);
+  }
+
   private createTaskDoneTool(
     taskId: string,
     worktreePath: string,
