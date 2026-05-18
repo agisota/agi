@@ -3578,7 +3578,7 @@ export class TaskExecutor {
         this.createTaskLogTool(task.id),
         this.createTaskCreateTool(),
         this.createTaskAddDepTool(task.id),
-        this.createTaskDoneTool(task.id, worktreePath, detail.prompt ?? "", codeReviewVerdicts, () => { taskDone = true; }),
+        this.createTaskDoneTool(task.id, worktreePath, detail.prompt ?? "", codeReviewVerdicts, () => { taskDone = true; }, audit),
         createRunVerificationTool({
           worktreePath,
           rootDir: this.rootDir,
@@ -5543,6 +5543,7 @@ export class TaskExecutor {
     promptContent: string,
     codeReviewVerdicts: Map<number, ReviewVerdict>,
     onDone: () => void,
+    audit?: RunAuditor,
   ): ToolDefinition {
     const store = this.store;
     return {
@@ -5675,7 +5676,7 @@ export class TaskExecutor {
         }
 
         const settings = await store.getSettings();
-        const scopeLeakCheck = await this.evaluateTaskDoneScopeLeak(task, worktreePath, promptContent, settings)
+        const scopeLeakCheck = await this.evaluateTaskDoneScopeLeak(task, worktreePath, promptContent, settings, audit)
           .catch((error: unknown) => {
             const errorMessage = error instanceof Error ? error.message : String(error);
             executorLog.warn(`${taskId}: scope-leak guard failed open: ${errorMessage}`);
