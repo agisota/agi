@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 const dashboardRoot = path.resolve(import.meta.dirname, "..");
 const appRoot = path.join(dashboardRoot, "app");
@@ -906,7 +907,15 @@ function closeServer(server) {
   });
 }
 
-main().catch((error) => {
-  console.error(`[dashboard-browser-smoke] ${error.stack ?? error.message}`);
-  process.exitCode = 1;
-});
+const isMainModule = (() => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return path.resolve(entry) === fileURLToPath(import.meta.url);
+})();
+
+if (isMainModule) {
+  main().catch((error) => {
+    console.error(`[dashboard-browser-smoke] ${error.stack ?? error.message}`);
+    process.exitCode = 1;
+  });
+}
