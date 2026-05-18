@@ -3553,6 +3553,9 @@ export class SelfHealingManager {
    * Final-fallback recovery for `in-review` tasks that fell through every other
    * scan and have sat untouched longer than `taskStuckTimeoutMs`.
    *
+   * When `settings.autoMerge` is disabled, this sweep is a no-op because
+   * PR-based manual review intentionally leaves tasks in `in-review`.
+   *
    * The other review-recovery scans each require a specific shape (failed
    * pre-merge step, incomplete steps, mergeable + worktree present, confirmed
    * merge, transient merge status). A task whose state doesn't match any of
