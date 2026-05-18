@@ -97,9 +97,15 @@ Implementation references:
 
 ## `.env` Auto-write into Worktrees
 
-The schema already carries env-materialization metadata (`env_exportable`, `env_export_key`) per secret.
+Fusion can materialize env-exportable secrets into each acquired task worktree when project settings enable it (`secretsEnv.enabled=true`).
 
-⚠️ Engine-side `.env` materialization settings and provisioning hooks (for example `secretsEnv.*`, overwrite policy, gitignore gating, teardown fingerprint cleanup) are not implemented in this branch. Track follow-up: **FN-4867**.
+- Supported settings: `enabled`, `filename` (default `.env`, validated as local filename only), `overwritePolicy` (`skip`/`merge`/`replace`), `keyPrefix`, `requireGitignored` (default `true`).
+- Safety guard: when `requireGitignored` is enabled, Fusion runs `git check-ignore -- <filename>` and refuses writes unless the file is ignored.
+- Write contract: managed content is canonicalized and written atomically with mode `0o600`; audit metadata includes keys and counts, never values.
+- Fingerprint sidecar: successful writes persist `.fusion-secrets-env.fingerprint` containing `<sha256>\n<filename>\n` (mode `0o600`) so teardown can verify file integrity before deletion.
+- Teardown cleanup: when a worktree is removed, Fusion deletes the managed env file only when the on-disk fingerprint still matches; edited files are preserved and only the sidecar is removed.
+
+Remaining non-env follow-up work (tool wiring, approvals, sync UX/polish) continues under **FN-4867**.
 
 ## Cross-node Sync
 
@@ -149,7 +155,7 @@ Wired in this branch/task lineage: `secret:read`, `secret:create`, `secret:updat
 
 Pending follow-ups:
 - Sync endpoint/event integration details continue under **FN-4913** (`secret:sync-push`, `secret:sync-pull`).
-- Env materialization lifecycle wiring continues under **FN-4912** (`secret:env-*`).
+- Non-env secret platform follow-ons remain tracked under **FN-4867** (tool wiring, approval UX, sync passphrase/runtime surfaces).
 
 **Plaintext prohibition:** audit payload metadata must never include plaintext, decrypted values, ciphertext, or nonce fields. Use `assertNoSecretPlaintext(...)` as the canonical enforcement helper before emitting secret audit events.
 
@@ -160,6 +166,6 @@ Pending follow-ups:
 - Out-of-scope / pending integration items for this branch:
   - Full runtime master-key management + rotation UX
   - `fn_secret_get` tool surface
-  - Worktree `.env` materialization pipeline
+  - Additional secrets platform follow-ons tracked under FN-4867 (tool wiring, approval/sync UX, advanced rotation/profile capabilities)
   - Cross-node secret sync endpoints/passphrase exchange
   - Advanced capabilities (TTL/rotation automation, env-set profiles, KMS/Vault backends, per-node asymmetric sync)
