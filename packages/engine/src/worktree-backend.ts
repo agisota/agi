@@ -17,6 +17,7 @@ import {
   parseIndexLockPath,
   tryRemoveStaleLock,
 } from "./worktree-stale-lock.js";
+import { parseStaleRegistrationPath, recoverStaleRegistration } from "./worktree-stale-registration.js";
 
 const execAsync = promisify(exec);
 const NATIVE_TIMEOUT_MS = 120_000;
@@ -211,7 +212,18 @@ export class NativeWorktreeBackend implements WorktreeBackend {
       return { path: input.worktreePath, branch: branchName };
     };
 
+    const createWithBranchForce = async (branchName: string): Promise<WorktreeCreateResult> => {
+      await execAsync(`git worktree add -f ${quoteShellArg(input.worktreePath)} ${quoteShellArg(branchName)}`, {
+        cwd: input.rootDir,
+        encoding: "utf-8",
+        timeout: NATIVE_TIMEOUT_MS,
+        maxBuffer: MAX_BUFFER,
+      });
+      return { path: input.worktreePath, branch: branchName };
+    };
+
     let staleLockRecoveryAttempted = false;
+    let staleRegistrationRecoveryAttempted = false;
     try {
       const created = await createWithBranch(input.branch);
       await installGuardOrCleanup(created.path);
@@ -280,6 +292,61 @@ export class NativeWorktreeBackend implements WorktreeBackend {
             reason: classification.reason,
           });
         }
+      }
+
+      const combinedErrorOutput = `${(error as { message?: string })?.message ?? ""}\n${getErrorStderr(error) ?? ""}`;
+      const staleRegistrationPath = parseStaleRegistrationPath(combinedErrorOutput);
+      if (staleRegistrationPath && !staleRegistrationRecoveryAttempted) {
+        staleRegistrationRecoveryAttempted = true;
+        await this.deps.audit?.git({
+          type: "worktree:stale-registration-detected",
+          target: input.worktreePath,
+          metadata: { staleRegistrationPath, worktreePath: input.worktreePath },
+        });
+        const recovery = await recoverStaleRegistration({
+          rootDir: input.rootDir,
+          worktreePath: input.worktreePath,
+          logger: this.deps.logger,
+        });
+        if (recovery.recovered) {
+          try {
+            const created = await createWithBranch(input.branch);
+            await this.deps.audit?.git({
+              type: "worktree:stale-registration-recovered",
+              target: input.worktreePath,
+              metadata: { actions: recovery.actions },
+            });
+            await installGuardOrCleanup(created.path);
+            return created;
+          } catch (retryError) {
+            const actionsWithForce = [...recovery.actions, "add-force-retry"];
+            try {
+              const created = await createWithBranchForce(input.branch);
+              await this.deps.audit?.git({
+                type: "worktree:stale-registration-recovered",
+                target: input.worktreePath,
+                metadata: { actions: actionsWithForce },
+              });
+              await installGuardOrCleanup(created.path);
+              return created;
+            } catch (forceError) {
+              await this.deps.audit?.git({
+                type: "worktree:stale-registration-recovery-failed",
+                target: input.worktreePath,
+                metadata: {
+                  actions: actionsWithForce,
+                  reason: `${formatError(retryError).detail}; force-retry: ${formatError(forceError).detail}`,
+                },
+              });
+              throw error;
+            }
+          }
+        }
+        await this.deps.audit?.git({
+          type: "worktree:stale-registration-recovery-failed",
+          target: input.worktreePath,
+          metadata: { actions: recovery.actions, reason: recovery.reason ?? "unknown" },
+        });
       }
 
       if (!input.allowSiblingBranchRename) {

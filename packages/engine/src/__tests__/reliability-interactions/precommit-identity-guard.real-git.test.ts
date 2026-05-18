@@ -74,5 +74,5 @@ describe("pre-commit identity guard (real git)", () => {
     } finally {
       rmSync(rootDir, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 });

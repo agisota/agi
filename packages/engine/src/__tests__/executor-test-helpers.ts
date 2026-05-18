@@ -134,6 +134,15 @@ vi.mock("../worktree-stale-lock.js", async () => {
   };
 });
 
+vi.mock("../worktree-stale-registration.js", async () => {
+  const actual = await vi.importActual<typeof import("../worktree-stale-registration.js")>("../worktree-stale-registration.js");
+  return {
+    ...actual,
+    parseStaleRegistrationPath: vi.fn(actual.parseStaleRegistrationPath),
+    recoverStaleRegistration: vi.fn(),
+  };
+});
+
 vi.mock("node:child_process", async () => {
   const { promisify } = await import("node:util");
   const { EventEmitter } = await import("node:events");
@@ -259,6 +268,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { hydrateWorktreeDb } from "../worktree-db-hydrate.js";
 import { classifyTaskWorktree, describeRegisteredWorktrees, isUsableTaskWorktree } from "../worktree-pool.js";
 import { classifyStaleLock, tryRemoveStaleLock } from "../worktree-stale-lock.js";
+import { parseStaleRegistrationPath, recoverStaleRegistration } from "../worktree-stale-registration.js";
 import { executingTaskLock } from "../active-session-registry.js";
 
 export const mockedCreateFnAgent = vi.mocked(createFnAgent);
@@ -277,6 +287,8 @@ export const mockedDescribeRegisteredWorktrees = vi.mocked(describeRegisteredWor
 export const mockedIsUsableTaskWorktree = vi.mocked(isUsableTaskWorktree);
 export const mockedClassifyStaleLock = vi.mocked(classifyStaleLock);
 export const mockedTryRemoveStaleLock = vi.mocked(tryRemoveStaleLock);
+export const mockedParseStaleRegistrationPath = vi.mocked(parseStaleRegistrationPath);
+export const mockedRecoverStaleRegistration = vi.mocked(recoverStaleRegistration);
 export const mockedInstallTaskWorktreeIdentityGuard = vi.mocked(installTaskWorktreeIdentityGuard);
 
 export type EventListener = (...args: unknown[]) => void;
@@ -359,8 +371,16 @@ export function resetExecutorMocks() {
   });
   mockedClassifyStaleLock.mockReset();
   mockedTryRemoveStaleLock.mockReset();
+  mockedParseStaleRegistrationPath.mockReset();
+  mockedRecoverStaleRegistration.mockReset();
   mockedInstallTaskWorktreeIdentityGuard.mockReset();
   mockedClassifyStaleLock.mockResolvedValue({ kind: "fresh", reason: "fresh" } as any);
+  mockedParseStaleRegistrationPath.mockImplementation((value) => {
+    if (!value) return null;
+    const match = /'([^']+)'\s+is a missing but already registered worktree/i.exec(String(value));
+    return match?.[1] ?? null;
+  });
+  mockedRecoverStaleRegistration.mockResolvedValue({ recovered: true, actions: ["prune"] });
   mockedInstallTaskWorktreeIdentityGuard.mockResolvedValue(undefined);
   mockedTryRemoveStaleLock.mockResolvedValue({ removed: true });
   mockExecuteAll.mockResolvedValue([]);

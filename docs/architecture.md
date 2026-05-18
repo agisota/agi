@@ -1541,7 +1541,7 @@ The GitHub tracking state listener now attaches to every registered project stor
 - Classifier gates are deterministic: the lock must exist, be older than the stale threshold (default 30s), not be owned by a live `activeSessionRegistry` session, and resolve to a normalized lock/worktree path.
 - If classified `stale`, Fusion removes the lock and retries create exactly once.
 - If staleness cannot be proven, lock removal is refused and the flow raises `StaleWorktreeIndexLockError` so task failure messaging can escalate with manual remediation guidance.
-- Run-audit events emitted by the create path: `worktree:stale-lock-detected`, `worktree:stale-lock-recovered`, `worktree:stale-lock-recovery-failed`, `worktree:stale-lock-refused`.
+- Run-audit events emitted by the create path: `worktree:stale-lock-detected`, `worktree:stale-lock-recovered`, `worktree:stale-lock-recovery-failed`, `worktree:stale-lock-refused`, `worktree:stale-registration-detected`, `worktree:stale-registration-recovered`, `worktree:stale-registration-recovery-failed`.
 
 #### Branch-conflict inspection and auto-reclaim
 - `inspectBranchConflict` classifies branch collisions as `stale`, `stale-resolved`, `reclaimable`, or `live-foreign`.

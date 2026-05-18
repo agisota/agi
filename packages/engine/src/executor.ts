@@ -52,6 +52,7 @@ import {
   parseIndexLockPath,
   tryRemoveStaleLock,
 } from "./worktree-stale-lock.js";
+import { parseStaleRegistrationPath, recoverStaleRegistration } from "./worktree-stale-registration.js";
 import {
   BranchConflictError,
   BranchCrossContaminationError,
@@ -8460,7 +8461,10 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
       | "worktree:stale-lock-detected"
       | "worktree:stale-lock-recovered"
       | "worktree:stale-lock-recovery-failed"
-      | "worktree:stale-lock-refused",
+      | "worktree:stale-lock-refused"
+      | "worktree:stale-registration-detected"
+      | "worktree:stale-registration-recovered"
+      | "worktree:stale-registration-recovery-failed",
     targetPath: string,
     metadata: Record<string, unknown>,
   ): Promise<void> {
@@ -8533,6 +8537,34 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
    * Single attempt to create a worktree with conflict detection and recovery.
    * Returns the actual worktree path used (may differ from input if recovery generated new name).
    */
+  private async recoverStaleRegistration(taskId: string, path: string, conflictInfo: { path?: string; message?: string }): Promise<boolean> {
+    const staleRegistrationPath = conflictInfo.path ?? path;
+    await this.emitStaleLockAudit(taskId, "worktree:stale-registration-detected", path, {
+      staleRegistrationPath,
+      worktreePath: path,
+    });
+
+    const recovery = await recoverStaleRegistration({
+      rootDir: this.rootDir,
+      worktreePath: path,
+      logger: executorLog,
+    });
+
+    if (recovery.recovered) {
+      await this.emitStaleLockAudit(taskId, "worktree:stale-registration-recovered", path, {
+        actions: recovery.actions,
+      });
+      await this.store.logEntry(taskId, "Recovered stale worktree registration and retrying", staleRegistrationPath, this.getRunContextFor(taskId));
+      return true;
+    }
+
+    await this.emitStaleLockAudit(taskId, "worktree:stale-registration-recovery-failed", path, {
+      actions: recovery.actions,
+      reason: recovery.reason ?? "unknown",
+    });
+    return false;
+  }
+
   private async tryCreateWorktree(
     branch: string,
     path: string,
@@ -8620,6 +8652,7 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
     };
 
     let staleLockRecoveryAttempted = false;
+    let staleRegistrationRecoveryAttempted = false;
     try {
       await createWithBranch(branch);
       executorLog.log(`Worktree created: ${path}${startPoint ? ` (from ${startPoint})` : ""}`);
@@ -8637,6 +8670,17 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
         if (recovered) {
           await createWithBranch(branch);
           executorLog.log(`Worktree created after stale lock recovery: ${path}`);
+          await installGuardOrCleanup();
+          return { path, branch };
+        }
+      }
+
+      if (conflictInfo.type === "stale-registration" && !staleRegistrationRecoveryAttempted) {
+        staleRegistrationRecoveryAttempted = true;
+        const recovered = await this.recoverStaleRegistration(taskId, path, conflictInfo);
+        if (recovered) {
+          await createWithBranch(branch);
+          executorLog.log(`Worktree created after stale registration recovery: ${path}`);
           await installGuardOrCleanup();
           return { path, branch };
         }
@@ -8709,6 +8753,17 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
           if (recovered) {
             await createFromExistingBranch();
             executorLog.log(`Worktree created from existing branch after stale lock recovery: ${path}`);
+            await installGuardOrCleanup();
+            return { path, branch };
+          }
+        }
+
+        if (fallbackConflictInfo.type === "stale-registration" && !staleRegistrationRecoveryAttempted) {
+          staleRegistrationRecoveryAttempted = true;
+          const recovered = await this.recoverStaleRegistration(taskId, path, fallbackConflictInfo);
+          if (recovered) {
+            await createFromExistingBranch();
+            executorLog.log(`Worktree created from existing branch after stale registration recovery: ${path}`);
             await installGuardOrCleanup();
             return { path, branch };
           }
@@ -9191,7 +9246,7 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
    * - "working tree already exists"
    */
   private extractWorktreeConflictInfo(error: unknown): {
-    type: "already-used" | "invalid-reference" | "leading-directories" | "already-exists" | "not-git-repo" | "index-lock-contention" | "unknown";
+    type: "already-used" | "invalid-reference" | "leading-directories" | "already-exists" | "not-git-repo" | "index-lock-contention" | "stale-registration" | "unknown";
     path?: string;
     lockPath?: string;
     message?: string;
@@ -9220,6 +9275,11 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
     const lockPath = parseIndexLockPath(output);
     if (lockPath) {
       return { type: "index-lock-contention", lockPath, message: output };
+    }
+
+    const staleRegistrationPath = parseStaleRegistrationPath(output);
+    if (staleRegistrationPath) {
+      return { type: "stale-registration", path: staleRegistrationPath, message: output };
     }
 
     // Pattern: invalid reference: 'branch-name'

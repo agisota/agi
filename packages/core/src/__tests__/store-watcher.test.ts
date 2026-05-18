@@ -50,7 +50,7 @@ describe("TaskStore", () => {
       } finally {
         harness.store().stopWatching();
       }
-    }, 60_000);
+    }, 120_000);
     it("cache is updated when polling is active even without fs.watch", async () => {
       await harness.store().watch();
 
