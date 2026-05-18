@@ -1438,7 +1438,7 @@ describe("ProjectEngine paused in-review auto-merge behavior", () => {
       column: "done",
       branch: "fusion/fn-merged",
       mergeDetails: { mergeConfirmed: true, mergedAt: "2026-05-18T00:00:00.000Z", mergeTargetBranch: "main" },
-    });
+    } as any);
     mocks.currentStore = mockStore.store;
 
     const engine = createEngine();
