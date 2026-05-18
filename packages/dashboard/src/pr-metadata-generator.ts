@@ -2,7 +2,7 @@ import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { GlobalSettings, ProjectSettings, Task } from "@fusion/core";
+import type { GlobalSettings, ProjectSettings, Settings, Task } from "@fusion/core";
 import { resolveTaskPlanningModel } from "@fusion/core";
 import { createFnAgent } from "@fusion/engine";
 
@@ -24,7 +24,7 @@ interface AiMetadataResult {
 
 function buildFallback(task: Task): GeneratedPrMetadata {
   return {
-    title: task.title,
+    title: task.title ?? task.id,
     body: [
       "## Summary",
       "",
@@ -184,7 +184,7 @@ export async function generatePrMetadata(input: {
   const templateExists = await access(templatePath).then(() => true).catch(() => false);
   const template = templateExists ? await readFile(templatePath, "utf8") : "";
 
-  const model = resolveTaskPlanningModel(task, settings);
+  const model = resolveTaskPlanningModel(task, settings as Partial<Settings>);
   let aiText = "";
   const { session } = await createFnAgent({
     cwd: repoRoot,
