@@ -1301,7 +1301,7 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
         throw badRequest("Task must be in 'in-review' column to recover branch binding");
       }
 
-      const selfHealingManager = resolveSelfHealingManager(scopedStore);
+      const selfHealingManager = _resolveSelfHealingManager(scopedStore);
       if (!selfHealingManager) {
         throw badRequest("Self-healing manager unavailable");
       }
