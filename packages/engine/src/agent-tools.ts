@@ -12,7 +12,7 @@ import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, relative, resolve } from "node:path";
 import type { AgentStore, AgentState, AgentCapability, AgentUpdateInput, TaskDocument, TaskDocumentCreateInput, TaskStore, RunMutationContext, MessageStore, Message, SourceType, Settings, ResearchRun, ResearchRunStatus, TaskCreateInput, ReflectionStore, ApprovalRequestStore, ProjectSettings, ChatStore } from "@fusion/core";
-import { DASHBOARD_USER_ID, canAgentTakeImplementationTaskForExplicitRouting, dailyMemoryPath, ensureOpenClawMemoryFiles, extractAgentProvisioningRequest, formatRoleMismatchReason, getMemoryBackendCapabilities, getProjectMemory, isEphemeralAgent, memoryLongTermPath, normalizeMessageParticipant, reconcileDeterministicDuplicate, resolveAgentProvisioningPolicy, resolveMemoryBackend, resolveResearchSettings, resolveTitleSummarizerSettingsModel, runDeterministicDuplicateGuard, scheduleQmdProjectMemoryRefresh, searchProjectMemory, shouldSkipBackgroundQmdRefresh, summarizeTitle } from "@fusion/core";
+import { DASHBOARD_USER_ID, canAgentTakeImplementationTaskForExplicitRouting, dailyMemoryPath, ensureOpenClawMemoryFiles, extractAgentProvisioningRequest, formatRoleMismatchReason, getMemoryBackendCapabilities, getProjectMemory, isEphemeralAgent, memoryLongTermPath, normalizeMessageParticipant, reconcileDeterministicDuplicate, resolveAgentProvisioningPolicy, resolveMemoryBackend, resolveResearchSettings, resolveTaskGithubTracking, resolveTitleSummarizerSettingsModel, runDeterministicDuplicateGuard, scheduleQmdProjectMemoryRefresh, searchProjectMemory, shouldSkipBackgroundQmdRefresh, summarizeTitle } from "@fusion/core";
 import { ResearchOrchestrator } from "./research-orchestrator.js";
 import { ResearchProviderRegistry } from "./research/provider-registry.js";
 import { ResearchStepRunner } from "./research-step-runner.js";
@@ -634,10 +634,31 @@ export async function createAgentTask(
         }
       : undefined;
 
-    const createdTask = await store.createTask({
+    const globalSettings =
+      (await store.getGlobalSettingsStore?.()?.getSettings?.()) ?? {};
+    const resolvedTracking = resolveTaskGithubTracking(
+      { githubTracking: input.githubTracking },
+      settings,
+      globalSettings,
+    );
+
+    const shouldPrefillGithubTrackingEnabled =
+      input.githubTracking?.enabled !== false && resolvedTracking.enabled;
+    const createInput: TaskCreateInput = {
       ...input,
       source: nextSource,
-    }, {
+      githubTracking: shouldPrefillGithubTrackingEnabled
+        ? {
+            ...(input.githubTracking ?? {}),
+            enabled: true,
+            ...(input.githubTracking?.repoOverride || !resolvedTracking.repo
+              ? {}
+              : { repoOverride: `${resolvedTracking.repo.owner}/${resolvedTracking.repo.repo}` }),
+          }
+        : input.githubTracking,
+    };
+
+    const createdTask = await store.createTask(createInput, {
       settings: { autoSummarizeTitles: settings.autoSummarizeTitles === true },
       onSummarize: rootDir
         ? async (description: string) => {

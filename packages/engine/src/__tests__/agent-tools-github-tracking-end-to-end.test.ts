@@ -86,6 +86,7 @@ describe("agent tool github tracking end-to-end", () => {
 
     const persisted = await store.getTask(taskId);
     expect(persisted).toBeTruthy();
+    expect(persisted?.githubTracking?.enabled).toBe(true);
     const resolvedTracking = resolveTaskGithubTracking(
       persisted!,
       depsArg?.projectSettings as never,

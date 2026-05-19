@@ -4,7 +4,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { TaskStore, setTaskCreatedHook, type Task } from "@fusion/core";
-import { createTaskCreateTool, createDelegateTaskTool } from "../agent-tools.js";
+import { createAgentTask, createTaskCreateTool, createDelegateTaskTool } from "../agent-tools.js";
 
 function makeTmpDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -73,5 +73,90 @@ describe("agent task creation github-tracking hook integration", () => {
     }));
 
     await expect(run()).resolves.toBeTruthy();
+  });
+});
+
+describe("createAgentTask githubTracking prefill", () => {
+  let rootDir: string;
+  let globalDir: string;
+  let store: TaskStore;
+
+  beforeEach(async () => {
+    setTaskCreatedHook(undefined);
+    rootDir = makeTmpDir("kb-engine-agent-tools-gh-track-prefill-");
+    globalDir = makeTmpDir("kb-engine-agent-tools-gh-track-prefill-global-");
+    store = new TaskStore(rootDir, globalDir, { inMemoryDb: true });
+    await store.init();
+  });
+
+  afterEach(async () => {
+    setTaskCreatedHook(undefined);
+    store.close();
+    await rm(rootDir, { recursive: true, force: true });
+    await rm(globalDir, { recursive: true, force: true });
+  });
+
+  async function createViaAgentTask(params: Record<string, unknown> = {}): Promise<{ githubTracking?: { enabled?: boolean; repoOverride?: string } }> {
+    const created = await createAgentTask(store, {
+      description: "tracking defaults task",
+      source: { sourceType: "api" },
+      ...(params as never),
+    });
+    const task = await store.getTask(created.task.id);
+    return task;
+  }
+
+  it("prefills enabled=true from project defaults", async () => {
+    await store.updateSettings({
+      githubTrackingEnabledByDefault: true,
+      githubTrackingDefaultRepo: "owner/repo",
+    });
+
+    const task = await createViaAgentTask();
+    expect(task.githubTracking?.enabled).toBe(true);
+    expect(task.githubTracking?.repoOverride).toBe("owner/repo");
+  });
+
+  it("does not prefill when project defaults disabled", async () => {
+    await store.updateSettings({
+      githubTrackingEnabledByDefault: false,
+      githubTrackingDefaultRepo: "owner/repo",
+    });
+
+    const task = await createViaAgentTask();
+    expect(task.githubTracking).toBeUndefined();
+  });
+
+  it("preserves explicit opt-out enabled=false", async () => {
+    await store.updateSettings({
+      githubTrackingEnabledByDefault: true,
+      githubTrackingDefaultRepo: "owner/repo",
+    });
+
+    const task = await createViaAgentTask({ githubTracking: { enabled: false } });
+    expect(task.githubTracking?.enabled).toBe(false);
+  });
+
+  it("sets enabled=true even when no repo is configured", async () => {
+    await store.updateSettings({
+      githubTrackingEnabledByDefault: true,
+      githubTrackingDefaultRepo: undefined,
+    });
+
+    const task = await createViaAgentTask();
+    expect(task.githubTracking?.enabled).toBe(true);
+    expect(task.githubTracking?.repoOverride).toBeUndefined();
+  });
+
+  it("uses global-only defaults when project settings are empty", async () => {
+    await store.getGlobalSettingsStore().updateSettings({
+      githubTrackingDefaultEnabledForNewTasks: true,
+      githubTrackingDefaultRepo: "global/repo",
+    });
+    vi.spyOn(store, "getSettings").mockResolvedValue({} as never);
+
+    const task = await createViaAgentTask();
+    expect(task.githubTracking?.enabled).toBe(true);
+    expect(task.githubTracking?.repoOverride).toBe("global/repo");
   });
 });
