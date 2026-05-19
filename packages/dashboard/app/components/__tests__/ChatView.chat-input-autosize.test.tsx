@@ -10,11 +10,12 @@ describe("ChatView chat input autosize", () => {
     const textareaRule = chatViewCss.match(/\.chat-input-textarea\s*\{[^}]*\}/);
 
     expect(textareaRule).not.toBeNull();
-    expect(textareaRule?.[0]).toContain("max-height: 320px");
+    expect(textareaRule?.[0]).toContain("max-height: 640px");
   });
 
   it("clamps oversized textarea growth to the new max height", () => {
-    expect(clampChatInputHeight(600)).toBe(320);
+    expect(clampChatInputHeight(600)).toBe(600);
+    expect(clampChatInputHeight(800)).toBe(640);
     expect(clampChatInputHeight(600)).not.toBe(120);
   });
 
