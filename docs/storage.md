@@ -15,6 +15,12 @@
 - Archived-task flows (`archiveTask`, archived cleanup/migration) still hard-delete from the active `tasks` table after copying to cold storage (`archive.db`).
 - ID reservation is unchanged: soft-deleted IDs remain reserved. `distributed-task-id` and `task-id-integrity` intentionally scan all task rows (including soft-deleted rows), and must not filter on `deletedAt`.
 
+### Dashboard delete-event handling (FN-5135)
+
+- Dashboard clients treat any SSE payload with `deletedAt != null` (`task:created`, `task:updated`, `task:moved`, `task:merged`) as a delete-equivalent and remove/suppress that task locally.
+- SSE slim serialization (`stripTaskListHeavyFields`) must preserve `deletedAt`; dropping it can resurrect soft-deleted cards on live boards.
+- Client-side SWR cache hydration also filters `deletedAt` rows before normalization as defense-in-depth; REST slim `listTasks` remains server-filtered with `deletedAt IS NULL`.
+
 ### Lineage children (FN-5129)
 
 - `deleteTask` and `archiveTask` now enforce lineage integrity for `sourceParentTaskId` links.

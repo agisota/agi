@@ -586,7 +586,7 @@ export function useTasks(options?: UseTasksOptions) {
       return;
     }
 
-    const normalizedTasks = incomingTasks.map(normalizeTask);
+    const normalizedTasks = filterActiveTasks(incomingTasks.map(normalizeTask));
     setTasks((prev) => {
       let next = prev;
 
