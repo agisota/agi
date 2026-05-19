@@ -3436,6 +3436,13 @@ export class Database {
     if (version < 88) {
       this.applyMigration(88, () => {
         try {
+          const taskColumns = this.getTableColumns("tasks");
+          const requiredColumns = ["paused", "userPaused", "pausedByAgentId", "pausedReason"];
+          if (!requiredColumns.every((column) => taskColumns.has(column))) {
+            console.log("[done-paused-backfill] db.ts migration skipped (missing paused columns on legacy schema)");
+            return;
+          }
+
           const result = this.db
             .prepare(`UPDATE tasks
                 SET paused = 0,

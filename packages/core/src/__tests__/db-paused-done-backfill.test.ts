@@ -3,7 +3,6 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import Sqlite from "better-sqlite3";
 import { Database } from "../db.js";
 import { TaskStore } from "../store.js";
 
@@ -28,6 +27,9 @@ describe("done paused backfill", () => {
     const seedStore = new TaskStore(rootDir, globalDir);
     await seedStore.init();
     const task = await seedStore.createTask({ description: "drifted done paused task" });
+    await seedStore.moveTask(task.id, "todo");
+    await seedStore.moveTask(task.id, "in-progress");
+    await seedStore.moveTask(task.id, "in-review");
     await seedStore.moveTask(task.id, "done");
     await seedStore.updateTask(task.id, {
       paused: true,
@@ -38,9 +40,10 @@ describe("done paused backfill", () => {
     seedStore.close();
 
     const fusionDir = join(rootDir, ".fusion");
-    const sqlite = new Sqlite(join(fusionDir, "fusion.db"));
-    sqlite.prepare("UPDATE __meta SET value = '87' WHERE key = 'schemaVersion'").run();
-    sqlite.close();
+    const schemaDowngradeDb = new Database(fusionDir);
+    schemaDowngradeDb.init();
+    schemaDowngradeDb.prepare("UPDATE __meta SET value = '87' WHERE key = 'schemaVersion'").run();
+    schemaDowngradeDb.close();
 
     const migrationLog = vi.spyOn(console, "log").mockImplementation(() => {});
     const db = new Database(fusionDir);

@@ -6519,15 +6519,19 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
       const repairedTaskIds: string[] = [];
       for (const [taskId, cachedTask] of this.taskCache.entries()) {
         if (cachedTask.column !== "done") continue;
-        if (!this.clearDoneTransientFields(cachedTask)) continue;
 
-        await this.atomicWriteTaskJson(this.taskDir(taskId), cachedTask);
-        this.taskCache.set(taskId, { ...cachedTask });
+        const taskDir = this.taskDir(taskId);
+        const raw = await readFile(join(taskDir, "task.json"), "utf-8");
+        const diskTask = JSON.parse(raw) as Task;
+        if (!this.clearDoneTransientFields(diskTask)) continue;
+
+        await this.atomicWriteTaskJson(taskDir, diskTask);
+        this.taskCache.set(taskId, { ...diskTask });
         repairedTaskIds.push(taskId);
       }
       this.donePauseBackfillDone = true;
 
-      storeLog.info("done-task pause metadata backfill completed", {
+      storeLog.log("done-task pause metadata backfill completed", {
         phase: "watch:done-pause-backfill",
         repairedCount: repairedTaskIds.length,
         repairedTaskIds: repairedTaskIds.slice(0, 20),
