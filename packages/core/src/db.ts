@@ -120,7 +120,7 @@ export function probeFts5(db: DatabaseSync): boolean {
 
 // ── Schema Definition ────────────────────────────────────────────────
 
-const SCHEMA_VERSION = 88;
+const SCHEMA_VERSION = 89;
 
 function normalizeTaskComments(
   steeringComments: SteeringComment[] | undefined,
@@ -495,6 +495,19 @@ CREATE TABLE IF NOT EXISTS agentBlockedStates (
   updatedAt TEXT NOT NULL,
   FOREIGN KEY (agentId) REFERENCES agents(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS mergeQueue (
+  taskId TEXT PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+  enqueuedAt TEXT NOT NULL,
+  priority TEXT NOT NULL DEFAULT 'normal',
+  leasedBy TEXT,
+  leasedAt TEXT,
+  leaseExpiresAt TEXT,
+  attemptCount INTEGER NOT NULL DEFAULT 0,
+  lastError TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_mergeQueue_lease_ready ON mergeQueue(leasedBy, priority, enqueuedAt);
+CREATE INDEX IF NOT EXISTS idx_mergeQueue_leaseExpiresAt ON mergeQueue(leaseExpiresAt);
 
 -- Task documents (key-value store per task with revision tracking)
 CREATE TABLE IF NOT EXISTS task_documents (
@@ -3462,6 +3475,31 @@ export class Database {
         } catch (error) {
           console.warn("[done-paused-backfill] db.ts migration failed", error);
         }
+      });
+    }
+
+    if (version < 89) {
+      this.applyMigration(89, () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS mergeQueue (
+            taskId TEXT PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+            enqueuedAt TEXT NOT NULL,
+            priority TEXT NOT NULL DEFAULT 'normal',
+            leasedBy TEXT,
+            leasedAt TEXT,
+            leaseExpiresAt TEXT,
+            attemptCount INTEGER NOT NULL DEFAULT 0,
+            lastError TEXT
+          )
+        `);
+        this.db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_mergeQueue_lease_ready
+            ON mergeQueue(leasedBy, priority, enqueuedAt)
+        `);
+        this.db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_mergeQueue_leaseExpiresAt
+            ON mergeQueue(leaseExpiresAt)
+        `);
       });
     }
 

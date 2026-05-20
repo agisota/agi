@@ -38,6 +38,31 @@ export type TaskPriority = (typeof TASK_PRIORITIES)[number];
  */
 export const DEFAULT_TASK_PRIORITY: TaskPriority = "normal";
 
+export interface MergeQueueEntry {
+  taskId: string;
+  enqueuedAt: string;
+  priority: TaskPriority;
+  leasedBy: string | null;
+  leasedAt: string | null;
+  leaseExpiresAt: string | null;
+  attemptCount: number;
+  lastError: string | null;
+}
+
+export interface MergeQueueEnqueueOptions {
+  priority?: TaskPriority;
+  now?: string;
+}
+
+export interface MergeQueueAcquireOptions {
+  leaseDurationMs: number;
+  now?: string;
+}
+
+export type MergeQueueReleaseOutcome =
+  | { kind: "success" }
+  | { kind: "failure"; error: string };
+
 /**
  * Dashboard high-fan-out blocker threshold. A blocker is considered high impact
  * when at least this many active todo tasks are waiting on it.
@@ -4944,6 +4969,13 @@ export interface AgentPromptsConfig {
  *  - "sandbox": Sandbox backend lifecycle events for user-configured command execution */
 export type RunAuditDomain = "database" | "git" | "filesystem" | "sandbox";
 
+export type RunAuditMutationType =
+  | "mergeQueue:enqueue"
+  | "mergeQueue:lease-acquired"
+  | "mergeQueue:lease-released"
+  | "mergeQueue:lease-expired"
+  | (string & {});
+
 /** Input for recording a run-audit event. */
 export interface RunAuditEventInput {
   /** ISO-8601 timestamp when the event occurred. Defaults to current time if not provided. */
@@ -4957,7 +4989,7 @@ export interface RunAuditEventInput {
   /** The domain/category of the mutation. */
   domain: RunAuditDomain;
   /** Type of mutation (e.g., "task:update", "git:commit", "file:write"). */
-  mutationType: string;
+  mutationType: RunAuditMutationType;
   /** Target of the mutation (e.g., task ID, file path, branch name). */
   target: string;
   /** Optional structured metadata about the mutation (compact, actionable data). */
@@ -4979,7 +5011,7 @@ export interface RunAuditEvent {
   /** The domain/category of the mutation */
   domain: RunAuditDomain;
   /** Type of mutation (e.g., "task:update", "git:commit", "file:write") */
-  mutationType: string;
+  mutationType: RunAuditMutationType;
   /** Target of the mutation (e.g., task ID, file path, branch name) */
   target: string;
   /** Optional structured metadata about the mutation */
@@ -4997,7 +5029,7 @@ export interface RunAuditEventFilter {
   /** Filter by domain. */
   domain?: RunAuditDomain;
   /** Filter by mutation type. */
-  mutationType?: string;
+  mutationType?: RunAuditMutationType;
   /** Start of time range (inclusive). */
   startTime?: string;
   /** End of time range (inclusive). */

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync, watch, type FSWatcher } from "node:fs";
-import type { Task, TaskDetail, TaskCreateInput, TaskAttachment, AgentLogEntry, BoardConfig, Column, CheckoutClaimPrecondition, MergeResult, Settings, GlobalSettings, ProjectSettings, ActivityLogEntry, ActivityEventType, TaskDocument, TaskDocumentRevision, TaskDocumentCreateInput, TaskDocumentWithTask, InboxTask, TaskLogEntry, RunMutationContext, RunAuditEvent, RunAuditEventInput, RunAuditEventFilter, ArchivedTaskEntry, ArchiveAgentLogMode, TaskPriority, SourceType, WorkflowStepTemplate, Agent, AutostashOrphanRecord, TaskCommitAssociation, TaskCommitAssociationMatchSource, TaskCommitAssociationConfidence, GithubIssueAction } from "./types.js";
+import type { Task, TaskDetail, TaskCreateInput, TaskAttachment, AgentLogEntry, BoardConfig, Column, CheckoutClaimPrecondition, MergeResult, Settings, GlobalSettings, ProjectSettings, ActivityLogEntry, ActivityEventType, TaskDocument, TaskDocumentRevision, TaskDocumentCreateInput, TaskDocumentWithTask, InboxTask, TaskLogEntry, RunMutationContext, RunAuditEvent, RunAuditEventInput, RunAuditEventFilter, ArchivedTaskEntry, ArchiveAgentLogMode, TaskPriority, SourceType, WorkflowStepTemplate, Agent, AutostashOrphanRecord, TaskCommitAssociation, TaskCommitAssociationMatchSource, TaskCommitAssociationConfidence, GithubIssueAction, MergeQueueEntry, MergeQueueEnqueueOptions, MergeQueueAcquireOptions, MergeQueueReleaseOutcome } from "./types.js";
 import { createActivityLogSnapshot, createRunAuditSnapshot, createTaskMetadataSnapshot, toTaskMetadataRecord, validateSnapshotEnvelope, type ActivityLogSnapshot, type RunAuditSnapshot, type TaskMetadataSnapshot } from "./shared-mesh-state.js";
 import { VALID_TRANSITIONS, DEFAULT_SETTINGS, isGlobalOnlySettingsKey, WORKFLOW_STEP_TEMPLATES, validateDocumentKey } from "./types.js";
 import { DEFAULT_PROJECT_SETTINGS } from "./settings-schema.js";
@@ -260,6 +260,17 @@ interface RunAuditEventRow {
   mutationType: string;
   target: string;
   metadata: string | null;
+}
+
+interface MergeQueueRow {
+  taskId: string;
+  enqueuedAt: string;
+  priority: string;
+  leasedBy: string | null;
+  leasedAt: string | null;
+  leaseExpiresAt: string | null;
+  attemptCount: number;
+  lastError: string | null;
 }
 
 /** Database row shape for the config table. */
@@ -792,6 +803,35 @@ export function detectSelfDefeatingDependency(
     matchedVerb,
     operandTaskId,
   };
+}
+
+export class MergeQueueTaskNotFoundError extends Error {
+  constructor(public readonly taskId: string) {
+    super(`Cannot enqueue merge queue entry for missing task ${taskId}`);
+    this.name = "MergeQueueTaskNotFoundError";
+  }
+}
+
+export class MergeQueueLeaseOwnershipError extends Error {
+  constructor(
+    public readonly taskId: string,
+    public readonly workerId: string,
+    public readonly currentOwner: string | null,
+  ) {
+    super(
+      currentOwner
+        ? `Worker ${workerId} does not own merge queue lease for ${taskId}; current owner is ${currentOwner}`
+        : `Worker ${workerId} cannot release merge queue lease for ${taskId}; the entry is not currently leased`,
+    );
+    this.name = "MergeQueueLeaseOwnershipError";
+  }
+}
+
+export class InvalidMergeQueueLeaseDurationError extends Error {
+  constructor(public readonly leaseDurationMs: number) {
+    super(`merge queue leaseDurationMs must be > 0 (received ${leaseDurationMs})`);
+    this.name = "InvalidMergeQueueLeaseDurationError";
+  }
 }
 
 export class TaskStore extends EventEmitter<TaskStoreEvents> {
@@ -5615,6 +5655,19 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
 
   // ── Run Audit APIs ───────────────────────────────────────────────────
 
+  private rowToMergeQueueEntry(row: MergeQueueRow): MergeQueueEntry {
+    return {
+      taskId: row.taskId,
+      enqueuedAt: row.enqueuedAt,
+      priority: normalizeTaskPriority(row.priority),
+      leasedBy: row.leasedBy,
+      leasedAt: row.leasedAt,
+      leaseExpiresAt: row.leaseExpiresAt,
+      attemptCount: row.attemptCount,
+      lastError: row.lastError,
+    };
+  }
+
   /**
    * Convert a database row to a RunAuditEvent object.
    */
@@ -5748,6 +5801,210 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
     `).all(...sqlParams) as unknown as RunAuditEventRow[];
 
     return rows.map((row) => this.rowToRunAuditEvent(row));
+  }
+
+  enqueueMergeQueue(taskId: string, opts: MergeQueueEnqueueOptions = {}): MergeQueueEntry {
+    return this.db.transactionImmediate(() => {
+      const existing = this.db.prepare("SELECT * FROM mergeQueue WHERE taskId = ?").get(taskId) as MergeQueueRow | undefined;
+      const taskRow = this.db.prepare("SELECT priority FROM tasks WHERE id = ?").get(taskId) as { priority: string | null } | undefined;
+      if (!taskRow) {
+        throw new MergeQueueTaskNotFoundError(taskId);
+      }
+
+      const now = opts.now ?? new Date().toISOString();
+      const priority = opts.priority ?? normalizeTaskPriority(taskRow.priority);
+
+      let entry: MergeQueueEntry;
+      let alreadyEnqueued = true;
+      if (existing) {
+        entry = this.rowToMergeQueueEntry(existing);
+      } else {
+        this.db.prepare(`
+          INSERT INTO mergeQueue (taskId, enqueuedAt, priority, attemptCount)
+          VALUES (?, ?, ?, 0)
+          ON CONFLICT(taskId) DO NOTHING
+        `).run(taskId, now, priority);
+        const inserted = this.db.prepare("SELECT * FROM mergeQueue WHERE taskId = ?").get(taskId) as MergeQueueRow | undefined;
+        if (!inserted) {
+          throw new Error(`Failed to read merge queue entry for ${taskId} after enqueue`);
+        }
+        entry = this.rowToMergeQueueEntry(inserted);
+        alreadyEnqueued = false;
+      }
+
+      this.insertRunAuditEventRow({
+        taskId,
+        domain: "database",
+        mutationType: "mergeQueue:enqueue",
+        target: taskId,
+        metadata: {
+          taskId,
+          priority: entry.priority,
+          enqueuedAt: entry.enqueuedAt,
+          alreadyEnqueued,
+        },
+      });
+
+      return entry;
+    });
+  }
+
+  acquireMergeQueueLease(workerId: string, opts: MergeQueueAcquireOptions): MergeQueueEntry | null {
+    if (opts.leaseDurationMs <= 0) {
+      throw new InvalidMergeQueueLeaseDurationError(opts.leaseDurationMs);
+    }
+
+    return this.db.transactionImmediate(() => {
+      const now = opts.now ?? new Date().toISOString();
+      const leaseExpiresAt = new Date(Date.parse(now) + opts.leaseDurationMs).toISOString();
+      const leased = this.db.prepare(`
+        UPDATE mergeQueue
+           SET leasedBy = ?, leasedAt = ?, leaseExpiresAt = ?
+         WHERE taskId = (
+           SELECT taskId FROM mergeQueue
+            WHERE leasedBy IS NULL OR leaseExpiresAt <= ?
+            ORDER BY CASE priority
+                       WHEN 'urgent' THEN 0
+                       WHEN 'high'   THEN 1
+                       WHEN 'normal' THEN 2
+                       WHEN 'low'    THEN 3
+                       ELSE 4
+                     END ASC,
+                     enqueuedAt ASC
+            LIMIT 1
+         )
+         RETURNING *
+      `).get(workerId, now, leaseExpiresAt, now) as MergeQueueRow | undefined;
+
+      if (!leased) {
+        return null;
+      }
+
+      const entry = this.rowToMergeQueueEntry(leased);
+      this.insertRunAuditEventRow({
+        taskId: entry.taskId,
+        domain: "database",
+        mutationType: "mergeQueue:lease-acquired",
+        target: entry.taskId,
+        metadata: {
+          taskId: entry.taskId,
+          workerId,
+          leaseExpiresAt: entry.leaseExpiresAt,
+          priority: entry.priority,
+        },
+      });
+      return entry;
+    });
+  }
+
+  releaseMergeQueueLease(taskId: string, workerId: string, outcome: MergeQueueReleaseOutcome): void {
+    this.db.transactionImmediate(() => {
+      const current = this.db.prepare("SELECT leasedBy FROM mergeQueue WHERE taskId = ?").get(taskId) as { leasedBy: string | null } | undefined;
+      if (!current || current.leasedBy !== workerId) {
+        throw new MergeQueueLeaseOwnershipError(taskId, workerId, current?.leasedBy ?? null);
+      }
+
+      if (outcome.kind === "success") {
+        this.db.prepare("DELETE FROM mergeQueue WHERE taskId = ? AND leasedBy = ?").run(taskId, workerId);
+        this.insertRunAuditEventRow({
+          taskId,
+          domain: "database",
+          mutationType: "mergeQueue:lease-released",
+          target: taskId,
+          metadata: {
+            taskId,
+            workerId,
+            outcome: "success",
+          },
+        });
+        return;
+      }
+
+      const released = this.db.prepare(`
+        UPDATE mergeQueue
+           SET leasedBy = NULL,
+               leasedAt = NULL,
+               leaseExpiresAt = NULL,
+               attemptCount = attemptCount + 1,
+               lastError = ?
+         WHERE taskId = ? AND leasedBy = ?
+         RETURNING *
+      `).get(outcome.error, taskId, workerId) as MergeQueueRow | undefined;
+      if (!released) {
+        throw new MergeQueueLeaseOwnershipError(taskId, workerId, null);
+      }
+
+      const entry = this.rowToMergeQueueEntry(released);
+      this.insertRunAuditEventRow({
+        taskId,
+        domain: "database",
+        mutationType: "mergeQueue:lease-released",
+        target: taskId,
+        metadata: {
+          taskId,
+          workerId,
+          outcome: "failure",
+          attemptCount: entry.attemptCount,
+          error: outcome.error,
+        },
+      });
+    });
+  }
+
+  recoverExpiredMergeQueueLeases(now: string = new Date().toISOString()): MergeQueueEntry[] {
+    return this.db.transactionImmediate(() => {
+      const expired = this.db.prepare(`
+        SELECT * FROM mergeQueue
+         WHERE leasedBy IS NOT NULL AND leaseExpiresAt <= ?
+         ORDER BY leaseExpiresAt ASC, enqueuedAt ASC
+      `).all(now) as MergeQueueRow[];
+      if (expired.length === 0) {
+        return [];
+      }
+
+      const recoveredRows = this.db.prepare(`
+        UPDATE mergeQueue
+           SET leasedBy = NULL,
+               leasedAt = NULL,
+               leaseExpiresAt = NULL
+         WHERE leasedBy IS NOT NULL AND leaseExpiresAt <= ?
+         RETURNING *
+      `).all(now) as MergeQueueRow[];
+
+      const previousByTaskId = new Map(expired.map((row) => [row.taskId, row]));
+      for (const row of recoveredRows) {
+        const previous = previousByTaskId.get(row.taskId);
+        this.insertRunAuditEventRow({
+          taskId: row.taskId,
+          domain: "database",
+          mutationType: "mergeQueue:lease-expired",
+          target: row.taskId,
+          metadata: {
+            taskId: row.taskId,
+            previousLeasedBy: previous?.leasedBy ?? null,
+            previousLeaseExpiresAt: previous?.leaseExpiresAt ?? null,
+            recoveredAt: now,
+          },
+        });
+      }
+
+      return recoveredRows.map((row) => this.rowToMergeQueueEntry(row));
+    });
+  }
+
+  peekMergeQueue(): MergeQueueEntry[] {
+    const rows = this.db.prepare(`
+      SELECT * FROM mergeQueue
+      ORDER BY CASE priority
+                 WHEN 'urgent' THEN 0
+                 WHEN 'high'   THEN 1
+                 WHEN 'normal' THEN 2
+                 WHEN 'low'    THEN 3
+                 ELSE 4
+               END ASC,
+               enqueuedAt ASC
+    `).all() as MergeQueueRow[];
+    return rows.map((row) => this.rowToMergeQueueEntry(row));
   }
 
   // ── End Run Audit APIs ───────────────────────────────────────────────

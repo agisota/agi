@@ -141,7 +141,7 @@ Important execution nuance:
 - **Backend settings keys defined in `@fusion/core`:** **78** total
   - **Global settings:** 17 (`GlobalSettings`)
   - **Project settings:** 61 (`ProjectSettings`)
-- **SQLite tables in project DB schema (`packages/core/src/db.ts`):** **45** (including migration-created tables)
+- **SQLite tables in project DB schema (`packages/core/src/db.ts`):** **46** (including migration-created tables)
 - **Issues identified:** **9**
   - High: 2
   - Medium: 5
@@ -309,6 +309,7 @@ Additional backend notes:
 | Table | Purpose |
 |---|---|
 | `tasks` | Core task metadata and JSON-backed nested fields (priority, dependencies, steps, log, attachments, comments, model overrides, workflow results, merge details, assignment, mission linkage). |
+| `mergeQueue` | Durable merge handoff queue keyed by `taskId`. Stores enqueue ordering (`enqueuedAt`, mirrored `priority`), single-owner lease state (`leasedBy`, `leasedAt`, `leaseExpiresAt`), and retry diagnostics (`attemptCount`, `lastError`). Leasing is priority-first + FIFO within priority, and expired leases are recoverable without incrementing attempts. FN-5242 adds the persistence/lease primitive; FN-5241 and FN-5243 wire executor enqueue + merger consumption. |
 
 The `tasks.githubTracking` JSON column stores per-task GitHub tracking state (`enabled`, optional `repoOverride`, linked issue metadata, and `unlinkedAt`). It is additive and default-off; imported-source issue metadata remains in `issueInfo` / `sourceIssue`. Behavior wiring (issue creation/lifecycle sync and UI surfacing) lands in FN-3870/FN-3873/FN-3874.
 | `config` | Single-row project configuration (`nextId`, settings payload, workflow step counters). |
