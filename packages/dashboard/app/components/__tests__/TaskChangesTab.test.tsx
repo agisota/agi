@@ -151,7 +151,7 @@ describe("TaskChangesTab — worktree-backed (non-done tasks)", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("2 files modified during execution.")).toBeTruthy();
+      expect(screen.getByText("2 files changed.")).toBeTruthy();
     });
     expect(screen.getByText("packages/core/src/store.ts")).toBeTruthy();
     expect(screen.getByText("packages/core/src/types.ts")).toBeTruthy();
@@ -608,11 +608,13 @@ describe("TaskChangesTab — regression: non-done tasks and done-without-commitS
     );
 
     await waitFor(() => {
-      expect(screen.getByText("1 file in the merged commit.")).toBeTruthy();
+      expect(screen.getByText("1 file changed.")).toBeTruthy();
     });
     expect(screen.getByText("These are files captured from the merged commit metadata. The lineage-backed diff is unavailable for this task.")).toBeTruthy();
     expect(screen.getByText("packages/cli/src/commands/__tests__/settings.test.ts")).toBeTruthy();
     expect(screen.queryByText("packages/cli/src/commands/__tests__/task.test.ts")).toBeNull();
+    expect(screen.queryByText(/touched during execution/i)).toBeNull();
+    expect(screen.queryByText(/in the merged commit\b/i)).toBeNull();
     expect(screen.queryByText(/Error loading changes:/)).toBeNull();
     expect(screen.queryByText("Files Changed (2)")).toBeNull();
     expect(mockFetchTaskDiff).toHaveBeenCalledWith("FN-001", undefined, undefined);
@@ -632,11 +634,13 @@ describe("TaskChangesTab — regression: non-done tasks and done-without-commitS
     );
 
     await waitFor(() => {
-      expect(screen.getByText("2 files modified during execution.")).toBeTruthy();
+      expect(screen.getByText("2 files changed.")).toBeTruthy();
     });
     expect(screen.getByText("These are files captured from the worktree during execution. They may differ from the files that actually landed on main. The lineage-backed diff is unavailable for this task.")).toBeTruthy();
     expect(screen.getByText("packages/cli/src/commands/__tests__/settings.test.ts")).toBeTruthy();
     expect(screen.getByText("packages/cli/src/commands/__tests__/task.test.ts")).toBeTruthy();
+    expect(screen.queryByText(/touched during execution/i)).toBeNull();
+    expect(screen.queryByText(/in the merged commit\b/i)).toBeNull();
     expect(screen.queryByText(/Error loading changes:/)).toBeNull();
     expect(screen.queryByText("Files Changed (2)")).toBeNull();
     expect(mockFetchTaskDiff).toHaveBeenCalledWith("FN-001", undefined, undefined);
