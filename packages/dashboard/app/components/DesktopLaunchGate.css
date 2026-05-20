@@ -18,7 +18,7 @@
   border: 1px solid var(--border-subtle, #2a2f3a);
   border-radius: 12px;
   padding: 2rem 1.75rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-lg);
 }
 
 .desktop-launch-gate__panel h1,
