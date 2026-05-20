@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { loadAllAppCss } from "../../test/cssFixture";
 import { SecretsView } from "../SecretsView";
 
 type JsonResponse = {
@@ -17,18 +18,40 @@ function mockJsonResponse({ ok, status = ok ? 200 : 400, body }: JsonResponse): 
   } as unknown as Response;
 }
 
-function expectVisibleEyeIcon(svg: SVGElement) {
-  const style = getComputedStyle(svg);
-  expect(svg).toBeInTheDocument();
-  expect(svg.getAttribute("width")).toBeTruthy();
-  expect(svg.getAttribute("height")).toBeTruthy();
-  expect(style.display).toBe("block");
-  expect(style.stroke).not.toBe("none");
+function installAllCss() {
+  const style = document.createElement("style");
+  style.setAttribute("data-test-all-app-css", "true");
+  style.textContent = loadAllAppCss();
+  document.head.appendChild(style);
+}
+
+function removeAllCss() {
+  document.head.querySelector('[data-test-all-app-css="true"]')?.remove();
+}
+
+function expectVisibleActionIcon(button: HTMLElement) {
+  const svg = button.querySelector("svg");
+  expect(svg).not.toBeNull();
+  const svgStyle = getComputedStyle(svg as SVGElement);
+  const buttonStyle = getComputedStyle(button);
+  expect(svg).toHaveClass("secrets-action-icon");
+  expect(Number.parseFloat(svgStyle.width)).toBeGreaterThan(0);
+  expect(Number.parseFloat(svgStyle.height)).toBeGreaterThan(0);
+  expect(svgStyle.display).toBe("block");
+  expect(svgStyle.stroke.toLowerCase()).not.toBe("none");
+  expect(svgStyle.stroke).not.toBe(buttonStyle.backgroundColor);
 }
 
 describe("SecretsView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    document.documentElement.dataset.theme = "dark";
+    installAllCss();
+  });
+
+  afterEach(() => {
+    removeAllCss();
+    delete document.documentElement.dataset.theme;
   });
 
   it("renders Not configured status", async () => {
@@ -171,7 +194,9 @@ describe("SecretsView", () => {
     expect(screen.queryByText("__sync_passphrase__")).not.toBeInTheDocument();
   });
 
-  it("renders a visible row reveal icon", async () => {
+  it.each(["dark", "light"] as const)("keeps header and row action icons visible in %s theme", async (theme) => {
+    document.documentElement.dataset.theme = theme;
+
     vi.stubGlobal(
       "fetch",
       vi
@@ -190,14 +215,19 @@ describe("SecretsView", () => {
     );
 
     render(<SecretsView addToast={vi.fn()} />);
+    await screen.findByText("VISIBLE");
 
-    const revealButton = await screen.findByRole("button", { name: "Reveal" });
-    const svg = revealButton.querySelector("svg");
-    expect(svg).not.toBeNull();
-    expectVisibleEyeIcon(svg as SVGElement);
+    expectVisibleActionIcon(screen.getByRole("button", { name: "Refresh" }));
+    expectVisibleActionIcon(screen.getByRole("button", { name: "Add Secret" }));
+    expectVisibleActionIcon(screen.getByRole("button", { name: "Reveal" }));
+    expectVisibleActionIcon(screen.getByRole("button", { name: "Copy" }));
+    expectVisibleActionIcon(screen.getByRole("button", { name: "Edit" }));
+    expectVisibleActionIcon(screen.getByRole("button", { name: "Delete" }));
   });
 
-  it("renders a visible modal value toggle icon", async () => {
+  it.each(["dark", "light"] as const)("keeps the modal value toggle icon visible in %s theme", async (theme) => {
+    document.documentElement.dataset.theme = theme;
+
     vi.stubGlobal(
       "fetch",
       vi
@@ -210,10 +240,6 @@ describe("SecretsView", () => {
     await screen.findByText("Not configured");
 
     await userEvent.click(screen.getByRole("button", { name: "Add Secret" }));
-
-    const toggleButton = screen.getByRole("button", { name: "Show value" });
-    const svg = toggleButton.querySelector("svg");
-    expect(svg).not.toBeNull();
-    expectVisibleEyeIcon(svg as SVGElement);
+    expectVisibleActionIcon(screen.getByRole("button", { name: "Show value" }));
   });
 });

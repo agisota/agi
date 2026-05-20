@@ -142,7 +142,6 @@ describe("process-supervisor", () => {
 
     const child = superviseSpawn(process.execPath, [fixturePath, "exit-immediately"], {
       stdio: "ignore",
-      maxLifetimeMs: 100,
     });
 
     expect(child.pgid).toBeNull();

@@ -43,6 +43,17 @@ const EMPTY_FORM: SecretFormState = {
   envExportKey: "",
 };
 
+const actionIconProps = {
+  className: "secrets-action-icon",
+  "aria-hidden": true,
+  style: { width: "1em", height: "1em" },
+} as const;
+
+const spinningActionIconProps = {
+  ...actionIconProps,
+  className: "secrets-action-icon spin",
+} as const;
+
 export const SecretsView = ({ addToast }: SecretsViewProps) => {
   const [secrets, setSecrets] = useState<SecretRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -258,8 +269,8 @@ export const SecretsView = ({ addToast }: SecretsViewProps) => {
       <div className="secrets-header">
         <h2>Secrets</h2>
         <div className="secrets-header-actions">
-          <button className="btn btn-sm" onClick={() => void loadSecrets()}><RefreshCw size={14} /> Refresh</button>
-          <button className="btn btn-primary btn-sm" onClick={openCreate}><Plus size={14} /> Add Secret</button>
+          <button className="btn btn-sm" onClick={() => void loadSecrets()}><RefreshCw {...actionIconProps} /> Refresh</button>
+          <button className="btn btn-primary btn-sm" onClick={openCreate}><Plus {...actionIconProps} /> Add Secret</button>
         </div>
       </div>
 
@@ -280,7 +291,7 @@ export const SecretsView = ({ addToast }: SecretsViewProps) => {
       </article>
 
       {error ? <div className="form-error">{error}</div> : null}
-      {loading ? <div className="secrets-loading"><RefreshCw size={14} className="spin" /> Loading…</div> : null}
+      {loading ? <div className="secrets-loading"><RefreshCw {...spinningActionIconProps} /> Loading…</div> : null}
       {!loading && sortedSecrets.length === 0 ? <div className="secrets-empty">No secrets found.</div> : null}
 
       <div className="secrets-list">
@@ -306,13 +317,13 @@ export const SecretsView = ({ addToast }: SecretsViewProps) => {
                     onClick={() => void revealSecret(secret)}
                     aria-label={revealed ? "Hide" : "Reveal"}
                   >
-                    {revealed ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
+                    {revealed ? <EyeOff {...actionIconProps} /> : <Eye {...actionIconProps} />}
                   </button>
                   <button className="btn btn-icon" onClick={() => void copySecret(secret)} aria-label="Copy" disabled={!revealed}>
-                    {copiedId === secret.id ? <Check size={14} /> : <Copy size={14} />}
+                    {copiedId === secret.id ? <Check {...actionIconProps} /> : <Copy {...actionIconProps} />}
                   </button>
-                  <button className="btn btn-icon" onClick={() => openEdit(secret)} aria-label="Edit"><Pencil size={14} /></button>
-                  <button className="btn btn-icon btn-danger" onClick={() => setShowDeleteId(secret.id)} aria-label="Delete"><Trash2 size={14} /></button>
+                  <button className="btn btn-icon" onClick={() => openEdit(secret)} aria-label="Edit"><Pencil {...actionIconProps} /></button>
+                  <button className="btn btn-icon btn-danger" onClick={() => setShowDeleteId(secret.id)} aria-label="Delete"><Trash2 {...actionIconProps} /></button>
                 </div>
                 {showDeleteId === secret.id ? (
                   <div className="secrets-confirm">
@@ -352,7 +363,7 @@ export const SecretsView = ({ addToast }: SecretsViewProps) => {
             </div>
             <div className="secrets-modal-body">
               <div className="form-group"><label>Key</label><input className="input" value={form.key} onChange={(e) => setForm((c) => ({ ...c, key: e.target.value }))} /></div>
-              <div className="form-group"><label>Value</label><div className="secrets-value-row"><input className="input" type={showValue ? "text" : "password"} autoComplete="off" spellCheck={false} value={form.value} onChange={(e) => setForm((c) => ({ ...c, value: e.target.value }))} /><button type="button" className="btn btn-icon secrets-visibility-toggle" onClick={() => setShowValue((s) => !s)} aria-label={showValue ? "Hide value" : "Show value"}>{showValue ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}</button></div></div>
+              <div className="form-group"><label>Value</label><div className="secrets-value-row"><input className="input" type={showValue ? "text" : "password"} autoComplete="off" spellCheck={false} value={form.value} onChange={(e) => setForm((c) => ({ ...c, value: e.target.value }))} /><button type="button" className="btn btn-icon secrets-visibility-toggle" onClick={() => setShowValue((s) => !s)} aria-label={showValue ? "Hide value" : "Show value"}>{showValue ? <EyeOff {...actionIconProps} /> : <Eye {...actionIconProps} />}</button></div></div>
               <div className="form-group"><label>Description</label><textarea className="input" value={form.description} onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))} /></div>
               <div className="form-group"><label>Scope</label><div className="secrets-radio-row"><label><input type="radio" checked={form.scope === "project"} onChange={() => setForm((c) => ({ ...c, scope: "project" }))} disabled={Boolean(editing)} /> Project</label><label><input type="radio" checked={form.scope === "global"} onChange={() => setForm((c) => ({ ...c, scope: "global" }))} disabled={Boolean(editing)} /> Global</label></div></div>
               <div className="form-group"><label>Access policy</label><select className="select" value={form.accessPolicy} onChange={(e) => setForm((c) => ({ ...c, accessPolicy: e.target.value as SecretPolicy }))}><option value="auto">auto</option><option value="prompt">prompt</option><option value="deny">deny</option></select></div>
