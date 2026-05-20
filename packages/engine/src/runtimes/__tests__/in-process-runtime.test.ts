@@ -20,6 +20,7 @@ const {
   mockResumeOrphaned,
   mockTaskStoreSettings,
   mockTaskStoreGetTask,
+  mockTaskStoreUpdateSettings,
   mockMessageStoreSetHook,
   mockSchedulerConfigurePrMonitoring,
   mockIsGitRepository,
@@ -37,6 +38,7 @@ const {
   mockResumeOrphaned: vi.fn().mockResolvedValue(undefined),
   mockTaskStoreSettings: {} as Record<string, unknown>,
   mockTaskStoreGetTask: vi.fn().mockResolvedValue(null),
+  mockTaskStoreUpdateSettings: vi.fn().mockResolvedValue(undefined),
   mockMessageStoreSetHook: vi.fn(),
   mockSchedulerConfigurePrMonitoring: vi.fn(),
   mockIsGitRepository: vi.fn().mockResolvedValue(true),
@@ -72,6 +74,7 @@ vi.mock("@fusion/core", async () => {
       self.updateTask = vi.fn().mockImplementation(async (taskId: string, patch: Record<string, unknown>) => ({ id: taskId, ...patch }));
       self.moveTask = vi.fn().mockResolvedValue(undefined);
       self.getSettings = vi.fn().mockImplementation(async () => structuredClone(mockTaskStoreSettings));
+      self.updateSettings = mockTaskStoreUpdateSettings;
       self.getMissionStore = vi.fn().mockReturnValue({
         listMissions: vi.fn().mockReturnValue([]),
         getMissionWithHierarchy: vi.fn().mockReturnValue(null),
@@ -285,6 +288,19 @@ describe("InProcessRuntime", () => {
       await runtime.start();
       expect(runtime.getStatus()).toBe("active");
     }, 30000);
+
+    it("stamps engineActiveSinceMs during runtime start", async () => {
+      const before = Date.now();
+      await runtime.start();
+      const after = Date.now();
+
+      expect(mockTaskStoreUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ engineActiveSinceMs: expect.any(Number) }),
+      );
+      const stamp = (mockTaskStoreUpdateSettings.mock.calls.at(-1)?.[0] as { engineActiveSinceMs: number }).engineActiveSinceMs;
+      expect(stamp).toBeGreaterThanOrEqual(before);
+      expect(stamp).toBeLessThanOrEqual(after);
+    });
 
     it("does not spawn real git subprocesses during start()", async () => {
       const execSpy = vi.spyOn(childProcess, "exec");

@@ -11,6 +11,7 @@ export interface InReviewStalledSignal {
   quietMs: number;
   thresholdMs: number;
   lastActivityAt: string;
+  effectiveLastActivityAt?: string;
   lastActivitySource: "log" | "column-moved" | "updated";
 }
 
@@ -20,6 +21,8 @@ export interface InReviewStalledContext {
   autoMerge?: boolean;
   activeMergeTaskId?: string | null;
   executingTaskIds?: ReadonlySet<string>;
+  engineActiveSinceMs?: number;
+  engineActivationGraceMs?: number;
 }
 
 export const DEFAULT_IN_REVIEW_STALLED_THRESHOLD_MS = 24 * 60 * 60_000;
@@ -54,7 +57,11 @@ export function getInReviewStalledSignal(
   const lastActivity = getLastActivity(task);
   if (!lastActivity) return undefined;
 
-  const quietMs = Math.max(0, now - lastActivity.time);
+  const activationFloorMs = getActivationFloorMs(context);
+  const effectiveLastActivityMs = activationFloorMs !== undefined
+    ? Math.max(lastActivity.time, activationFloorMs)
+    : lastActivity.time;
+  const quietMs = Math.max(0, now - effectiveLastActivityMs);
   if (quietMs < thresholdMs) return undefined;
 
   const ageAnchor = Date.parse(task.columnMovedAt ?? task.updatedAt);
@@ -72,8 +79,19 @@ export function getInReviewStalledSignal(
     quietMs,
     thresholdMs,
     lastActivityAt: new Date(lastActivity.time).toISOString(),
+    ...(effectiveLastActivityMs !== lastActivity.time
+      ? { effectiveLastActivityAt: new Date(effectiveLastActivityMs).toISOString() }
+      : {}),
     lastActivitySource: lastActivity.source,
   };
+}
+
+function getActivationFloorMs(context: InReviewStalledContext): number | undefined {
+  if (typeof context.engineActiveSinceMs !== "number" || !Number.isFinite(context.engineActiveSinceMs)) {
+    return undefined;
+  }
+
+  return context.engineActiveSinceMs + Math.max(0, context.engineActivationGraceMs ?? 0);
 }
 
 function hasRecentReasonDrivenStall(log: readonly Pick<Task["log"][number], "action" | "timestamp">[], floor: number): boolean {

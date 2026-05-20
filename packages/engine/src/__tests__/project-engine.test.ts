@@ -1696,6 +1696,35 @@ describe("ProjectEngine paused in-review auto-merge behavior", () => {
     await engine.stop();
   });
 
+  it("stamps engineActiveSinceMs on global and engine unpause transitions", async () => {
+    const mockStore = createMockStore({ ...baseSettings, autoMerge: true });
+    mocks.currentStore = mockStore.store;
+    const engine = createEngine();
+
+    await engine.start();
+    mockStore.store.updateSettings.mockClear();
+
+    await mockStore.emitSettingsUpdated(
+      { ...baseSettings, autoMerge: true, globalPause: false },
+      { ...baseSettings, autoMerge: true, globalPause: true },
+    );
+
+    await mockStore.emitSettingsUpdated(
+      { ...baseSettings, autoMerge: true, enginePaused: false },
+      { ...baseSettings, autoMerge: true, enginePaused: true },
+    );
+
+    const activationStampCalls = mockStore.store.updateSettings.mock.calls.filter(
+      ([patch]) => patch && typeof patch === "object" && "engineActiveSinceMs" in patch,
+    );
+    expect(activationStampCalls).toHaveLength(2);
+    for (const [patch] of activationStampCalls) {
+      expect((patch as { engineActiveSinceMs: unknown }).engineActiveSinceMs).toEqual(expect.any(Number));
+    }
+
+    await engine.stop();
+  });
+
   it("resumes deferred startup recovery on engine unpause", async () => {
     const mockStore = createMockStore(baseSettings);
     mocks.currentStore = mockStore.store;

@@ -4702,6 +4702,24 @@ describe("SelfHealingManager", () => {
       managerWithRecovery.stop();
     });
 
+    it("suppresses transient-merge stall surfacing when engine activation floor is recent", async () => {
+      vi.setSystemTime(new Date("2026-01-01T00:10:00.000Z"));
+      const managerWithRecovery = new SelfHealingManager(store, { rootDir: "/tmp/test-project" });
+      (store.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        taskStuckTimeoutMs: 60_000,
+        autoMerge: true,
+        engineActiveSinceMs: Date.parse("2026-01-01T00:10:00.000Z"),
+        engineActivationGraceMs: 300_000,
+      });
+      (store.listTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
+        staleMergingTask({ mergeDetails: { mergeConfirmed: true } }),
+      ]);
+
+      expect(await managerWithRecovery.surfaceInReviewStalls()).toBe(0);
+      expect(store.logEntry).not.toHaveBeenCalled();
+      managerWithRecovery.stop();
+    });
+
     it("skips entirely when autoMerge is disabled", async () => {
       vi.setSystemTime(new Date("2026-01-01T00:10:00.000Z"));
       const managerWithRecovery = new SelfHealingManager(store, { rootDir: "/tmp/test-project" });
@@ -4998,6 +5016,22 @@ describe("SelfHealingManager", () => {
       managerWithRecovery.stop();
     });
 
+    it("suppresses quiet in-review surfacing when engine activation floor is recent", async () => {
+      vi.setSystemTime(new Date("2026-01-02T01:00:00.000Z"));
+      const managerWithRecovery = new SelfHealingManager(store, { rootDir: "/tmp/test-project" });
+      (store.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        inReviewStalledThresholdMs: 24 * 60 * 60_000,
+        autoMerge: true,
+        engineActiveSinceMs: Date.parse("2026-01-02T01:00:00.000Z"),
+        engineActivationGraceMs: 300_000,
+      });
+      (store.listTasks as ReturnType<typeof vi.fn>).mockResolvedValue([inReviewTask()]);
+
+      expect(await managerWithRecovery.surfaceInReviewStalled()).toBe(0);
+      expect(store.logEntry).not.toHaveBeenCalled();
+      managerWithRecovery.stop();
+    });
+
     it("skips for recent activity, paused, global pause, engine pause, autoMerge off, threshold off, executing, and active merge", async () => {
       vi.setSystemTime(new Date("2026-01-02T01:00:00.000Z"));
       const managerWithRecovery = new SelfHealingManager(store, {
@@ -5082,6 +5116,21 @@ describe("SelfHealingManager", () => {
       vi.setSystemTime(new Date("2026-01-01T00:10:00.000Z"));
       const managerWithRecovery = new SelfHealingManager(store, { rootDir: "/tmp/test-project" });
       (store.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({ stalePausedReviewThresholdMs: 24 * 60 * 60_000 });
+      (store.listTasks as ReturnType<typeof vi.fn>).mockResolvedValue([pausedReviewTask()]);
+
+      expect(await managerWithRecovery.surfaceStalePausedReviews()).toBe(0);
+      expect(store.logEntry).not.toHaveBeenCalled();
+      managerWithRecovery.stop();
+    });
+
+    it("suppresses stale paused review surfacing when engine activation floor is recent", async () => {
+      vi.setSystemTime(new Date("2026-01-02T01:00:00.000Z"));
+      const managerWithRecovery = new SelfHealingManager(store, { rootDir: "/tmp/test-project" });
+      (store.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        stalePausedReviewThresholdMs: 24 * 60 * 60_000,
+        engineActiveSinceMs: Date.parse("2026-01-02T01:00:00.000Z"),
+        engineActivationGraceMs: 300_000,
+      });
       (store.listTasks as ReturnType<typeof vi.fn>).mockResolvedValue([pausedReviewTask()]);
 
       expect(await managerWithRecovery.surfaceStalePausedReviews()).toBe(0);
@@ -5184,6 +5233,21 @@ describe("SelfHealingManager", () => {
         "FN-5034",
         expect.stringContaining("disposition options — unpause, move to triage, archive, or create follow-up task"),
       );
+      managerWithRecovery.stop();
+    });
+
+    it("suppresses stale paused todo surfacing when engine activation floor is recent", async () => {
+      vi.setSystemTime(new Date("2026-01-02T01:00:00.000Z"));
+      const managerWithRecovery = new SelfHealingManager(store, { rootDir: "/tmp/test-project" });
+      (store.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        stalePausedTodoThresholdMs: 24 * 60 * 60_000,
+        engineActiveSinceMs: Date.parse("2026-01-02T01:00:00.000Z"),
+        engineActivationGraceMs: 300_000,
+      });
+      (store.listTasks as ReturnType<typeof vi.fn>).mockResolvedValue([pausedTodoTask()]);
+
+      expect(await managerWithRecovery.surfaceStalePausedTodos()).toBe(0);
+      expect(store.logEntry).not.toHaveBeenCalled();
       managerWithRecovery.stop();
     });
 

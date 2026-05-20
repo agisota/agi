@@ -4130,6 +4130,8 @@ export class SelfHealingManager {
           executingTaskIds,
           staleMergingMinAgeMs: this.options.staleMergingStatusMinAgeMs ?? DEFAULT_STALE_MERGING_STATUS_MIN_AGE_MS,
           maxAutoMergeRetries: MAX_AUTO_MERGE_RETRIES,
+          engineActiveSinceMs: settings.engineActiveSinceMs,
+          engineActivationGraceMs: settings.engineActivationGraceMs,
         });
         if (!signal) continue;
 
@@ -4266,6 +4268,8 @@ export class SelfHealingManager {
           autoMerge: true,
           activeMergeTaskId,
           executingTaskIds,
+          engineActiveSinceMs: settings.engineActiveSinceMs,
+          engineActivationGraceMs: settings.engineActivationGraceMs,
         });
         if (!signal) continue;
 
@@ -4315,7 +4319,12 @@ export class SelfHealingManager {
 
       for (const task of tasks) {
         if (task.paused !== true) continue;
-        const signal = getStalePausedReviewSignal(task, { now: cycleStartMs, thresholdMs });
+        const signal = getStalePausedReviewSignal(task, {
+          now: cycleStartMs,
+          thresholdMs,
+          engineActiveSinceMs: settings.engineActiveSinceMs,
+          engineActivationGraceMs: settings.engineActivationGraceMs,
+        });
         if (!signal) continue;
         if (Date.parse(task.updatedAt) >= cycleStartMs) continue;
 
@@ -4361,7 +4370,12 @@ export class SelfHealingManager {
 
       for (const task of tasks) {
         if (task.paused !== true) continue;
-        const signal = getStalePausedTodoSignal(task, { now: cycleStartMs, thresholdMs });
+        const signal = getStalePausedTodoSignal(task, {
+          now: cycleStartMs,
+          thresholdMs,
+          engineActiveSinceMs: settings.engineActiveSinceMs,
+          engineActivationGraceMs: settings.engineActivationGraceMs,
+        });
         if (!signal) continue;
         if (Date.parse(task.updatedAt) >= cycleStartMs) continue;
 

@@ -284,6 +284,8 @@ export const DEFAULT_PROJECT_SETTINGS = {
   specStalenessEnabled: false,
   specStalenessMaxAgeMs: 6 * 60 * 60 * 1000,
   taskStuckTimeoutMs: 600_000,
+  engineActiveSinceMs: undefined,
+  engineActivationGraceMs: 5 * 60_000,
   inReviewStallDeadlockThreshold: 3,
   stalePausedReviewThresholdMs: 24 * 60 * 60_000,
   inReviewStalledThresholdMs: 24 * 60 * 60_000,

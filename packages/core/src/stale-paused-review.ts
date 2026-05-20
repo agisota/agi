@@ -15,6 +15,8 @@ export interface StalePausedReviewSignal {
 export interface StalePausedReviewContext {
   now?: number;
   thresholdMs?: number;
+  engineActiveSinceMs?: number;
+  engineActivationGraceMs?: number;
 }
 
 export const DEFAULT_STALE_PAUSED_REVIEW_THRESHOLD_MS = 24 * 60 * 60_000;
@@ -33,7 +35,9 @@ export function getStalePausedReviewSignal(
   const anchor = Date.parse(task.columnMovedAt ?? task.updatedAt);
   if (!Number.isFinite(anchor)) return undefined;
 
-  const ageMs = now - anchor;
+  const activationFloorMs = getActivationFloorMs(context);
+  const effectiveAnchor = activationFloorMs !== undefined ? Math.max(anchor, activationFloorMs) : anchor;
+  const ageMs = Math.max(0, now - effectiveAnchor);
   if (ageMs < thresholdMs) return undefined;
 
   return {
@@ -45,4 +49,12 @@ export function getStalePausedReviewSignal(
     pausedReason: task.pausedReason,
     pausedByAgentId: task.pausedByAgentId,
   };
+}
+
+function getActivationFloorMs(context: StalePausedReviewContext): number | undefined {
+  if (typeof context.engineActiveSinceMs !== "number" || !Number.isFinite(context.engineActiveSinceMs)) {
+    return undefined;
+  }
+
+  return context.engineActiveSinceMs + Math.max(0, context.engineActivationGraceMs ?? 0);
 }

@@ -46,4 +46,23 @@ describe("getStalePausedTodoSignal", () => {
     expect(getStalePausedTodoSignal({ ...baseTask }, { now: NOW, thresholdMs: 0 })).toBeUndefined();
     expect(getStalePausedTodoSignal({ ...baseTask }, { now: NOW, thresholdMs: -1 })).toBeUndefined();
   });
+
+  it("suppresses signal during activation grace warmup", () => {
+    const signal = getStalePausedTodoSignal({ ...baseTask }, {
+      now: NOW,
+      engineActiveSinceMs: NOW - 60_000,
+      engineActivationGraceMs: 5 * 60_000,
+    });
+    expect(signal).toBeUndefined();
+  });
+
+  it("fires once activation floor is sufficiently in the past", () => {
+    const signal = getStalePausedTodoSignal({ ...baseTask }, {
+      now: NOW,
+      engineActiveSinceMs: NOW - DEFAULT_STALE_PAUSED_TODO_THRESHOLD_MS - 5_000,
+      engineActivationGraceMs: 0,
+    });
+    expect(signal?.code).toBe("stale-paused-todo");
+    expect(signal?.ageMs).toBe(DEFAULT_STALE_PAUSED_TODO_THRESHOLD_MS);
+  });
 });

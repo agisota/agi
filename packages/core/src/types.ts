@@ -3045,6 +3045,15 @@ export interface ProjectSettings {
    *  than this duration, the task is considered stuck and will be terminated and retried.
    *  Default: 600000 (10 minutes). Set to 0 to disable. */
   taskStuckTimeoutMs?: number;
+  /** Epoch ms when the in-process runtime last became active (startup or transition
+   *  out of globalPause/enginePaused). Time-based stuck/stalled/stale detectors floor
+   *  their activity anchor at this value so engine downtime is not counted as quiet time.
+   *  Stamped by the runtime; undefined when no runtime has come up yet. */
+  engineActiveSinceMs?: number;
+  /** Extra grace period in milliseconds added to engineActiveSinceMs before any
+   *  time-based stuck/stalled/stale signal may fire after activation.
+   *  Default: 300000 (5 minutes). Set to 0 to disable the grace period. */
+  engineActivationGraceMs?: number;
   /** Minimum number of identical consecutive in-review stall log entries (same code + reason)
    *  before the task is auto-disposed with `pausedReason='in-review-stall-deadlock'`.
    *  Default: 3. Set to 0 to disable. */

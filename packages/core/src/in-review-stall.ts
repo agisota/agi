@@ -30,6 +30,8 @@ export interface InReviewStallContext {
   executingTaskIds?: ReadonlySet<string>;
   staleMergingMinAgeMs?: number;
   maxAutoMergeRetries?: number;
+  engineActiveSinceMs?: number;
+  engineActivationGraceMs?: number;
 }
 
 /** Keep aligned with engine DEFAULT_STALE_MERGING_STATUS_MIN_AGE_MS. */
@@ -100,7 +102,11 @@ export function getInReviewStallReason(
 
   if (task.status && TRANSIENT_MERGE_STATUSES.has(task.status)) {
     const updatedAtMs = Date.parse(task.updatedAt);
-    if (Number.isFinite(updatedAtMs) && now - updatedAtMs >= staleMergingMinAgeMs) {
+    const activationFloorMs = getActivationFloorMs(context);
+    const effectiveUpdatedAtMs = Number.isFinite(updatedAtMs)
+      ? activationFloorMs !== undefined ? Math.max(updatedAtMs, activationFloorMs) : updatedAtMs
+      : Number.NaN;
+    if (Number.isFinite(effectiveUpdatedAtMs) && Math.max(0, now - effectiveUpdatedAtMs) >= staleMergingMinAgeMs) {
       const minutes = Math.max(1, Math.floor(staleMergingMinAgeMs / 60_000));
       return {
         code: "transient-merge-status-no-owner",
@@ -137,4 +143,12 @@ export function getInReviewStallReason(
   }
 
   return undefined;
+}
+
+function getActivationFloorMs(context: InReviewStallContext): number | undefined {
+  if (typeof context.engineActiveSinceMs !== "number" || !Number.isFinite(context.engineActiveSinceMs)) {
+    return undefined;
+  }
+
+  return context.engineActiveSinceMs + Math.max(0, context.engineActivationGraceMs ?? 0);
 }

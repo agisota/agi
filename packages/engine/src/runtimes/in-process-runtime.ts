@@ -777,6 +777,13 @@ export class InProcessRuntime
       // 14. Start MissionAutopilot background polling
       this.missionAutopilot?.start();
 
+      try {
+        await this.taskStore.updateSettings({ engineActiveSinceMs: Date.now() });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        runtimeLog.warn(`Failed to stamp engineActiveSinceMs on runtime start: ${message}`);
+      }
+
       this.setStatus("active");
       runtimeLog.log(`InProcessRuntime started for project ${this.config.projectId}`);
     } catch (error) {

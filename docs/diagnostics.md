@@ -47,6 +47,8 @@ The process supervisor logs when it registers a supervised child, starts teardow
 
 ## No-progress churn stuck-task escalation (`[executor]`, `[stuck-detector]`, `[self-healing]`)
 
+Time-based stuck/stalled/stale surfaces now floor activity timestamps using `settings.engineActiveSinceMs` plus `settings.engineActivationGraceMs` (default `300000`). The runtime stamps `engineActiveSinceMs` on startup and each unpause transition so engine pause/downtime does not count as quiet time.
+
 - Trigger shape: one loop classification/compact-and-resume has already fired for the current `execute()` lifecycle, then ignored `fn_task_update` rebuffs accumulate to `ignoredStepUpdateCount >= 25` without intervening progress.
 - Executor diagnostic: `[executor] <taskId>: no-progress churn detected (ignoredStepUpdates=N, stuckKillStreak=M) — escalating to STUCK_NO_PROGRESS_CHURN`.
 - Self-healing diagnostic: `<taskId> no-progress churn detected (ignoredStepUpdates=N, stuckKillStreak=M) — marking failed`.

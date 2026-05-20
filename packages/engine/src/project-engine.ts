@@ -2416,6 +2416,14 @@ export class ProjectEngine {
       );
     }
 
+    try {
+      await store.updateSettings({ engineActiveSinceMs: Date.now() });
+    } catch (err: unknown) {
+      runtimeLog.warn(
+        `${source}: failed to stamp engineActiveSinceMs: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
     if (settings.globalPause || settings.enginePaused || !settings.autoMerge) {
       return;
     }

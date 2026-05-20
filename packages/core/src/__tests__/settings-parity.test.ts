@@ -150,6 +150,11 @@ describe("settings key parity", () => {
     expect(DEFAULT_PROJECT_SETTINGS.workflowStepTimeoutMs).toBe(360_000);
   });
 
+  it("defaults engine activation grace and leaves engine active clock undefined", () => {
+    expect(DEFAULT_PROJECT_SETTINGS.engineActivationGraceMs).toBe(300_000);
+    expect(DEFAULT_PROJECT_SETTINGS.engineActiveSinceMs).toBeUndefined();
+  });
+
   it("defaults autoRecovery and normalizes overrides", () => {
     expect(DEFAULT_PROJECT_SETTINGS.autoRecovery).toEqual({ mode: "deterministic-only", maxRetries: 3 });
     expect(normalizeAutoRecovery({ mode: "off", perClass: { "branch-conflict-unrecoverable": "ai-assisted" }, maxRetries: 2 })).toEqual({

@@ -30,6 +30,8 @@ export const DEFAULT_TASK_AGE_STALENESS_THRESHOLDS: Required<TaskAgeStalenessThr
 interface TaskAgeStalenessContext {
   now?: number;
   thresholds?: TaskAgeStalenessThresholds;
+  engineActiveSinceMs?: number;
+  engineActivationGraceMs?: number;
 }
 
 type TaskAgeStalenessTask = Pick<Task, "column" | "paused" | "columnMovedAt" | "updatedAt" | "mergeDetails">;
@@ -81,7 +83,9 @@ export function getTaskAgeStalenessSignal(
   if (!Number.isFinite(ageAnchorMs)) {
     return undefined;
   }
-  const ageMs = Math.max(0, now - ageAnchorMs);
+  const activationFloorMs = getActivationFloorMs(context);
+  const effectiveAgeAnchorMs = activationFloorMs !== undefined ? Math.max(ageAnchorMs, activationFloorMs) : ageAnchorMs;
+  const ageMs = Math.max(0, now - effectiveAgeAnchorMs);
 
   let level: TaskAgeStalenessLevel | undefined;
   if (criticalThresholdMs !== undefined && ageMs >= criticalThresholdMs) {
@@ -104,4 +108,12 @@ export function getTaskAgeStalenessSignal(
     column: task.column,
     paused: task.paused === true,
   };
+}
+
+function getActivationFloorMs(context: TaskAgeStalenessContext): number | undefined {
+  if (typeof context.engineActiveSinceMs !== "number" || !Number.isFinite(context.engineActiveSinceMs)) {
+    return undefined;
+  }
+
+  return context.engineActiveSinceMs + Math.max(0, context.engineActivationGraceMs ?? 0);
 }

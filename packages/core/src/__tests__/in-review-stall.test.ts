@@ -172,6 +172,45 @@ describe("getInReviewStallReason", () => {
     expect(getInReviewStallReason({ ...baseTask }, { now: NOW })).toBeUndefined();
   });
 
+  it("preserves status-driven merge-blocker even when activation floor is recent", () => {
+    const signal = getInReviewStallReason({
+      ...baseTask,
+      status: "merging",
+      updatedAt: new Date(NOW - DEFAULT_STALE_MERGING_MIN_AGE_MS - 60_000).toISOString(),
+    }, {
+      now: NOW,
+      engineActiveSinceMs: NOW - (DEFAULT_STALE_MERGING_MIN_AGE_MS - 60_000),
+      engineActivationGraceMs: 90_000,
+    });
+    expect(signal?.code).toBe("merge-blocker");
+  });
+
+  it("fires transient status once engine activation floor is old", () => {
+    const signal = getInReviewStallReason({
+      ...baseTask,
+      status: "merging",
+      updatedAt: new Date(NOW - DEFAULT_STALE_MERGING_MIN_AGE_MS - 60_000).toISOString(),
+    }, {
+      now: NOW,
+      engineActiveSinceMs: NOW - DEFAULT_STALE_MERGING_MIN_AGE_MS - 120_000,
+      engineActivationGraceMs: 0,
+    });
+    expect(signal?.code).toBe("transient-merge-status-no-owner");
+  });
+
+  it("with zero grace, counts from activation timestamp immediately", () => {
+    const signal = getInReviewStallReason({
+      ...baseTask,
+      status: "merging",
+      updatedAt: new Date(NOW - DEFAULT_STALE_MERGING_MIN_AGE_MS - 1).toISOString(),
+    }, {
+      now: NOW,
+      engineActiveSinceMs: NOW,
+      engineActivationGraceMs: 0,
+    });
+    expect(signal?.code).toBe("merge-blocker");
+  });
+
   it("prioritizes transient merge status over retries exhausted", () => {
     const signal = getInReviewStallReason({
       ...baseTask,

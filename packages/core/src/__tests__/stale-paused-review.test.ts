@@ -50,4 +50,23 @@ describe("getStalePausedReviewSignal", () => {
     }, { now: NOW });
     expect(signal?.ageMs).toBe(DEFAULT_STALE_PAUSED_REVIEW_THRESHOLD_MS + 1_000);
   });
+
+  it("suppresses signal during activation grace warmup", () => {
+    const signal = getStalePausedReviewSignal({ ...baseTask }, {
+      now: NOW,
+      engineActiveSinceMs: NOW - 60_000,
+      engineActivationGraceMs: 5 * 60_000,
+    });
+    expect(signal).toBeUndefined();
+  });
+
+  it("fires once activation floor is sufficiently in the past", () => {
+    const signal = getStalePausedReviewSignal({ ...baseTask }, {
+      now: NOW,
+      engineActiveSinceMs: NOW - DEFAULT_STALE_PAUSED_REVIEW_THRESHOLD_MS - 5_000,
+      engineActivationGraceMs: 0,
+    });
+    expect(signal?.code).toBe("stale-paused-review");
+    expect(signal?.ageMs).toBe(DEFAULT_STALE_PAUSED_REVIEW_THRESHOLD_MS);
+  });
 });

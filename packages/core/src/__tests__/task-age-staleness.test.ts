@@ -126,4 +126,28 @@ describe("getTaskAgeStalenessSignal", () => {
       )
     ).toThrowError(new RangeError("critical threshold must be >= warning threshold"));
   });
+
+  it("suppresses age signal during activation grace warmup", () => {
+    const signal = getTaskAgeStalenessSignal({
+      ...baseTask,
+      columnMovedAt: new Date(NOW - DEFAULT_TASK_AGE_STALENESS_THRESHOLDS.inProgressCriticalMs).toISOString(),
+    }, {
+      now: NOW,
+      engineActiveSinceMs: NOW - 60_000,
+      engineActivationGraceMs: 5 * 60_000,
+    });
+    expect(signal).toBeUndefined();
+  });
+
+  it("fires age signal when activation floor is far in the past", () => {
+    const signal = getTaskAgeStalenessSignal({
+      ...baseTask,
+      columnMovedAt: new Date(NOW - DEFAULT_TASK_AGE_STALENESS_THRESHOLDS.inProgressCriticalMs).toISOString(),
+    }, {
+      now: NOW,
+      engineActiveSinceMs: NOW - DEFAULT_TASK_AGE_STALENESS_THRESHOLDS.inProgressCriticalMs - 60_000,
+      engineActivationGraceMs: 0,
+    });
+    expect(signal?.level).toBe("critical");
+  });
 });

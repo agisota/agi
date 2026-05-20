@@ -120,4 +120,36 @@ describe("getInReviewStalledSignal", () => {
     }, { now: NOW, thresholdMs: 10_000 });
     expect(signal?.lastActivitySource).toBe("updated");
   });
+
+  it("suppresses signal during activation grace warmup", () => {
+    const signal = getInReviewStalledSignal(baseTask, {
+      now: NOW,
+      thresholdMs: 10_000,
+      engineActiveSinceMs: NOW - 5_000,
+      engineActivationGraceMs: 30_000,
+    });
+    expect(signal).toBeUndefined();
+  });
+
+  it("adds effectiveLastActivityAt when floor changes activity anchor", () => {
+    const signal = getInReviewStalledSignal(baseTask, {
+      now: NOW,
+      thresholdMs: 10_000,
+      engineActiveSinceMs: NOW - 20_000,
+      engineActivationGraceMs: 0,
+    });
+    expect(signal?.code).toBe("in-review-stalled");
+    expect(signal?.effectiveLastActivityAt).toBe(iso(NOW - 20_000));
+    expect(signal?.lastActivityAt).not.toBe(signal?.effectiveLastActivityAt);
+  });
+
+  it("fires normally when activation floor is far in the past", () => {
+    const signal = getInReviewStalledSignal(baseTask, {
+      now: NOW,
+      thresholdMs: 10_000,
+      engineActiveSinceMs: NOW - 100_000,
+      engineActivationGraceMs: 0,
+    });
+    expect(signal?.code).toBe("in-review-stalled");
+  });
 });
