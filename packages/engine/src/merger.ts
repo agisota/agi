@@ -6760,12 +6760,7 @@ export async function aiMergeTask(
     projectRoot: projectRootDir,
   });
   let reuseTaskWorktreeMerge = integrationRoot.mode === "reuse-task-worktree";
-  rootDir = integrationRoot.rootDir;
-  let integrationRemote = await resolveIntegrationRemote({
-    settings,
-    rootDir: rootDir,
-    integrationBranch: mergeTarget.branch,
-  });
+  let integrationRemote: string | undefined;
   const reacquireReuseIntegrationWorktree = async (
     reason: string,
     diagnostics: Record<string, unknown>,
@@ -7006,6 +7001,14 @@ export async function aiMergeTask(
       }
     }
   }
+
+  rootDir = integrationRoot.rootDir;
+  integrationRemote = await resolveIntegrationRemote({
+    settings,
+    rootDir,
+    integrationBranch: mergeTarget.branch,
+  });
+
   try {
     const integrationWorktreeState = await probeIntegrationWorktreeState({
       rootDir: integrationRoot.rootDir,
@@ -7032,6 +7035,9 @@ export async function aiMergeTask(
   }
 
   if (integrationRoot.mode === "reuse-task-worktree") {
+    // FN-5353: ensure the target task is in mergeQueue before attempting strict
+    // targetTaskId lease acquisition for reuse handoff.
+    store.enqueueMergeQueue(task.id, { priority: task.priority });
     try {
       reuseHandoff = await acquireReuseHandoff({
         task,

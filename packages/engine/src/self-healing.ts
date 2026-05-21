@@ -5532,6 +5532,8 @@ export class SelfHealingManager {
       await this.store.logEntry(task.id, "Auto-recovered (FN-4999): task in 'in-review' past handoff grace with no merge fan-out — re-emitting auto-merge handoff");
       if (this.options.requeueForAutoMerge) {
         try {
+          // FN-5353: strict targetTaskId leasing in reuse handoff requires an
+          // explicit queue row before re-emitting auto-merge.
           await this.store.enqueueMergeQueue(task.id);
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);

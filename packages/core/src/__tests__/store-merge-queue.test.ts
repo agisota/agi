@@ -173,6 +173,70 @@ describe("TaskStore merge queue", () => {
     });
   });
 
+  describe("acquireMergeQueueLease targetTaskId isolation (FN-5353)", () => {
+    it("returns null when target is absent even if another task is queued", async () => {
+      const taskA = await createInReviewTask();
+      store.getDatabase().prepare("DELETE FROM mergeQueue WHERE taskId = ?").run(taskA);
+      store.enqueueMergeQueue(taskA, { now: "2026-05-19T00:00:00.000Z" });
+
+      const before = store.getDatabase().prepare("SELECT leasedBy, leasedAt, leaseExpiresAt FROM mergeQueue WHERE taskId = ?").get(taskA) as {
+        leasedBy: string | null;
+        leasedAt: string | null;
+        leaseExpiresAt: string | null;
+      };
+
+      const lease = store.acquireMergeQueueLease("worker-target-miss", {
+        targetTaskId: "FN-5353-MISSING",
+        leaseDurationMs: 60_000,
+        now: "2026-05-19T00:01:00.000Z",
+      });
+      expect(lease).toBeNull();
+
+      const after = store.getDatabase().prepare("SELECT leasedBy, leasedAt, leaseExpiresAt FROM mergeQueue WHERE taskId = ?").get(taskA);
+      expect(after).toEqual(before);
+    });
+
+    it("returns null when target row is currently leased by another worker", async () => {
+      const taskA = await createInReviewTask();
+      store.getDatabase().prepare("UPDATE mergeQueue SET leasedBy = ?, leasedAt = ?, leaseExpiresAt = ? WHERE taskId = ?").run(
+        "worker-one",
+        "2026-05-19T00:01:00.000Z",
+        "2099-05-19T00:10:00.000Z",
+        taskA,
+      );
+
+      const lease = store.acquireMergeQueueLease("worker-two", {
+        targetTaskId: taskA,
+        leaseDurationMs: 60_000,
+        now: "2026-05-19T00:01:30.000Z",
+      });
+      expect(lease).toBeNull();
+    });
+
+    it("leases the targeted row when available", async () => {
+      const taskA = await createInReviewTask();
+      const lease = store.acquireMergeQueueLease("worker-target-hit", {
+        targetTaskId: taskA,
+        leaseDurationMs: 60_000,
+        now: "2026-05-19T00:02:00.000Z",
+      });
+
+      expect(lease?.taskId).toBe(taskA);
+      expect(lease?.leasedBy).toBe("worker-target-hit");
+    });
+
+    it("preserves legacy queue-head selection when targetTaskId is omitted", async () => {
+      const taskA = await createInReviewTask();
+      const lease = store.acquireMergeQueueLease("worker-head", {
+        leaseDurationMs: 60_000,
+        now: "2026-05-19T00:03:00.000Z",
+      });
+
+      expect(lease?.taskId).toBe(taskA);
+      expect(lease?.leasedBy).toBe("worker-head");
+    });
+  });
+
   it("rejects enqueue for tasks outside in-review", async () => {
     const todoTask = await createTask();
     await store.moveTask(todoTask, "todo");

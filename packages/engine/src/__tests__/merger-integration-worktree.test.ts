@@ -63,7 +63,7 @@ describe("resolveMergeIntegrationRoot", () => {
     });
   });
 
-  it("uses the project root when the task worktree is missing", () => {
+  it("returns empty sentinel rootDir when the task worktree is missing", () => {
     expect(
       resolveMergeIntegrationRoot({
         task: { id: "FN-5279", worktree: undefined } as any,
@@ -72,7 +72,7 @@ describe("resolveMergeIntegrationRoot", () => {
       }),
     ).toEqual({
       mode: "reuse-task-worktree",
-      rootDir: "/tmp/project-root",
+      rootDir: "",
       branchName: "fusion/fn-5279",
     });
   });
@@ -550,11 +550,11 @@ describe("acquireReuseHandoff", () => {
         worktreePath: "/tmp/task-worktree",
       }),
       "lease-handoff-failed",
-      "no-lease",
+      "target-not-queued",
     );
     expect(refusal.payload).toMatchObject({
-      queueHeadTaskId: "FN-5329",
-      queueHeadLeasedBy: "merger-reuse-handoff",
+      taskId: "FN-5279",
+      worktreePath: "/tmp/task-worktree",
     });
   });
 
@@ -625,6 +625,7 @@ describe("aiMergeTask integration-root behavior", () => {
     });
     store.acquireMergeQueueLease = vi.fn().mockReturnValue({ taskId: "FN-5279" });
     store.releaseMergeQueueLease = vi.fn();
+    store.enqueueMergeQueue = vi.fn();
     store.listTasks.mockResolvedValue([{ id: "FN-5279", column: "in-review", worktree: "/tmp/task-worktree" }]);
 
     const baseImpl = mockedExecSync.getMockImplementation();

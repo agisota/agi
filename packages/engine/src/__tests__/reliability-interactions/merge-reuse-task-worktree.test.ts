@@ -223,7 +223,7 @@ describe("FN-5279 reliability interactions: merge reuse task worktree", () => {
     }
   }, 30_000);
 
-  it.skipIf(!hasGit)("missing merge queue lease refuses handoff with no-lease diagnostics", async () => {
+  it.skipIf(!hasGit)("missing merge queue lease refuses handoff with target-not-queued diagnostics", async () => {
     const fixture = await makeReliabilityFixture({
       taskId: "FN-5279-RI-NO-LEASE",
       settings: {
@@ -264,13 +264,177 @@ describe("FN-5279 reliability interactions: merge reuse task worktree", () => {
       await expect(aiMergeTask(store, rootDir, task.id)).rejects.toMatchObject({
         name: "MergeHandoffRefusedError",
         gate: "lease-handoff-failed",
-        reason: "no-lease",
+        reason: "target-not-queued",
       });
       const refused = store.getRunAuditEvents({ taskId: task.id }).find((event) => event.mutationType === "merge:reuse-handoff-refused");
       expect(refused?.metadata).toMatchObject({
         gate: "lease-handoff-failed",
-        reason: "no-lease",
+        reason: "target-not-queued",
       });
+    } finally {
+      await fixture.cleanup();
+    }
+  }, 30_000);
+
+  it.skipIf(!hasGit)("FN-5353: aiMergeTask succeeds without pre-enqueue by self-enqueueing before handoff", async () => {
+    const fixture = await makeReliabilityFixture({
+      taskId: "FN-5353-RI-SELF-ENQUEUE",
+      settings: {
+        baseBranch: "master",
+        mergeIntegrationWorktree: "reuse-task-worktree",
+      } as any,
+    });
+
+    try {
+      const { rootDir, store, task } = fixture;
+      const actualTask = await store.getTask(task.id);
+      const branch = `fusion/${actualTask!.id.toLowerCase()}`;
+      const worktreeRoot = `${rootDir}-worktrees`;
+      const worktreePath = join(worktreeRoot, actualTask!.id.toLowerCase());
+
+      git(rootDir, "git branch -m main master");
+      const completedSteps = (actualTask?.steps ?? []).map((step) => ({ ...step, status: "done" as const }));
+      await store.updateTask(task.id, { baseBranch: "master", branch, steps: completedSteps, currentStep: completedSteps.length } as any);
+      await fixture.createBranch(branch);
+      await fixture.writeAndCommit("packages/engine/src/fn-5353-ri-self-enqueue.ts", "export const selfEnqueue = true;\n", "feat: add self enqueue merge content");
+      await fixture.checkout("master");
+      await mkdir(worktreeRoot, { recursive: true });
+      git(rootDir, `git worktree add ${JSON.stringify(worktreePath)} ${JSON.stringify(branch)}`);
+      await store.updateTask(task.id, { worktree: worktreePath, branch } as any);
+      store.getDatabase().prepare("DELETE FROM mergeQueue WHERE taskId = ?").run(task.id);
+
+      const result = await aiMergeTask(store, rootDir, task.id);
+      expect(result.merged).toBe(true);
+      expect((await store.getTask(task.id))?.column).toBe("done");
+      const auditTypes = store.getRunAuditEvents({ taskId: task.id }).map((event) => event.mutationType);
+      expect(auditTypes).toContain("merge:reuse-handoff-acquired");
+    } finally {
+      await fixture.cleanup();
+    }
+  }, 30_000);
+
+  it.skipIf(!hasGit)("FN-5353: cross-task queue entries remain untouched when aiMergeTask self-enqueues target", async () => {
+    const fixtureA = await makeReliabilityFixture({
+      taskId: "FN-5353-RI-TARGET-A",
+      settings: { baseBranch: "master", mergeIntegrationWorktree: "reuse-task-worktree" } as any,
+    });
+
+    try {
+      const { rootDir, store, task } = fixtureA;
+      const actualTask = await store.getTask(task.id);
+      const branch = `fusion/${actualTask!.id.toLowerCase()}`;
+      const worktreeRoot = `${rootDir}-worktrees`;
+      const worktreePath = join(worktreeRoot, actualTask!.id.toLowerCase());
+
+      const other = await store.createTask({ description: "queue head other", priority: "normal" });
+      await store.moveTask(other.id, "todo");
+      await store.moveTask(other.id, "in-progress");
+      await store.handoffToReview(other.id, {
+        ownerAgentId: "agent-1",
+        evidence: { reason: "fn_task_done", runId: "run-1", agentId: "agent-1" },
+      });
+      store.enqueueMergeQueue(other.id, { now: "2026-05-19T00:00:00.000Z" });
+
+      git(rootDir, "git branch -m main master");
+      const completedSteps = (actualTask?.steps ?? []).map((step) => ({ ...step, status: "done" as const }));
+      await store.updateTask(task.id, { baseBranch: "master", branch, steps: completedSteps, currentStep: completedSteps.length } as any);
+      await fixtureA.createBranch(branch);
+      await fixtureA.writeAndCommit("packages/engine/src/fn-5353-ri-target-not-queued.ts", "export const targetNotQueued = true;\n", "feat: add target not queued reproduction");
+      await fixtureA.checkout("master");
+      await mkdir(worktreeRoot, { recursive: true });
+      git(rootDir, `git worktree add ${JSON.stringify(worktreePath)} ${JSON.stringify(branch)}`);
+      await store.updateTask(task.id, { worktree: worktreePath, branch } as any);
+      store.getDatabase().prepare("DELETE FROM mergeQueue WHERE taskId = ?").run(task.id);
+
+      const result = await aiMergeTask(store, rootDir, task.id);
+      expect(result.merged).toBe(true);
+      expect((await store.getTask(task.id))?.column).toBe("done");
+
+      const otherRow = store.getDatabase().prepare("SELECT taskId, leasedBy FROM mergeQueue WHERE taskId = ?").get(other.id) as {
+        taskId: string;
+        leasedBy: string | null;
+      };
+      expect(otherRow.taskId).toBe(other.id);
+      expect(otherRow.leasedBy).toBeNull();
+    } finally {
+      await fixtureA.cleanup();
+    }
+  }, 30_000);
+
+  it.skipIf(!hasGit)("FN-5353: reuse handoff rejects project-root worktree misconfiguration", async () => {
+    const fixture = await makeReliabilityFixture({
+      taskId: "FN-5353-RI-PROJECT-ROOT-WORKTREE",
+      settings: {
+        baseBranch: "master",
+        mergeIntegrationWorktree: "reuse-task-worktree",
+      } as any,
+    });
+
+    try {
+      const { rootDir, store, task } = fixture;
+      const actualTask = await store.getTask(task.id);
+      const branch = `fusion/${actualTask!.id.toLowerCase()}`;
+      git(rootDir, "git branch -m main master");
+      const completedSteps = (actualTask?.steps ?? []).map((step) => ({ ...step, status: "done" as const }));
+      await store.updateTask(task.id, {
+        baseBranch: "master",
+        branch,
+        worktree: rootDir,
+        steps: completedSteps,
+        currentStep: completedSteps.length,
+      } as any);
+      await fixture.createBranch(branch);
+      await fixture.writeAndCommit("packages/engine/src/fn-5353-ri-project-root.ts", "export const projectRootReuse = true;\n", "feat: add project root misconfiguration content");
+      await fixture.checkout("master");
+      store.enqueueMergeQueue(task.id);
+
+      await expect(aiMergeTask(store, rootDir, task.id)).rejects.toMatchObject({
+        name: "MergeHandoffRefusedError",
+        gate: "reuse-misconfigured",
+        reason: "worktree-equals-project-root",
+      });
+    } finally {
+      await fixture.cleanup();
+    }
+  }, 30_000);
+
+  it.skipIf(!hasGit)("FN-5353: missing task.worktree reacquires a reusable worktree before handoff gates", async () => {
+    const fixture = await makeReliabilityFixture({
+      taskId: "FN-5353-RI-MISSING-WORKTREE-HANDOFF",
+      settings: {
+        baseBranch: "master",
+        mergeIntegrationWorktree: "reuse-task-worktree",
+      } as any,
+    });
+
+    try {
+      const { rootDir, store, task } = fixture;
+      const actualTask = await store.getTask(task.id);
+      const branch = `fusion/${actualTask!.id.toLowerCase()}`;
+      git(rootDir, "git branch -m main master");
+
+      const completedSteps = (actualTask?.steps ?? []).map((step) => ({ ...step, status: "done" as const }));
+      await store.updateTask(task.id, {
+        baseBranch: "master",
+        branch,
+        worktree: null,
+        steps: completedSteps,
+        currentStep: completedSteps.length,
+      } as any);
+      await fixture.createBranch(branch);
+      await fixture.writeAndCommit("packages/engine/src/fn-5353-ri-missing-worktree-handoff.ts", "export const missingHandoff = true;\n", "feat: add missing worktree handoff content");
+      await fixture.checkout("master");
+      store.enqueueMergeQueue(task.id);
+
+      const result = await aiMergeTask(store, rootDir, task.id);
+      expect(result.merged).toBe(true);
+      expect((await store.getTask(task.id))?.column).toBe("done");
+      const audits = store.getRunAuditEvents({ taskId: task.id });
+      const auditTypes = audits.map((event) => event.mutationType);
+      expect(auditTypes).toContain("merge:reuse-fallback-new-worktree");
+      expect(auditTypes).not.toContain("merge:reuse-handoff-refused");
+      const refused = audits.find((event) => event.mutationType === "merge:reuse-handoff-refused");
+      expect((refused?.metadata as { reason?: string } | undefined)?.reason).not.toBe("worktree-equals-project-root");
     } finally {
       await fixture.cleanup();
     }
@@ -329,7 +493,7 @@ describe("FN-5279 reliability interactions: merge reuse task worktree", () => {
     }
   }, 30_000);
 
-  it.skipIf(!hasGit)("FN-5363: target row leased by another worker refuses with no-lease and queue-head diagnostics", async () => {
+  it.skipIf(!hasGit)("FN-5363: target row leased by another worker refuses with target-not-queued diagnostics", async () => {
     const fixture = await makeReliabilityFixture({
       taskId: "FN-5363-RI-NO-LEASE-TARGET",
       settings: {
@@ -374,10 +538,10 @@ describe("FN-5279 reliability interactions: merge reuse task worktree", () => {
       await expect(aiMergeTask(store, rootDir, task.id)).rejects.toMatchObject({
         name: "MergeHandoffRefusedError",
         gate: "lease-handoff-failed",
-        reason: "no-lease",
+        reason: "target-not-queued",
       });
       const refused = store.getRunAuditEvents({ taskId: task.id }).find((event) => event.mutationType === "merge:reuse-handoff-refused");
-      expect(refused?.metadata).toMatchObject({ reason: "no-lease" });
+      expect(refused?.metadata).toMatchObject({ reason: "target-not-queued" });
     } finally {
       await fixture.cleanup();
     }

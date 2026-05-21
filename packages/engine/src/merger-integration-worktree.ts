@@ -32,6 +32,8 @@ const MERGE_HANDOFF_WORKER_ID = "merger-reuse-handoff";
 
 export interface MergeIntegrationRootResolution {
   mode: MergeIntegrationWorktreeMode;
+  // Sentinel: empty string means reuse mode is requested but no reusable
+  // task.worktree is currently recorded; caller must reacquire before use.
   rootDir: string;
   branchName: string;
 }
@@ -51,10 +53,11 @@ export function resolveMergeIntegrationRoot(
     input.settings.mergeIntegrationWorktree,
   );
 
+  const reusablePath = input.task.worktree?.trim() || "";
   return {
     mode,
     rootDir: mode === "reuse-task-worktree"
-      ? input.task.worktree?.trim() || input.projectRoot
+      ? reusablePath
       : input.projectRoot,
     branchName,
   };
@@ -295,6 +298,13 @@ function asCentralClaimAccessor(store: TaskStore): {
 export async function acquireReuseHandoff(input: ReuseHandoffInput): Promise<HandoffResult> {
   const expectedBranch = canonicalFusionBranchName(input.task.id);
   const worktreePath = input.worktreePath;
+  if (canonicalizePath(worktreePath) === canonicalizePath(input.projectRoot)) {
+    throw new MergeHandoffRefusedError("reuse-misconfigured", "worktree-equals-project-root", {
+      taskId: input.task.id,
+      projectRoot: input.projectRoot,
+      worktreePath,
+    });
+  }
   const dirtyPaths = Array.from(await snapshotDirtyFilesLocal(worktreePath)).sort();
   const dirtyFingerprint = await gitDirtyFingerprintLocal(worktreePath);
   if (dirtyPaths.length > 0 || dirtyFingerprint) {
@@ -481,14 +491,21 @@ export async function acquireReuseHandoff(input: ReuseHandoffInput): Promise<Han
     }
     throw error;
   }
-  if (!lease || !("taskId" in lease) || lease.taskId !== input.task.id) {
+  if (!lease) {
+    throw new MergeHandoffRefusedError("lease-handoff-failed", "target-not-queued", {
+      taskId: input.task.id,
+      worktreePath,
+    });
+  }
+
+  if (!("taskId" in lease) || lease.taskId !== input.task.id) {
     const queueHead = (input.store as TaskStore & {
       peekMergeQueueHead?: () => { taskId: string; leasedBy: string | null; column: string | null } | null;
     }).peekMergeQueueHead?.();
     throw new MergeHandoffRefusedError("lease-handoff-failed", "no-lease", {
       taskId: input.task.id,
       worktreePath,
-      acquiredTaskId: lease && "taskId" in lease ? lease.taskId : null,
+      acquiredTaskId: "taskId" in lease ? lease.taskId : null,
       queueHeadTaskId: queueHead?.taskId ?? null,
       queueHeadLeasedBy: queueHead?.leasedBy ?? null,
     });
