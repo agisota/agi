@@ -4842,6 +4842,9 @@ export class SelfHealingManager {
         !task.paused &&
         !executingIds.has(task.id) &&
         !(task.status && GHOST_REVIEW_PRESERVED_STATUSES.has(task.status)) &&
+        // FN-5448: completed tasks promoted by stranded-completed recovery must
+        // not be kicked back to todo by ghost-review fallback.
+        !(Array.isArray(task.steps) && task.steps.length > 0 && task.steps.every((step) => step.status === "done" || step.status === "skipped")) &&
         // Confirmed merges belong in `done` (handled by `recoverMergedReviewTasks`).
         task.mergeDetails?.mergeConfirmed !== true &&
         now - new Date(task.columnMovedAt ?? task.updatedAt).getTime() >= timeoutMs

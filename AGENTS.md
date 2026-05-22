@@ -154,6 +154,10 @@ When `settings.autoMerge: false`, `in-review` is terminal-until-merged by a huma
 
 `testMode?: boolean` is now available in both project and global settings. If project `testMode === true` (or the resolved default provider is `"mock"` at any tier), every AI lane is forced to `mock/scripted`, overriding per-task and per-lane model selections. The dashboard exposes this via the Settings Modal "Enable test mode" toggle and a persistent "Test mode — no real AI calls" banner.
 
+### Reliability Mechanism Coverage
+
+- FN-5448: composition backstop for stranded-completed todo recovery × ghost-review fallback at `packages/engine/src/__tests__/reliability-interactions/completed-task-oscillation.test.ts`.
+
 ---
 
 ## Reference docs (deeper detail)
