@@ -83,13 +83,14 @@ import {
   type TaskSourceIssue,
   type Task,
   type AutostashOrphanRecord,
+  normalizeMergeAdvanceAutoSyncMode,
 } from "@fusion/core";
 import { describeModel, promptWithFallback } from "./pi.js";
 import { accumulateSessionTokenUsage } from "./session-token-usage.js";
 import { createResolvedAgentSession, extractRuntimeHint, resolveMergerSessionModel } from "./agent-session-helpers.js";
 import { createFallbackModelObserver } from "./fallback-model-observer.js";
 import { buildSessionSkillContext } from "./session-skill-context.js";
-import { classifyTaskWorktree, getRegisteredWorktreeBranchMap, RemovalReason, removeWorktree, type WorktreePool } from "./worktree-pool.js";
+import { classifyTaskWorktree, getRegisteredWorktreeBranches, RemovalReason, removeWorktree, type WorktreePool } from "./worktree-pool.js";
 import { activeSessionRegistry } from "./active-session-registry.js";
 import { AgentLogger } from "./agent-logger.js";
 import { mergerLog } from "./logger.js";
@@ -158,9 +159,14 @@ async function runMergeAdvanceAutoSync(input: {
   mode: "ff-only" | "stash-and-ff";
 }): Promise<void> {
   const { audit, taskId, projectRootDir, integrationBranch, previousSha, newSha, mode } = input;
-  let branchMap: Map<string, string>;
+  // `getRegisteredWorktreeBranches` returns ALL (branch, path) pairs, not a
+  // Map keyed by branch — multiple worktrees can share a branch when the user
+  // created secondary checkouts via `git worktree add --force -b`. Collapsing
+  // to a Map would silently skip all but the last-iterated of those, which is
+  // exactly the surprise-`git status` bug this hook was meant to fix.
+  let entries: Array<{ branch: string; worktreePath: string }>;
   try {
-    branchMap = await getRegisteredWorktreeBranchMap(projectRootDir);
+    entries = await getRegisteredWorktreeBranches(projectRootDir);
   } catch (err: unknown) {
     await audit.git({
       type: "merge:auto-sync",
@@ -177,9 +183,9 @@ async function runMergeAdvanceAutoSync(input: {
   }
 
   const matchingWorktrees: string[] = [];
-  for (const [branch, worktreePath] of branchMap.entries()) {
-    if (branch === integrationBranch) {
-      matchingWorktrees.push(worktreePath);
+  for (const entry of entries) {
+    if (entry.branch === integrationBranch) {
+      matchingWorktrees.push(entry.worktreePath);
     }
   }
 
@@ -238,10 +244,10 @@ async function runMergeAdvanceAutoSync(input: {
         worktreePath,
         outcome: result.kind,
         ...(result.kind === "synced-with-pop-conflict"
-          ? { conflictedFiles: result.conflictedFiles, patchPath: result.patchPath, stashedFiles: result.stashedFiles }
+          ? { conflictedFiles: result.conflictedFiles, patchPath: result.patchPath, stashedFiles: result.stashedFiles, untrackedSkippedAsTracked: result.untrackedSkippedAsTracked }
           : {}),
         ...(result.kind === "synced-with-edits-restored"
-          ? { stashedFiles: result.stashedFiles, untrackedRestored: result.untrackedRestored }
+          ? { stashedFiles: result.stashedFiles, untrackedRestored: result.untrackedRestored, untrackedSkippedAsTracked: result.untrackedSkippedAsTracked }
           : {}),
         ...(result.kind === "failed"
           ? { stage: result.stage, error: result.error }
@@ -9726,10 +9732,7 @@ export async function aiMergeTask(
         // the merge has already landed at this point: failing the merger run
         // because a downstream worktree sync threw would leave the project in
         // a worse state than just emitting the failure as an audit event.
-        const autoSyncSetting = (settings as { mergeAdvanceAutoSync?: unknown }).mergeAdvanceAutoSync;
-        const autoSyncMode = autoSyncSetting === "off" || autoSyncSetting === "ff-only" || autoSyncSetting === "stash-and-ff"
-          ? autoSyncSetting
-          : "stash-and-ff";
+        const autoSyncMode = normalizeMergeAdvanceAutoSyncMode(settings.mergeAdvanceAutoSync);
         if (autoSyncMode !== "off") {
           try {
             await runMergeAdvanceAutoSync({

@@ -2,6 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiRequestError, api } from "../api";
 import { subscribeSse } from "../sse-bus";
 
+export interface AutoSyncOutcome {
+  worktreePath: string | null;
+  outcome: string;
+  mode: string;
+  stashedFiles?: string[];
+  untrackedRestored?: string[];
+  untrackedSkippedAsTracked?: string[];
+  conflictedFiles?: string[];
+  patchPath?: string;
+  stage?: string;
+  error?: string;
+}
+
 interface MergeAdvanceEvent {
   taskId: string;
   integrationBranch: string;
@@ -16,6 +29,7 @@ interface MergeAdvanceEvent {
     dirty: boolean;
     untrackedCount: number;
   } | null;
+  autoSync?: AutoSyncOutcome[];
 }
 
 interface MergeAdvanceEventsResponse {

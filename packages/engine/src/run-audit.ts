@@ -238,21 +238,29 @@ export type GitMutationType =
    *   newSha?: string;
    *   worktreePath?: string;
    *   outcome:
-   *     | "clean-pull"
-   *     | "stash-pull-pop"
-   *     | "stash-pop-conflict"
-   *     | "skipped-dirty"
-   *     | "skipped-not-on-branch"
-   *     | "failed"
-   *     | "enumeration-failed"
-   *     | "exception";
-   *   stashSha?: string;
-   *   stashLabel?: string;
-   *   conflictedFiles?: string[];
-   *   stage?: "stash" | "pull" | "pop";
+   *     | "clean-sync"                  // worktree was clean against previousSha; reset --hard HEAD snapped it forward
+   *     | "synced-with-edits-restored"  // real edits captured as patch, snapped to HEAD, patch re-applied cleanly
+   *     | "synced-with-pop-conflict"    // patch failed to reapply OR untracked file collided with newly-tracked path
+   *     | "skipped-dirty"               // ff-only mode + real edits → no-op (banner surfaces for manual handling)
+   *     | "skipped-not-on-branch"       // worktree's HEAD is on a different branch than integrationBranch
+   *     | "skipped-head-not-at-new-sha" // concurrent advance moved HEAD past newSha between guard and reset
+   *     | "failed"                      // git command exited non-zero; see stage + error
+   *     | "enumeration-failed"          // `git worktree list --porcelain` failed in the project root
+   *     | "exception";                  // syncWorktreeToHead threw outside its own try/catch
+   *   stashedFiles?: string[];          // tracked-file edits captured into patchPath
+   *   patchPath?: string;               // /tmp/fusion-worktree-sync-<id>/edits.patch (preserved when outcome surfaces a conflict)
+   *   conflictedFiles?: string[];       // paths git apply --3way couldn't reconcile; falls back to patch-header parsing when the index has no unmerged entries
+   *   untrackedRestored?: string[];     // untracked files copied back into the worktree after the snap
+   *   untrackedSkippedAsTracked?: string[]; // untracked files whose paths collided with newly-tracked files at HEAD; left in the stage dir
+   *   stage?: "snapshot" | "reset" | "apply" | "untracked-restore"; // only on outcome === "failed"
    *   error?: string;
    * }
    * ```
+   *
+   * Per-step `pull:fast-forward`, `stash:push`, `stash:pop`, and
+   * `stash:pop-conflict` events that flow through the merger's auditor as
+   * part of this auto-sync carry `metadata.autoSync = true` so consumers can
+   * filter them apart from user-triggered git operations.
    */
   | "merge:auto-sync"
   /**

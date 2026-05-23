@@ -50,6 +50,19 @@ const REVIEW_VERDICT_RE = /###\s+Verdict:\s*(APPROVE|REVISE|RETHINK|UNAVAILABLE)
 const REVIEW_STEP_RE = /^(plan|code) review Step (\d+): (APPROVE|REVISE|RETHINK|UNAVAILABLE)\b/i;
 const DUPLICATE_STOPWORDS = new Set(["a", "an", "the", "and", "or", "of", "to", "for", "in", "is", "on", "with", "fn"]);
 
+interface AutoSyncOutcome {
+  worktreePath: string | null;
+  outcome: string;
+  mode: string;
+  stashedFiles?: string[];
+  untrackedRestored?: string[];
+  untrackedSkippedAsTracked?: string[];
+  conflictedFiles?: string[];
+  patchPath?: string;
+  stage?: string;
+  error?: string;
+}
+
 interface MergeAdvanceEvent {
   taskId: string;
   integrationBranch: string;
@@ -64,6 +77,12 @@ interface MergeAdvanceEvent {
     dirty: boolean;
     untrackedCount: number;
   } | null;
+  /** Per-worktree outcomes of the merger's post-advance auto-sync hook. Empty
+   *  array when `mergeAdvanceAutoSync: "off"` or no other worktree was on the
+   *  integration branch. A `synced-with-pop-conflict` entry carries
+   *  `patchPath` pointing at the user's saved edits and `conflictedFiles` /
+   *  `untrackedSkippedAsTracked` for surfacing in the conflict modal. */
+  autoSync: AutoSyncOutcome[];
 }
 
 interface MergeAdvanceEventsResponse {
@@ -249,7 +268,39 @@ function extractUserCheckout(metadata: unknown): MergeAdvanceEvent["userCheckout
   };
 }
 
-function extractMergeAdvanceEvent(event: RunAuditEvent): Omit<MergeAdvanceEvent, "userCheckout"> | null {
+function extractAutoSyncOutcome(event: RunAuditEvent): AutoSyncOutcome | null {
+  const metadata = event.metadata;
+  if (!metadata || typeof metadata !== "object") return null;
+  const candidate = metadata as {
+    worktreePath?: unknown;
+    outcome?: unknown;
+    mode?: unknown;
+    stashedFiles?: unknown;
+    untrackedRestored?: unknown;
+    untrackedSkippedAsTracked?: unknown;
+    conflictedFiles?: unknown;
+    patchPath?: unknown;
+    stage?: unknown;
+    error?: unknown;
+  };
+  if (typeof candidate.outcome !== "string" || candidate.outcome.length === 0) return null;
+  const stringArray = (v: unknown): string[] | undefined =>
+    Array.isArray(v) && v.every((x) => typeof x === "string") ? (v as string[]) : undefined;
+  return {
+    worktreePath: typeof candidate.worktreePath === "string" ? candidate.worktreePath : null,
+    outcome: candidate.outcome,
+    mode: typeof candidate.mode === "string" ? candidate.mode : "stash-and-ff",
+    stashedFiles: stringArray(candidate.stashedFiles),
+    untrackedRestored: stringArray(candidate.untrackedRestored),
+    untrackedSkippedAsTracked: stringArray(candidate.untrackedSkippedAsTracked),
+    conflictedFiles: stringArray(candidate.conflictedFiles),
+    patchPath: typeof candidate.patchPath === "string" ? candidate.patchPath : undefined,
+    stage: typeof candidate.stage === "string" ? candidate.stage : undefined,
+    error: typeof candidate.error === "string" ? candidate.error : undefined,
+  };
+}
+
+function extractMergeAdvanceEvent(event: RunAuditEvent): Omit<MergeAdvanceEvent, "userCheckout" | "autoSync"> | null {
   const metadata = event.metadata;
   if (!metadata || typeof metadata !== "object") {
     console.warn(`[merge-advance-events] dropping run-audit event ${event.id}: missing metadata`);
@@ -555,9 +606,31 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
           userCheckout = extractUserCheckout(matchingState.metadata);
         }
 
+        // Join in any per-worktree auto-sync outcomes for this task. We keep
+        // events whose timestamp falls in a small window around the advance
+        // so a `synced-with-pop-conflict` (carrying patchPath) surfaces to
+        // the dashboard banner even when the sync ran slightly after the
+        // advance event was recorded.
+        const autoSyncEvents = storeWithRunAudit.getRunAuditEvents({
+          taskId: extracted.taskId,
+          domain: "git",
+          mutationType: "merge:auto-sync",
+          limit,
+        });
+        const advanceMs = Date.parse(advanceEvent.timestamp);
+        const AUTO_SYNC_WINDOW_MS = 5 * 60 * 1000;
+        const autoSync: AutoSyncOutcome[] = [];
+        for (const ev of autoSyncEvents) {
+          const evMs = Date.parse(ev.timestamp);
+          if (Math.abs(evMs - advanceMs) > AUTO_SYNC_WINDOW_MS) continue;
+          const outcome = extractAutoSyncOutcome(ev);
+          if (outcome) autoSync.push(outcome);
+        }
+
         events.push({
           ...extracted,
           userCheckout,
+          autoSync,
         });
       }
 

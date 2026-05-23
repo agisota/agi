@@ -181,6 +181,101 @@ describe("runMergeAdvanceAutoSync (post-local-ref-advance reconciliation)", () =
     }
   });
 
+  it("untracked file colliding with a newly-tracked path is NOT overwritten — merged content is preserved", async () => {
+    // User has an untracked `feature.txt` (locally meaningful) BEFORE the
+    // task merge. The task's commit adds `feature.txt` as a tracked file with
+    // different content. Without the collision guard, the auto-sync would
+    // clobber the merged version with the user's stale untracked bytes.
+    writeFileSync(join(fx.projectRoot, "feature.txt"), "USER stale local\n");
+
+    await runMergeAdvanceAutoSync({
+      store: fx.store,
+      audit: makeAudit(fx.store, "FN-COLLIDE"),
+      taskId: "FN-COLLIDE",
+      projectRootDir: fx.projectRoot,
+      integrationBranch: "main",
+      previousSha: fx.previousSha,
+      newSha: fx.newSha,
+      mode: "stash-and-ff",
+    });
+
+    // The merged version (from the task commit) must win.
+    expect(readFileSync(join(fx.projectRoot, "feature.txt"), "utf-8")).toBe("task work\n");
+
+    const autoSync = fx.recorded.filter((e) => e.mutationType === "merge:auto-sync");
+    expect(autoSync).toHaveLength(1);
+    // Auto-sync surfaces the collision as synced-with-pop-conflict so the
+    // dashboard's existing conflict UI hooks fire.
+    expect(autoSync[0].metadata).toMatchObject({
+      outcome: "synced-with-pop-conflict",
+      untrackedSkippedAsTracked: ["feature.txt"],
+    });
+  });
+
+  it("apply --3way failure on a deleted/renamed file: conflictedFiles populated from patch header, not left empty", async () => {
+    // Set up a scenario where the user edits a tracked file that the merge
+    // deletes. `git apply --3way` fails without staging unmerged entries, so
+    // --diff-filter=U would otherwise return []. The patch-header fallback
+    // must surface the affected path.
+    //
+    // Build fresh fixture: project has `doomed.txt` at previousSha, user
+    // edits it, task commit deletes it.
+    rmSync(fx.root, { recursive: true, force: true });
+    const root = mkdtempSync(join(testTempParent(), "merger-auto-sync-delete-"));
+    const upstream = join(root, "upstream.git");
+    const projectRoot = join(root, "project");
+    const taskWorktree = join(root, "task");
+    git(root, `git init --bare -b main "${upstream}"`);
+    git(root, `git clone "${upstream}" "${projectRoot}"`);
+    git(projectRoot, 'git config user.email "u@e.com"');
+    git(projectRoot, 'git config user.name "U"');
+    writeFileSync(join(projectRoot, "doomed.txt"), "v1\n");
+    git(projectRoot, "git add doomed.txt");
+    git(projectRoot, 'git commit -m "init"');
+    git(projectRoot, "git push -u origin main");
+    const previousSha = git(projectRoot, "git rev-parse HEAD");
+
+    git(projectRoot, `git worktree add -b fusion/fn-test "${taskWorktree}"`);
+    // Task commit deletes doomed.txt
+    execSync(`rm "${join(taskWorktree, "doomed.txt")}"`);
+    git(taskWorktree, "git add -A");
+    git(taskWorktree, 'git commit -m "delete doomed"');
+    const newSha = git(taskWorktree, "git rev-parse HEAD");
+    git(projectRoot, `git update-ref refs/heads/main ${newSha}`);
+
+    // User modified doomed.txt before merge
+    writeFileSync(join(projectRoot, "doomed.txt"), "v1\nuser edit\n");
+
+    const recorded: RunAuditEventInput[] = [];
+    const store = {
+      recordRunAuditEvent: vi.fn(async (input: RunAuditEventInput) => { recorded.push(input); }),
+    } as unknown as TaskStore;
+
+    try {
+      await runMergeAdvanceAutoSync({
+        store,
+        audit: makeAudit(store, "FN-DELETED"),
+        taskId: "FN-DELETED",
+        projectRootDir: projectRoot,
+        integrationBranch: "main",
+        previousSha,
+        newSha,
+        mode: "stash-and-ff",
+      });
+
+      const autoSync = recorded.filter((e) => e.mutationType === "merge:auto-sync");
+      expect(autoSync).toHaveLength(1);
+      expect(autoSync[0].metadata).toMatchObject({ outcome: "synced-with-pop-conflict" });
+      const metadata = autoSync[0].metadata as { conflictedFiles?: string[]; patchPath?: string };
+      // Patch-header fallback must surface doomed.txt even though git apply
+      // failed before staging any unmerged index entries.
+      expect(metadata.conflictedFiles).toContain("doomed.txt");
+      expect(typeof metadata.patchPath).toBe("string");
+    } finally {
+      try { rmSync(root, { recursive: true, force: true }); } catch { /* best-effort */ }
+    }
+  });
+
   it("no other worktrees on integration branch → no audit emissions", async () => {
     await runMergeAdvanceAutoSync({
       store: fx.store,
