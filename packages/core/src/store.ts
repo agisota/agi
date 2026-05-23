@@ -3422,9 +3422,6 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
 
     const task = await this.createTaskWithDistributedReservation(input, {
       createTaskWithId: async (taskId) => {
-        if (input.dependencies?.includes(taskId)) {
-          throw new Error(`Task ${taskId} cannot depend on itself`);
-        }
         await this.assertNoDependencyCycle(taskId, input.dependencies ?? [], "createTask");
         return this._createTaskInternal(
           input,
@@ -3523,10 +3520,6 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
     const id = options.taskId.trim();
     if (!id) {
       throw new Error("taskId is required");
-    }
-
-    if (input.dependencies?.includes(id)) {
-      throw new Error(`Task ${id} cannot depend on itself`);
     }
 
     await this.assertNoDependencyCycle(id, input.dependencies ?? [], "createTaskWithReservedId");
@@ -5090,10 +5083,6 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
     runContext?: RunMutationContext,
   ): Promise<Task> {
     return this.withTaskLock(id, async () => {
-      // Validate that task doesn't depend on itself
-      if (updates.dependencies?.includes(id)) {
-        throw new Error(`Task ${id} cannot depend on itself`);
-      }
       if (updates.dependencies !== undefined) {
         await this.assertNoDependencyCycle(
           id,

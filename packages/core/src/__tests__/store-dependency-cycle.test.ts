@@ -136,9 +136,69 @@ describe("TaskStore dependency cycle guard", () => {
     const store = harness.store();
     const a = await store.createTask({ title: "A", description: "A" });
 
-    await expect(store.updateTask(a.id, { dependencies: [a.id] })).rejects.toThrow(
-      `Task ${a.id} cannot depend on itself`,
-    );
+    let error: unknown;
+    try {
+      await store.updateTask(a.id, { dependencies: [a.id] });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(DependencyCycleError);
+    expect(error).toMatchObject({
+      name: "DependencyCycleError",
+      taskId: a.id,
+      cyclePath: [a.id, a.id],
+    });
+    expect((error as DependencyCycleError).message).toContain(`${a.id} → ${a.id}`);
+
+    const refreshedA = await store.getTask(a.id);
+    expect(refreshedA.dependencies).toEqual([]);
+
+    const rows = (store as any).db
+      .prepare("SELECT metadata FROM runAuditEvents WHERE taskId = ? AND mutationType = ?")
+      .all(a.id, "task:dependency-cycle-rejected") as Array<{ metadata: string | { source?: string } }>;
+    expect(rows).toHaveLength(1);
+    const metadata = typeof rows[0].metadata === "string" ? JSON.parse(rows[0].metadata) : rows[0].metadata;
+    expect(metadata.source).toBe("updateTask");
+  });
+
+  it("rejects createTaskWithReservedId self-loop with typed cycle contract", async () => {
+    const store = harness.store();
+
+    let error: unknown;
+    try {
+      await store.createTaskWithReservedId(
+        { title: "self", description: "self", dependencies: ["FN-SELF-1"] },
+        { taskId: "FN-SELF-1" },
+      );
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(DependencyCycleError);
+    expect(error).toMatchObject({
+      taskId: "FN-SELF-1",
+      cyclePath: ["FN-SELF-1", "FN-SELF-1"],
+    });
+
+    const rows = (store as any).db
+      .prepare("SELECT metadata FROM runAuditEvents WHERE taskId = ? AND mutationType = ?")
+      .all("FN-SELF-1", "task:dependency-cycle-rejected") as Array<{ metadata: string | { source?: string } }>;
+    expect(rows).toHaveLength(1);
+    const metadata = typeof rows[0].metadata === "string" ? JSON.parse(rows[0].metadata) : rows[0].metadata;
+    expect(metadata.source).toBe("createTaskWithReservedId");
+
+    await expect(store.getTask("FN-SELF-1")).rejects.toThrow("Task FN-SELF-1 not found");
+  });
+
+  it("prioritizes self-edge cycle path when mixed with other dependencies", async () => {
+    const store = harness.store();
+    const a = await store.createTask({ title: "A", description: "A" });
+
+    await expect(store.updateTask(a.id, { dependencies: [a.id, "FN-NONEXISTENT"] })).rejects.toMatchObject({
+      taskId: a.id,
+      cyclePath: [a.id, a.id],
+    });
   });
 
   it("rejects incremental update that closes a loop and preserves state", async () => {
