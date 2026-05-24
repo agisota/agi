@@ -9808,7 +9808,14 @@ export async function aiMergeTask(
           audit,
         });
         if (!advanceResult.advanced) {
-          if (advanceResult.reason === "concurrent-advance") {
+          // `non-fast-forward-advance` has the same root cause as
+          // `concurrent-advance` — integration moved during the merge window,
+          // here detected by ancestry rather than CAS old-value mismatch —
+          // so route it through the same rebind/retry path (FN-5576).
+          if (
+            advanceResult.reason === "concurrent-advance"
+            || advanceResult.reason === "non-fast-forward-advance"
+          ) {
             throw new IntegrationBranchConcurrentAdvanceError({
               integrationBranch,
               expectedCurrentSha,
