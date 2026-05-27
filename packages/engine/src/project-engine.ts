@@ -19,7 +19,7 @@ import type { ProjectRuntimeConfig } from "./project-runtime.js";
 import { PrMonitor } from "./pr-monitor.js";
 import { PrCommentHandler } from "./pr-comment-handler.js";
 import { NtfyNotifier } from "./notifier.js";
-import { NotificationService, OAuthExpiryMonitor } from "./notification/index.js";
+import { NotificationService, OAuthExpiryMonitor, OAuthValidityLogger } from "./notification/index.js";
 import type { NotificationChatStore } from "./notification/notification-service.js";
 import { GridlockDetector } from "./gridlock-detector.js";
 import { createFusionAuthStorage } from "./auth-storage.js";
@@ -177,6 +177,7 @@ export class ProjectEngine {
   private notifier?: NtfyNotifier;
   private notificationService?: NotificationService;
   private oauthExpiryMonitor?: OAuthExpiryMonitor;
+  private oauthValidityLogger?: OAuthValidityLogger;
   private gridlockDetector?: GridlockDetector;
   private cronRunner?: CronRunner;
   private automationStore?: AutomationStoreType;
@@ -353,11 +354,14 @@ export class ProjectEngine {
         agentNameResolver,
       });
       await this.notificationService.start();
+      const authStorage = createFusionAuthStorage();
       this.oauthExpiryMonitor = new OAuthExpiryMonitor({
-        authStorage: createFusionAuthStorage(),
+        authStorage,
         notificationService: this.notificationService,
       });
       await this.oauthExpiryMonitor.start();
+      this.oauthValidityLogger = new OAuthValidityLogger({ authStorage });
+      await this.oauthValidityLogger.start();
 
       // Backward-compatibility shim for gridlock notifications.
       this.notifier = new NtfyNotifier(
@@ -581,6 +585,7 @@ export class ProjectEngine {
 
     // Stop auxiliary subsystems
     this.oauthExpiryMonitor?.stop();
+    this.oauthValidityLogger?.stop();
     this.notificationService?.stop();
     this.notifier?.stop();
     this.gridlockDetector?.stop();

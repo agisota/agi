@@ -9,3 +9,5 @@ export type { NotificationServiceOptions } from "./notification-service.js";
 
 export { OAuthExpiryMonitor } from "./oauth-expiry-monitor.js";
 export type { AuthStorageLike as OAuthExpiryAuthStorageLike, OAuthExpiryMonitorOptions } from "./oauth-expiry-monitor.js";
+
+export { OAuthValidityLogger } from "./oauth-validity-logger.js";

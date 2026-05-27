@@ -1,0 +1,129 @@
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, X } from "lucide-react";
+import { fetchAuthStatus } from "../api";
+import "./OAuthReloginBanner.css";
+
+const DISMISS_STORAGE_KEY = "fusion:oauth-relogin-dismissed";
+
+function loadDismissedProviderIds(): Set<string> {
+  if (typeof window === "undefined") {
+    return new Set();
+  }
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(DISMISS_STORAGE_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) {
+      return new Set();
+    }
+    return new Set(parsed.filter((value): value is string => typeof value === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function persistDismissedProviderIds(providerIds: Set<string>): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(DISMISS_STORAGE_KEY, JSON.stringify(Array.from(providerIds)));
+}
+
+export function OAuthReloginBanner({
+  onReLogin,
+  pollIntervalMs,
+}: {
+  onReLogin: (providerId?: string) => void;
+  pollIntervalMs?: number;
+}): JSX.Element | null {
+  const [expiredProviders, setExpiredProviders] = useState<Array<{ id: string; name: string }>>([]);
+  const [dismissedProviderIds, setDismissedProviderIds] = useState<Set<string>>(() => loadDismissedProviderIds());
+
+  useEffect(() => {
+    let active = true;
+
+    const refreshAuthStatus = async () => {
+      try {
+        const { providers } = await fetchAuthStatus();
+        if (!active) {
+          return;
+        }
+        const nextExpiredProviders = providers
+          .filter((provider) => provider.type === "oauth" && provider.expired === true)
+          .map((provider) => ({ id: provider.id, name: provider.name }));
+
+        setExpiredProviders(nextExpiredProviders);
+        setDismissedProviderIds((currentDismissed) => {
+          const expiredProviderIds = new Set(nextExpiredProviders.map((provider) => provider.id));
+          const filteredDismissed = new Set(
+            Array.from(currentDismissed).filter((providerId) => expiredProviderIds.has(providerId)),
+          );
+          if (filteredDismissed.size === currentDismissed.size) {
+            return currentDismissed;
+          }
+          persistDismissedProviderIds(filteredDismissed);
+          return filteredDismissed;
+        });
+      } catch {
+        // Non-blocking banner; ignore transient status fetch failures.
+      }
+    };
+
+    void refreshAuthStatus();
+    const interval = window.setInterval(refreshAuthStatus, pollIntervalMs ?? 60 * 60 * 1000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [pollIntervalMs]);
+
+  const visibleExpiredProviders = useMemo(
+    () => expiredProviders.filter((provider) => !dismissedProviderIds.has(provider.id)),
+    [dismissedProviderIds, expiredProviders],
+  );
+
+  if (visibleExpiredProviders.length === 0) {
+    return null;
+  }
+
+  const isSingleProvider = visibleExpiredProviders.length === 1;
+  const providerList = visibleExpiredProviders.map((provider) => provider.name).join(", ");
+
+  const handleDismiss = () => {
+    const nextDismissed = new Set(dismissedProviderIds);
+    for (const provider of visibleExpiredProviders) {
+      nextDismissed.add(provider.id);
+    }
+    setDismissedProviderIds(nextDismissed);
+    persistDismissedProviderIds(nextDismissed);
+  };
+
+  return (
+    <section className="oauth-relogin-banner" role="status" aria-live="polite">
+      <div className="oauth-relogin-banner__content">
+        <AlertTriangle aria-hidden="true" />
+        <p className="oauth-relogin-banner__message">
+          {isSingleProvider
+            ? `Re-login required: ${providerList}. Your ${providerList} session expired — sign in again to keep agents running.`
+            : `Re-login required: ${providerList}`}
+        </p>
+      </div>
+      <div className="oauth-relogin-banner__actions">
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() => onReLogin(isSingleProvider ? visibleExpiredProviders[0]?.id : undefined)}
+        >
+          Re-login
+        </button>
+        <button
+          type="button"
+          className="btn-icon oauth-relogin-banner__dismiss"
+          aria-label="Dismiss OAuth re-login banner"
+          onClick={handleDismiss}
+        >
+          <X aria-hidden="true" />
+        </button>
+      </div>
+    </section>
+  );
+}

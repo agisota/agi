@@ -248,17 +248,23 @@ export const registerAuthRoutes: ApiRouteRegistrar = (ctx) => {
         name: string;
         authenticated: boolean;
         type: "oauth" | "api_key" | "cli";
+        expired?: boolean;
         keyHint?: string;
         loginInProgress?: boolean;
         requiresManualCode?: boolean;
-      }[] = oauthProviders.map((p) => ({
-        id: p.id,
-        name: p.name,
-        authenticated: storage.hasAuth(p.id) && !isExpiredOauthCredential(p.id, storage),
-        type: "oauth" as const,
-        loginInProgress: loginInProgress.has(p.id),
-        requiresManualCode: getManualCodeConfig(p.id, origin) !== undefined || undefined,
-      }));
+      }[] = oauthProviders.map((p) => {
+        const hasAuth = storage.hasAuth(p.id);
+        const expired = hasAuth && isExpiredOauthCredential(p.id, storage);
+        return {
+          id: p.id,
+          name: p.name,
+          authenticated: hasAuth && !expired,
+          type: "oauth" as const,
+          expired,
+          loginInProgress: loginInProgress.has(p.id),
+          requiresManualCode: getManualCodeConfig(p.id, origin) !== undefined || undefined,
+        };
+      });
 
       // Include API-key-backed providers if supported
       if (storage.getApiKeyProviders) {

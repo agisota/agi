@@ -635,7 +635,7 @@ describe("GET /auth/status", () => {
     // Structural assertions here are about OAuth + API-key paths only.
     const providers = res.body.providers.filter((p: any) => p.id !== "claude-cli" && p.id !== "droid-cli" && p.id !== "cursor-cli" && p.id !== "llama-cpp");
     expect(providers).toEqual([
-      { id: "github-copilot", name: "GitHub Copilot", authenticated: true, type: "oauth", loginInProgress: false },
+      { id: "github-copilot", name: "GitHub Copilot", authenticated: true, type: "oauth", expired: false, loginInProgress: false },
       { id: "openrouter", name: "OpenRouter", authenticated: false, type: "api_key" },
       { id: "kimi-coding", name: "Kimi", authenticated: false, type: "api_key" },
     ]);
@@ -657,6 +657,7 @@ describe("GET /auth/status", () => {
       name: "GitHub Copilot",
       authenticated: true,
       type: "oauth",
+      expired: false,
       loginInProgress: false,
     });
   });
@@ -679,8 +680,8 @@ describe("GET /auth/status", () => {
     expect(res.status).toBe(200);
     const providers = res.body.providers.filter((p: any) => p.id !== "claude-cli" && p.id !== "droid-cli" && p.id !== "cursor-cli" && p.id !== "llama-cpp");
     expect(providers).toEqual([
-      { id: "github-copilot", name: "GitHub Copilot", authenticated: true, type: "oauth", loginInProgress: false },
-      { id: "openai-codex", name: "OpenAI Codex", authenticated: false, type: "oauth", loginInProgress: false, requiresManualCode: true },
+      { id: "github-copilot", name: "GitHub Copilot", authenticated: true, type: "oauth", expired: false, loginInProgress: false },
+      { id: "openai-codex", name: "OpenAI Codex", authenticated: false, type: "oauth", expired: false, loginInProgress: false, requiresManualCode: true },
       { id: "openrouter", name: "OpenRouter", authenticated: false, type: "api_key" },
       { id: "kimi-coding", name: "Kimi", authenticated: false, type: "api_key" },
       { id: "acme-extension", name: "Acme Extension", authenticated: true, type: "api_key" },
@@ -727,19 +728,36 @@ describe("GET /auth/status", () => {
     expect(res.body.providers[0].authenticated).toBe(false);
   });
 
-  it("treats expired oauth credentials as unauthenticated", async () => {
-    (authStorage.hasAuth as ReturnType<typeof vi.fn>).mockReturnValue(true);
-    (authStorage.get as ReturnType<typeof vi.fn>).mockImplementation((provider: string) =>
-      provider === "github-copilot"
-        ? { type: "oauth", access: "token", refresh: "refresh", expires: Date.now() - 1_000 }
-        : undefined,
+  it("reports oauth expired flag for valid, expired, and missing credentials", async () => {
+    const now = Date.now();
+    (authStorage.getOAuthProviders as ReturnType<typeof vi.fn>).mockReturnValue([
+      { id: "github-copilot", name: "GitHub Copilot" },
+      { id: "claude", name: "Claude" },
+      { id: "gemini-oauth", name: "Gemini OAuth" },
+    ]);
+    (authStorage.hasAuth as ReturnType<typeof vi.fn>).mockImplementation(
+      (provider: string) => provider !== "gemini-oauth",
     );
+    (authStorage.get as ReturnType<typeof vi.fn>).mockImplementation((provider: string) => {
+      if (provider === "github-copilot") {
+        return { type: "oauth", access: "token", refresh: "refresh", expires: now + 60_000 };
+      }
+      if (provider === "claude") {
+        return { type: "oauth", access: "token", refresh: "refresh", expires: now - 1_000 };
+      }
+      return undefined;
+    });
 
     const res = await GET(app, "/api/auth/status");
 
     expect(res.status).toBe(200);
     const githubCopilot = res.body.providers.find((p: any) => p.id === "github-copilot");
-    expect(githubCopilot.authenticated).toBe(false);
+    const claude = res.body.providers.find((p: any) => p.id === "claude");
+    const geminiOauth = res.body.providers.find((p: any) => p.id === "gemini-oauth");
+
+    expect(githubCopilot).toMatchObject({ authenticated: true, expired: false });
+    expect(claude).toMatchObject({ authenticated: false, expired: true });
+    expect(geminiOauth).toMatchObject({ authenticated: false, expired: false });
   });
 
   it("reports loginInProgress for oauth providers with active logins", async () => {

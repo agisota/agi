@@ -1441,6 +1441,8 @@ export interface AuthProvider {
   authenticated: boolean;
   /** True when the server currently has an active OAuth login flow for this provider. */
   loginInProgress?: boolean;
+  /** True when an OAuth credential is stored locally but its expires timestamp is in the past — prompt the user to re-login. */
+  expired?: boolean;
   /** True when the redirect cannot reach this dashboard host and the user must paste the URL/code back manually. */
   requiresManualCode?: boolean;
   /**

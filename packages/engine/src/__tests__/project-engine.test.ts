@@ -3,7 +3,7 @@ import { ProjectEngine } from "../project-engine.js";
 import { runtimeLog } from "../logger.js";
 import { TunnelProcessManager } from "../remote-access/tunnel-process-manager.js";
 import { NtfyNotifier } from "../notifier.js";
-import { NotificationService, OAuthExpiryMonitor } from "../notification/index.js";
+import { NotificationService, OAuthExpiryMonitor, OAuthValidityLogger } from "../notification/index.js";
 
 const mocks = vi.hoisted(() => ({
   syncInsightExtractionAutomation: vi.fn(),
@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => ({
   notificationServiceStop: vi.fn(),
   oauthExpiryMonitorStart: vi.fn(async () => undefined),
   oauthExpiryMonitorStop: vi.fn(),
+  oauthValidityLoggerStart: vi.fn(async () => undefined),
+  oauthValidityLoggerStop: vi.fn(),
   runtimeConfigurePrMonitoring: vi.fn(),
   prHandlerCreateFollowUpTask: vi.fn(async () => undefined),
 }));
@@ -97,6 +99,10 @@ vi.mock("../notification/index.js", () => ({
   OAuthExpiryMonitor: vi.fn().mockImplementation(() => ({
     start: mocks.oauthExpiryMonitorStart,
     stop: mocks.oauthExpiryMonitorStop,
+  })),
+  OAuthValidityLogger: vi.fn().mockImplementation(() => ({
+    start: mocks.oauthValidityLoggerStart,
+    stop: mocks.oauthValidityLoggerStop,
   })),
 }));
 
@@ -261,6 +267,8 @@ beforeEach(() => {
   mocks.notificationServiceStop.mockClear();
   mocks.oauthExpiryMonitorStart.mockClear();
   mocks.oauthExpiryMonitorStop.mockClear();
+  mocks.oauthValidityLoggerStart.mockClear();
+  mocks.oauthValidityLoggerStop.mockClear();
 
   mocks.execFile.mockImplementation((
     _file: string,
