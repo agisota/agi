@@ -27,7 +27,9 @@
     "generate:icons": "tsx scripts/generate-icons.ts",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win"
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
   },
   "dependencies": {
     "@fusion/core": "workspace:*",

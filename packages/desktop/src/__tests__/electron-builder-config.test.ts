@@ -11,7 +11,7 @@ async function readDesktopFile(relativePath: string): Promise<string> {
   return readFile(path.join(desktopRoot, relativePath), "utf-8");
 }
 
-describe("electron-builder windows config", () => {
+describe("electron-builder desktop config", () => {
   it("keeps required Windows packaging targets and metadata", async () => {
     const builderConfig = await readDesktopFile("electron-builder.yml");
 
@@ -53,11 +53,34 @@ describe("electron-builder windows config", () => {
     expect(builderConfig).not.toContain("certificateSubjectName:");
   });
 
-  it("exposes a dedicated dist:win script", async () => {
+  it("exposes dedicated platform-specific dist scripts", async () => {
     const packageJsonRaw = await readDesktopFile("package.json");
     const packageJson = JSON.parse(packageJsonRaw) as { scripts?: Record<string, string> };
 
     expect(packageJson.scripts?.["dist:win"]).toBe("electron-builder --win");
+    expect(packageJson.scripts?.["dist:mac"]).toBe("electron-builder --mac");
+    expect(packageJson.scripts?.["dist:linux"]).toBe("electron-builder --linux");
+  });
+
+  it("keeps required mac and linux targets", async () => {
+    const builderConfig = await readDesktopFile("electron-builder.yml");
+
+    expect(builderConfig).toMatch(/mac:\s*[\s\S]*?target:\s*[\s\S]*?-\s*target:\s*dmg/m);
+    expect(builderConfig).toMatch(/mac:\s*[\s\S]*?target:\s*[\s\S]*?-\s*target:\s*zip/m);
+
+    const linuxSectionMatch = builderConfig.match(/linux:\s*[\s\S]*$/m);
+    expect(linuxSectionMatch?.[0]).toBeDefined();
+
+    const linuxSection = linuxSectionMatch![0];
+    expect(linuxSection).toMatch(/target:\s*[\s\S]*?-\s*target:\s*AppImage/m);
+    expect(linuxSection).toMatch(/target:\s*[\s\S]*?-\s*target:\s*deb/m);
+    expect(linuxSection).toMatch(/target:\s*[\s\S]*?-\s*target:\s*tar\.gz/m);
+
+    const linuxTargetEntries = Array.from(
+      linuxSection.matchAll(/-\s*target:\s*([^\n\r]+)/g),
+      (match) => match[1]?.trim(),
+    );
+    expect(linuxTargetEntries[0]).toBe("AppImage");
   });
 });
 

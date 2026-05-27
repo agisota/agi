@@ -341,6 +341,8 @@ Tray icons are generated from `packages/dashboard/app/public/logo.svg`.
 - `pnpm --filter @fusion/desktop pack` — generate unpacked artifacts via electron-builder (`--dir`)
 - `pnpm --filter @fusion/desktop dist` — generate installable desktop artifacts via electron-builder
 - `pnpm --filter @fusion/desktop dist:win` — generate Windows installable artifacts (`--win`)
+- `pnpm --filter @fusion/desktop dist:mac` — generate macOS installable artifacts (`--mac`)
+- `pnpm --filter @fusion/desktop dist:linux` — generate Linux installable artifacts (`--linux`)
 - `pnpm dist:desktop:win` — workspace alias to build desktop assets then run Windows packaging
 
 ## Packaging
@@ -350,8 +352,13 @@ Desktop packaging is configured in `electron-builder.yml`.
 - Output directory: `packages/desktop/dist-electron`
 - Targets: macOS (`dmg`, `zip`), Windows (`nsis`, `portable`), Linux (`AppImage`, `deb`, `tar.gz`)
 - Windows artifacts: `Fusion-<version>-win-x64.exe` and `Fusion-<version>-win-arm64.exe` (both NSIS + portable variants) in `packages/desktop/dist-electron/`
-- Binary GitHub Release workflow (`.github/workflows/release.yml`) now attaches Windows desktop artifacts: x64 + arm64 outputs (NSIS + portable), matching `.exe.sha256` sidecars, and `.blockmap` files.
+- Binary GitHub Release workflow (`.github/workflows/release.yml`) now attaches desktop artifacts for all supported platforms:
+  - Windows: x64 + arm64 outputs (NSIS + portable), matching `.exe.sha256` sidecars, and `.blockmap` files.
+  - macOS: `Fusion-<version>-mac-arm64.dmg`, `Fusion-<version>-mac-x64.dmg`, matching `.zip` variants, `.sha256` sidecars, and `.blockmap` files.
+  - Linux: `Fusion-<version>-linux-x64.AppImage` with `.sha256`, plus best-effort `.deb` and `.tar.gz` outputs (and sidecars) when available on the runner image.
 - Tag-less release rehearsal workflow (`.github/workflows/test-release.yml`) mirrors that artifact collection path without publishing a real GitHub Release.
+- macOS Developer ID signing/notarization and Linux signing are not wired in these release jobs yet; release-attached macOS/Linux artifacts are currently unsigned and follow-up tasks will add signing flows.
+- Linux `.deb` and `.tar.gz` outputs are best-effort and may be absent on some runner images without failing the release.
 - Isolated manual Windows build path: `.github/workflows/desktop-windows.yml` (`workflow_dispatch` on `windows-latest`) runs `electron-builder --win --x64 --arm64 --publish never`.
 - ARM64 artifacts are cross-built on the `windows-latest` x64 runner; execution/validation still requires a Windows ARM64 device or emulator.
 - Deep link protocol: `fusion://`
