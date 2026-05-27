@@ -283,7 +283,7 @@ export function useChat(
   const [searchQuery, setSearchQuery] = useState("");
 
   // Pagination
-  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
 
   // Agent name resolution map
   const { agentsMap } = useAgentsMapCache(projectId);
@@ -437,8 +437,8 @@ export function useChat(
 
   // Load messages when active session changes
   const loadMessages = useCallback(
-    async (sessionId: string, opts?: { offset?: number }) => {
-      const isPaginationRequest = typeof opts?.offset === "number" && opts.offset > 0;
+    async (sessionId: string, opts?: { offset?: number; before?: string }) => {
+      const isPaginationRequest = (typeof opts?.offset === "number" && opts.offset > 0) || typeof opts?.before === "string";
       const cacheKey = getChatMessagesCacheKey(projectId, sessionId);
       const cachedMessages = !isPaginationRequest ? readCachedMessages(projectId, sessionId) : [];
       const hasCachedMessages = cachedMessages.length > 0;
@@ -451,8 +451,9 @@ export function useChat(
       }
 
       try {
-        const data = await fetchChatMessages(sessionId, { limit: 50, ...opts }, projectId);
-        const mappedMessages = data.messages.map(mapChatMessageToInfo);
+        const data = await fetchChatMessages(sessionId, { limit: 50, order: "desc", ...opts }, projectId);
+        // API returns newest-first (order=desc); reverse so display is oldest-first.
+        const mappedMessages = data.messages.slice().reverse().map(mapChatMessageToInfo);
         if (isPaginationRequest) {
           if (activeSessionRef.current?.id === sessionId) {
             setMessages((prev) => [...mappedMessages, ...prev]);
@@ -630,7 +631,7 @@ export function useChat(
 
       // Reset transient state
       resetTransientComposerState();
-      setHasMoreMessages(true);
+      setHasMoreMessages(false);
 
       // Load messages for this session
       if (id) {
@@ -740,11 +741,14 @@ export function useChat(
     [activeSession, getChatMessagesCacheKey, projectId],
   );
 
-  // Load more messages (pagination)
+  // Load more messages (pagination — use before cursor for oldest displayed message)
   const loadMoreMessages = useCallback(async () => {
     if (!activeSession || !hasMoreMessages) return;
-    await loadMessages(activeSession.id, { offset: messages.length });
-  }, [activeSession, hasMoreMessages, loadMessages, messages.length]);
+    // messages[0] is the oldest visible message; fetch older ones using its createdAt as cursor
+    const cursor = messages[0]?.createdAt;
+    if (!cursor) return;
+    await loadMessages(activeSession.id, { before: cursor });
+  }, [activeSession, hasMoreMessages, loadMessages, messages]);
 
   const stopStreaming = useCallback(() => {
     if (!activeSession) return;

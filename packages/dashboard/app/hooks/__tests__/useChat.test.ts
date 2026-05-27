@@ -1083,7 +1083,7 @@ describe("useChat", () => {
     await waitFor(() => {
       expect(result.current.isStreaming).toBe(false);
       expect(addToast).not.toHaveBeenCalledWith("Load failed", "error");
-      expect(mockFetchChatMessages).toHaveBeenCalledWith("session-001", { limit: 50 }, undefined);
+      expect(mockFetchChatMessages).toHaveBeenCalledWith("session-001", { limit: 50, order: "desc" }, undefined);
     });
   });
 
@@ -2665,7 +2665,7 @@ describe("useChat", () => {
 
       // Verify messages were loaded
       await waitFor(() => {
-        expect(mockFetchChatMessages).toHaveBeenCalledWith("session-001", { limit: 50 }, undefined);
+        expect(mockFetchChatMessages).toHaveBeenCalledWith("session-001", { limit: 50, order: "desc" }, undefined);
       });
     });
 
