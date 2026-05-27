@@ -99,6 +99,7 @@ describe("useChat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    mockGetScopedItem.mockReturnValue(undefined);
     mockFetchChatSessions.mockResolvedValue({ sessions: [] });
     mockFetchChatSession.mockResolvedValue({
       session: makeSession({ id: "session-001", agentId: "agent-001" }),
@@ -559,7 +560,7 @@ describe("useChat", () => {
 
     const parsed = JSON.parse(localStorage.getItem(chatMessagesCacheKey(projectId, session.id)) ?? "null") as { data: ChatMessage[] };
     expect(parsed.data).toHaveLength(50);
-    expect(parsed.data[0]?.id).toBe("msg-1");
+    expect(parsed.data[0]?.id).toBe("msg-50");
   });
 
   it("selects a session and loads its messages", async () => {
@@ -583,7 +584,7 @@ describe("useChat", () => {
     });
 
     await waitFor(() => {
-      expect(mockFetchChatMessages).toHaveBeenCalledWith("session-001", { limit: 50 }, undefined);
+      expect(mockFetchChatMessages).toHaveBeenCalledWith("session-001", { limit: 50, order: "desc" }, undefined);
     });
 
     await waitFor(() => {
@@ -600,13 +601,13 @@ describe("useChat", () => {
     mockFetchChatSessions.mockResolvedValueOnce({ sessions: [session] });
 
     // Simulate a conversation with multiple user and assistant messages
-    // in backend chronological order (oldest first)
+    // API returns messages newest-first (order=desc); simulate that in the mock
     mockFetchChatMessages.mockResolvedValueOnce({
       messages: [
-        makeMessage({ id: "msg-001", sessionId: "session-001", role: "user", content: "First question" }),
-        makeMessage({ id: "msg-002", sessionId: "session-001", role: "assistant", content: "First answer" }),
-        makeMessage({ id: "msg-003", sessionId: "session-001", role: "user", content: "Second question" }),
         makeMessage({ id: "msg-004", sessionId: "session-001", role: "assistant", content: "Second answer" }),
+        makeMessage({ id: "msg-003", sessionId: "session-001", role: "user", content: "Second question" }),
+        makeMessage({ id: "msg-002", sessionId: "session-001", role: "assistant", content: "First answer" }),
+        makeMessage({ id: "msg-001", sessionId: "session-001", role: "user", content: "First question" }),
       ],
     });
 
@@ -2112,7 +2113,7 @@ describe("useChat", () => {
     const secondCall = mockFetchChatMessages.mock.calls[1];
     expect(secondCall[0]).toBe("session-001");
     expect(secondCall[1]).toHaveProperty("limit");
-    expect(secondCall[1]).toHaveProperty("offset");
+    expect(secondCall[1]).toHaveProperty("before");
 
     await waitFor(() => {
       expect(result.current.messages).toHaveLength(51);

@@ -692,7 +692,7 @@ describe("ChatStore", () => {
       it("combines before cursor with order=desc", () => {
         startFakeClock();
         const session = createTestSession(store);
-        store.addMessage(session.id, { role: "user", content: "First" });
+        const m1 = store.addMessage(session.id, { role: "user", content: "First" });
         advanceClock(5);
         const m2 = store.addMessage(session.id, { role: "assistant", content: "Second" });
         advanceClock(5);
@@ -703,6 +703,7 @@ describe("ChatStore", () => {
 
         expect(messages).toHaveLength(2);
         expect(messages[0].id).toBe(m2.id);
+        expect(messages[1].id).toBe(m1.id);
       });
     });
 
