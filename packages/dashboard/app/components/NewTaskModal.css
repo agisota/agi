@@ -179,6 +179,10 @@
   line-height: 1.4;
 }
 
+.new-task-branch-error {
+  margin: 0 var(--space-xl) var(--space-sm);
+}
+
 .new-task-modal textarea {
   min-height: calc(var(--space-xl) * 3 + var(--space-md));
   transition: height var(--transition-instant);
@@ -491,6 +495,10 @@
 
   .new-task-quick-fields {
     padding: 0 var(--space-md);
+  }
+
+  .new-task-branch-error {
+    margin: 0 var(--space-md) var(--space-sm);
   }
 
   .new-task-quick-fields .dep-trigger {

@@ -111,6 +111,22 @@ Planning Mode now includes branch controls on the summary screen before you crea
 
 These values are sent with the Planning Mode create-task request as `branchSelection`, so created tasks persist branch/base-branch settings consistently with other branch-aware task creation flows.
 
+## New Task Modal Branch Strategy
+
+The **New Task** dialog uses the same four-option **Branch strategy** selector and `branchSelection` payload as Planning Mode:
+
+- `Use project/default branch`
+- `Create auto-named branch per task`
+- `Use existing branch`
+- `Create custom new branch`
+
+Rules:
+
+- `existing` and `custom-new` require a branch name.
+- `project-default` leaves `branch` unset.
+- `auto-new` creates a branch after task creation using `fusion/{task-id}-{short-name}` (for example `fusion/fn-5671-branch-strategy-dropdown`).
+- `Merge target / base branch` stays optional for all modes.
+
 ## Chat View
 
 Chat view provides project-scoped conversations with agents.

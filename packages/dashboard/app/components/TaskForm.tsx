@@ -36,6 +36,7 @@ export interface PendingImage {
 }
 
 type TaskExecutionModeSelection = "standard" | "fast";
+export type BranchSelectionMode = "project-default" | "auto-new" | "existing" | "custom-new";
 
 export interface TaskFormProps {
   mode: "create" | "edit";
@@ -51,6 +52,8 @@ export interface TaskFormProps {
   onDependenciesChange: (deps: string[]) => void;
   branch?: string;
   onBranchChange?: (value: string) => void;
+  branchMode?: BranchSelectionMode;
+  onBranchModeChange?: (value: BranchSelectionMode) => void;
   baseBranch?: string;
   onBaseBranchChange?: (value: string) => void;
   nodeId?: string;
@@ -130,6 +133,8 @@ export function TaskForm({
   onDependenciesChange,
   branch,
   onBranchChange,
+  branchMode,
+  onBranchModeChange,
   baseBranch,
   onBaseBranchChange,
   nodeId,
@@ -967,12 +972,31 @@ export function TaskForm({
         </>
       )}
 
-      {(onBranchChange || onBaseBranchChange) && (
+      {(onBranchChange || onBaseBranchChange || onBranchModeChange) && (
         <div className="form-group">
           <label>Branch Settings</label>
-          {onBranchChange && (
+          {onBranchModeChange ? (
             <>
-              <label htmlFor="task-working-branch" className="model-select-label">Working branch</label>
+              <label htmlFor="task-branch-mode" className="model-select-label">Branch strategy</label>
+              <select
+                id="task-branch-mode"
+                className="input"
+                value={branchMode ?? "project-default"}
+                onChange={(event) => onBranchModeChange(event.target.value as BranchSelectionMode)}
+                disabled={disabled}
+              >
+                <option value="project-default">Use project/default branch</option>
+                <option value="auto-new">Create auto-named branch per task</option>
+                <option value="existing">Use existing branch</option>
+                <option value="custom-new">Create custom new branch</option>
+              </select>
+            </>
+          ) : null}
+          {onBranchChange && (!onBranchModeChange || branchMode === "existing" || branchMode === "custom-new") && (
+            <>
+              <label htmlFor="task-working-branch" className="model-select-label">
+                {onBranchModeChange ? "Branch name" : "Working branch"}
+              </label>
               <input
                 id="task-working-branch"
                 className="input"

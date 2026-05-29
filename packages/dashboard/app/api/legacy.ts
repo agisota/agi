@@ -330,7 +330,14 @@ export interface CreateTaskRequestOptions {
   localNodeId?: string;
 }
 
+export type BranchSelectionInput = {
+  mode: "project-default" | "auto-new" | "existing" | "custom-new";
+  branchName?: string;
+  baseBranch?: string;
+};
+
 export type CreateTaskInput = TaskCreateInput & {
+  branchSelection?: BranchSelectionInput;
   acknowledgedDuplicates?: string[];
   bypassDuplicateCheck?: boolean;
 };
@@ -375,6 +382,7 @@ export async function createTask(
     nodeId,
     branch,
     baseBranch,
+    branchSelection,
     githubTracking,
     acknowledgedDuplicates,
     bypassDuplicateCheck,
@@ -409,6 +417,7 @@ export async function createTask(
       nodeId,
       branch,
       baseBranch,
+      branchSelection,
       githubTracking,
       acknowledgedDuplicates,
       bypassDuplicateCheck,

@@ -653,6 +653,27 @@ describe("createTask", () => {
     expect(body).not.toHaveProperty("baseBranch");
   });
 
+  it("serializes branchSelection in create payload when provided", async () => {
+    globalThis.fetch = vi.fn().mockReturnValue(mockFetchResponse(true, FAKE_CREATED_TASK));
+
+    await createTask({
+      description: "Task with branch strategy",
+      branchSelection: {
+        mode: "custom-new",
+        branchName: "feature/new-task-flow",
+        baseBranch: "main",
+      },
+    });
+
+    const call = vi.mocked(globalThis.fetch).mock.calls[0];
+    const body = JSON.parse((call[1] as RequestInit).body as string);
+    expect(body.branchSelection).toEqual({
+      mode: "custom-new",
+      branchName: "feature/new-task-flow",
+      baseBranch: "main",
+    });
+  });
+
   it("serializes nodeId in create payload when execution target is specified", async () => {
     globalThis.fetch = vi.fn().mockReturnValue(mockFetchResponse(true, {
       ...FAKE_CREATED_TASK,

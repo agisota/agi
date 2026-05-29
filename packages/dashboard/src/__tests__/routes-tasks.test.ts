@@ -867,6 +867,78 @@ describe("POST /tasks", () => {
     );
   });
 
+  it("applies branchSelection on create when supplied", async () => {
+    (store.createTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...FAKE_TASK_DETAIL,
+      column: "triage",
+      branch: "feature/existing",
+      baseBranch: "main",
+    });
+
+    const res = await REQUEST(
+      buildApp(),
+      "POST",
+      "/api/tasks",
+      JSON.stringify({
+        description: "Task with branch selection",
+        branchSelection: {
+          mode: "existing",
+          branchName: " feature/existing ",
+          baseBranch: " main ",
+        },
+      }),
+      { "Content-Type": "application/json" },
+    );
+
+    expect(res.status).toBe(201);
+    expect(store.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        branch: "feature/existing",
+        baseBranch: "main",
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("persists an auto-derived branch for auto-new branchSelection", async () => {
+    (store.createTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...FAKE_TASK_DETAIL,
+      id: "FN-5671",
+      title: "Branch Strategy Dropdown",
+      description: "Task with auto-new strategy",
+      column: "triage",
+      branch: undefined,
+    });
+    (store.updateTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...FAKE_TASK_DETAIL,
+      id: "FN-5671",
+      title: "Branch Strategy Dropdown",
+      description: "Task with auto-new strategy",
+      column: "triage",
+      branch: "fusion/fn-5671-branch-strategy-dropdown",
+    });
+
+    const res = await REQUEST(
+      buildApp(),
+      "POST",
+      "/api/tasks",
+      JSON.stringify({
+        description: "Task with auto-new strategy",
+        title: "Branch Strategy Dropdown",
+        branchSelection: {
+          mode: "auto-new",
+        },
+      }),
+      { "Content-Type": "application/json" },
+    );
+
+    expect(res.status).toBe(201);
+    expect(store.updateTask).toHaveBeenCalledWith("FN-5671", {
+      branch: "fusion/fn-5671-branch-strategy-dropdown",
+    });
+    expect(res.body.branch).toBe("fusion/fn-5671-branch-strategy-dropdown");
+  });
+
   it("returns 400 when create branch payload is not a string", async () => {
     const res = await REQUEST(
       buildApp(),

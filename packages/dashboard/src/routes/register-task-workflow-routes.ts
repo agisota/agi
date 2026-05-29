@@ -43,7 +43,7 @@ import { planTaskWorktreePath } from "@fusion/engine";
 import type { RunAuditEventInput } from "@fusion/core";
 import { ApiError, badRequest, conflict, notFound } from "../api-error.js";
 import type { ApiRoutesContext } from "./types.js";
-import { resolveBranchSelection } from "./branch-selection.js";
+import { deriveAutoTaskBranch, getBranchSelectionMode, resolveBranchSelection } from "./branch-selection.js";
 
 const REVIEW_BLOCK_RE = /##\s+(Code|Plan)\s+Review:[\s\S]*?(?=\n##\s+(?:Code|Plan)\s+Review:|$)/gi;
 const REVIEW_VERDICT_RE = /###\s+Verdict:\s*(APPROVE|REVISE|RETHINK|UNAVAILABLE)\b/i;
@@ -940,6 +940,7 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
           ? source
           : { sourceType: "api" as const };
 
+      const requestedBranchMode = getBranchSelectionMode(branchSelection);
       const { branch: normalizedBranch, baseBranch: normalizedBaseBranch } =
         resolveBranchSelection(branchSelection, branch, baseBranch);
 
@@ -1222,8 +1223,19 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
         { onSummarize, settings: { autoSummarizeTitles: settings.autoSummarizeTitles } },
       );
 
+      // Newly created tasks are still triage/todo and cannot be worktree-acquired until
+      // moved to in-progress, so this in-request branch update is safe.
+      const taskWithAutoBranch = requestedBranchMode === "auto-new"
+        ? await scopedStore.updateTask(task.id, {
+            branch: deriveAutoTaskBranch(
+              task.id,
+              (((task.title ?? "").trim() || task.description).slice(0, 60)),
+            ),
+          })
+        : task;
+
       const deterministicReconcile = await reconcileDeterministicDuplicate(scopedStore, {
-        createdTask: task,
+        createdTask: taskWithAutoBranch,
         fingerprint: bypassDuplicateCheck === true ? null : contentFingerprint,
         windowMs: 60_000,
         logger: runtimeLogger,
@@ -1237,8 +1249,8 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
           try {
             await scopedStore.recordActivity({
               type: "task:duplicate-warning-overridden",
-              taskId: task.id,
-              taskTitle: task.title,
+              taskId: taskWithAutoBranch.id,
+              taskTitle: taskWithAutoBranch.title,
               details: `Created despite ${acknowledgedDuplicateIds.length} possible duplicate(s): ${acknowledgedDuplicateIds.join(", ")}`,
               metadata: {
                 acknowledgedDuplicateIds,
@@ -1253,7 +1265,7 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
           }
         }
 
-        res.status(201).json(task);
+        res.status(201).json(taskWithAutoBranch);
         return;
       } finally {
         deterministicGuard.releaseLock();

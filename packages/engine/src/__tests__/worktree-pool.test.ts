@@ -363,6 +363,46 @@ describe("WorktreePool", () => {
       });
     });
 
+    it("maps slugged fusion branches to canonical task IDs", async () => {
+      mockedExistsSync.mockReturnValue(true);
+
+      mockedExecSync.mockImplementation((cmd: any) => {
+        const cmdStr = String(cmd);
+        if (cmdStr === 'git checkout -B "fusion/fn-5671-add-dropdown" main') {
+          const err: any = new Error("branch conflict");
+          err.stderr = Buffer.from("fatal: 'fusion/fn-5671-add-dropdown' is already used by worktree at '/other/wt'");
+          throw err;
+        }
+        if (cmdStr === "git worktree list --porcelain") {
+          return Buffer.from(["worktree /other/wt", "HEAD 1111111", "branch refs/heads/fusion/fn-5671-add-dropdown", ""].join("\n"));
+        }
+        if (cmdStr.includes("git rev-parse --verify 'fusion/fn-5671-add-dropdown^{commit}'")) {
+          return Buffer.from("abc123def456\n");
+        }
+        return Buffer.from("");
+      });
+
+      const inspectSpy = vi.spyOn(branchConflictModule, "inspectBranchConflict").mockResolvedValueOnce({
+        kind: "live-foreign",
+        livePath: "/other/wt",
+        error: new BranchConflictError({
+          branchName: "fusion/fn-5671-add-dropdown",
+          conflictingWorktreePath: "/other/wt",
+          existingTipSha: "abc123def456",
+          strandedCommits: [],
+          startPoint: "main",
+          recommendedAction: "Inspect/reclaim.",
+        }),
+      });
+
+      await expect(pool.prepareForTask("/tmp/wt", "fusion/fn-5671-add-dropdown")).rejects.toBeInstanceOf(BranchConflictError);
+      expect(inspectSpy).toHaveBeenCalledWith(expect.objectContaining({
+        branchName: "fusion/fn-5671-add-dropdown",
+        ownerTaskId: "FN-5671",
+        requestingTaskId: "FN-5671",
+      }));
+    });
+
     it("throws BranchConflictError for cross-task live-foreign conflicts", async () => {
       mockedExistsSync.mockReturnValue(true);
 
@@ -896,6 +936,7 @@ describe("cleanupOrphanedWorktrees", () => {
     expect(removeCalls[0][0]).toContain("orphan-wt");
     expect(removeCalls[0][0]).not.toContain("active-wt");
   });
+
 
   it("handles git worktree remove failures gracefully (non-fatal)", async () => {
     mockedReaddirSync.mockReturnValue([

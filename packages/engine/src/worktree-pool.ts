@@ -252,7 +252,7 @@ export function isInsideWorktreesDir(
  * up via {@link cleanupOrphanedWorktrees}.
  */
 function deriveTaskIdFromBranch(branchName: string): string {
-  const match = branchName.match(/^fusion\/(fn-\d+)(?:-\d+)?$/i);
+  const match = branchName.match(/^fusion\/(fn-\d+)(?:-\d+)?(?:-[a-z0-9._-]+)*$/i);
   return match ? match[1].toUpperCase() : branchName.toUpperCase();
 }
 

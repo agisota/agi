@@ -12,6 +12,27 @@ export interface BranchSelectionPayload {
   baseBranch?: unknown;
 }
 
+export function getBranchSelectionMode(selectionInput: unknown): BranchSelectionMode | undefined {
+  if (selectionInput === undefined || selectionInput === null) return undefined;
+  if (typeof selectionInput !== "object" || Array.isArray(selectionInput)) {
+    throw badRequest("branchSelection must be an object");
+  }
+  const selection = selectionInput as BranchSelectionPayload;
+  const mode = typeof selection.mode === "string" ? selection.mode : undefined;
+  if (!mode) {
+    throw badRequest("branchSelection.mode is required");
+  }
+  if (![
+    "project-default",
+    "auto-new",
+    "existing",
+    "custom-new",
+  ].includes(mode)) {
+    throw badRequest("branchSelection.mode must be one of: project-default, auto-new, existing, custom-new");
+  }
+  return mode as BranchSelectionMode;
+}
+
 export type PlanningBranchMode = "shared" | "per-task-derived";
 
 export interface ResolvedBranchSelection {
@@ -50,24 +71,8 @@ export function resolveBranchSelection(
     return fallback;
   }
 
-  if (typeof selectionInput !== "object" || Array.isArray(selectionInput)) {
-    throw badRequest("branchSelection must be an object");
-  }
-
+  const mode = getBranchSelectionMode(selectionInput);
   const selection = selectionInput as BranchSelectionPayload;
-  const mode = typeof selection.mode === "string" ? selection.mode : undefined;
-  if (!mode) {
-    throw badRequest("branchSelection.mode is required");
-  }
-
-  if (![
-    "project-default",
-    "auto-new",
-    "existing",
-    "custom-new",
-  ].includes(mode)) {
-    throw badRequest("branchSelection.mode must be one of: project-default, auto-new, existing, custom-new");
-  }
 
   const baseBranch = normalizeOptionalBranch(selection.baseBranch, "branchSelection.baseBranch");
 
@@ -116,6 +121,12 @@ function sanitizeSegment(input: string): string {
     .replace(/-{2,}/g, "-")
     .replace(/^[-/.]+|[-/.]+$/g, "")
     .slice(0, 48);
+}
+
+export function deriveAutoTaskBranch(taskId: string, shortName: string): string {
+  const base = `fusion/${taskId.toLowerCase()}`;
+  const segment = sanitizeSegment(shortName ?? "");
+  return segment ? `${base}-${segment}` : base;
 }
 
 export function derivePerTaskBranch(sharedBranch: string | undefined, taskSegment: string): string | undefined {

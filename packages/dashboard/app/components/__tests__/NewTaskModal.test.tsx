@@ -215,27 +215,7 @@ describe("NewTaskModal", () => {
     });
   });
 
-  it("includes branch and baseBranch when provided", async () => {
-    const { props } = renderNewTaskModal();
-
-    fireEvent.change(screen.getByPlaceholderText("What needs to be done?"), { target: { value: "Task with branches" } });
-    fireEvent.click(screen.getByTestId("task-form-more-options-toggle"));
-    fireEvent.change(screen.getByLabelText("Working branch"), { target: { value: " feature/fn-3422 " } });
-    fireEvent.change(screen.getByLabelText("Merge target / base branch"), { target: { value: " main " } });
-
-    fireEvent.click(screen.getByRole("button", { name: "Create Task" }));
-
-    await waitFor(() => {
-      expect(props.onCreateTask).toHaveBeenCalledWith(
-        expect.objectContaining({
-          branch: "feature/fn-3422",
-          baseBranch: "main",
-        }),
-      );
-    });
-  });
-
-  it("omits branch and baseBranch when left blank", async () => {
+  it("submits project-default branch selection by default", async () => {
     const { props } = renderNewTaskModal();
 
     fireEvent.change(screen.getByPlaceholderText("What needs to be done?"), { target: { value: "Task without branches" } });
@@ -244,8 +224,89 @@ describe("NewTaskModal", () => {
     await waitFor(() => {
       expect(props.onCreateTask).toHaveBeenCalledWith(
         expect.objectContaining({
-          branch: undefined,
-          baseBranch: undefined,
+          branchSelection: { mode: "project-default" },
+        }),
+      );
+    });
+  });
+
+  it("submits existing branch selection with trimmed names", async () => {
+    const { props } = renderNewTaskModal();
+
+    fireEvent.change(screen.getByPlaceholderText("What needs to be done?"), { target: { value: "Task with branches" } });
+    fireEvent.click(screen.getByTestId("task-form-more-options-toggle"));
+    fireEvent.change(screen.getByLabelText("Branch strategy"), { target: { value: "existing" } });
+    fireEvent.change(screen.getByLabelText("Branch name"), { target: { value: " feature/fn-3422 " } });
+    fireEvent.change(screen.getByLabelText("Merge target / base branch"), { target: { value: " main " } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Task" }));
+
+    await waitFor(() => {
+      expect(props.onCreateTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          branchSelection: {
+            mode: "existing",
+            branchName: "feature/fn-3422",
+            baseBranch: "main",
+          },
+        }),
+      );
+    });
+  });
+
+  it("submits auto-new branch selection", async () => {
+    const { props } = renderNewTaskModal();
+
+    fireEvent.change(screen.getByPlaceholderText("What needs to be done?"), { target: { value: "Task with auto new" } });
+    fireEvent.click(screen.getByTestId("task-form-more-options-toggle"));
+    fireEvent.change(screen.getByLabelText("Branch strategy"), { target: { value: "auto-new" } });
+    fireEvent.change(screen.getByLabelText("Merge target / base branch"), { target: { value: " main " } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Task" }));
+
+    await waitFor(() => {
+      expect(props.onCreateTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          branchSelection: {
+            mode: "auto-new",
+            baseBranch: "main",
+          },
+        }),
+      );
+    });
+  });
+
+  it("requires branch name for custom-new mode", async () => {
+    const { props } = renderNewTaskModal();
+
+    fireEvent.change(screen.getByPlaceholderText("What needs to be done?"), { target: { value: "Task with branches" } });
+    fireEvent.click(screen.getByTestId("task-form-more-options-toggle"));
+    fireEvent.change(screen.getByLabelText("Branch strategy"), { target: { value: "custom-new" } });
+
+    expect(screen.getByRole("button", { name: "Create Task" })).toBeDisabled();
+    expect(screen.getByText("Branch name is required for this branch strategy.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Task" }));
+    await waitFor(() => {
+      expect(props.onCreateTask).not.toHaveBeenCalled();
+    });
+  });
+
+  it("submits custom-new branch selection when branch name exists", async () => {
+    const { props } = renderNewTaskModal();
+
+    fireEvent.change(screen.getByPlaceholderText("What needs to be done?"), { target: { value: "Task with custom new" } });
+    fireEvent.click(screen.getByTestId("task-form-more-options-toggle"));
+    fireEvent.change(screen.getByLabelText("Branch strategy"), { target: { value: "custom-new" } });
+    fireEvent.change(screen.getByLabelText("Branch name"), { target: { value: " feature/custom " } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Task" }));
+
+    await waitFor(() => {
+      expect(props.onCreateTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          branchSelection: {
+            mode: "custom-new",
+            branchName: "feature/custom",
+          },
         }),
       );
     });

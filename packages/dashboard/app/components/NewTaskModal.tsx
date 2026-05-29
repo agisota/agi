@@ -7,7 +7,7 @@ import { uploadAttachment } from "../api";
 import { Bot } from "lucide-react";
 import { useSetupReadiness } from "../hooks/useSetupReadiness";
 import { SetupWarningBanner } from "./SetupWarningBanner";
-import { TaskForm, type PendingImage } from "./TaskForm";
+import { TaskForm, type BranchSelectionMode, type PendingImage } from "./TaskForm";
 import { REPO_OVERRIDE_RE } from "./githubTracking";
 import { useConfirm } from "../hooks/useConfirm";
 import { useMobileKeyboard } from "../hooks/useMobileKeyboard";
@@ -41,6 +41,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
     : {};
   const [description, setDescription] = useState("");
   const [dependencies, setDependencies] = useState<string[]>([]);
+  const [branchMode, setBranchMode] = useState<BranchSelectionMode>("project-default");
   const [branch, setBranch] = useState("");
   const [baseBranch, setBaseBranch] = useState("");
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
@@ -144,6 +145,8 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
 
   const githubRepoOverrideTrimmed = githubRepoOverride.trim();
   const githubRepoOverrideInvalid = githubRepoOverrideTrimmed.length > 0 && !REPO_OVERRIDE_RE.test(githubRepoOverrideTrimmed);
+  const isBranchNameRequired = branchMode === "existing" || branchMode === "custom-new";
+  const hasInvalidBranchSelection = isBranchNameRequired && !branch.trim();
 
   // Track dirty state
   useEffect(() => {
@@ -160,12 +163,13 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
       reviewLevel !== undefined ||
       priority !== DEFAULT_TASK_PRIORITY ||
       nodeId !== undefined ||
+      branchMode !== "project-default" ||
       branch !== "" ||
       baseBranch !== "" ||
       githubTrackingEnabled ||
       githubRepoOverrideTrimmed !== "";
     setHasDirtyState(isDirty);
-  }, [description, dependencies, pendingImages, executorModel, validatorModel, planningModel, thinkingLevel, selectedWorkflowSteps, selectedAgentId, reviewLevel, priority, nodeId, branch, baseBranch, githubTrackingEnabled, githubRepoOverrideTrimmed]);
+  }, [description, dependencies, pendingImages, executorModel, validatorModel, planningModel, thinkingLevel, selectedWorkflowSteps, selectedAgentId, reviewLevel, priority, nodeId, branchMode, branch, baseBranch, githubTrackingEnabled, githubRepoOverrideTrimmed]);
 
   const handleClose = useCallback(async () => {
     if (hasDirtyState) {
@@ -195,6 +199,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
     setReviewLevel(undefined);
     setPriority(DEFAULT_TASK_PRIORITY);
     setNodeId(undefined);
+    setBranchMode("project-default");
     setBranch("");
     setBaseBranch("");
     setHasDirtyState(false);
@@ -205,7 +210,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
 
   const handleSubmit = useCallback(async () => {
     const trimmedDesc = description.trim();
-    if (!trimmedDesc || isSubmitting || githubRepoOverrideInvalid) return;
+    if (!trimmedDesc || isSubmitting || githubRepoOverrideInvalid || hasInvalidBranchSelection) return;
 
     setIsSubmitting(true);
     try {
@@ -213,7 +218,13 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
       const validatorSlashIdx = validatorModel.indexOf("/");
       const planningSlashIdx = planningModel.indexOf("/");
 
-      const task = await onCreateTask({
+      const createInput: TaskCreateInput & {
+        branchSelection?: {
+          mode: BranchSelectionMode;
+          branchName?: string;
+          baseBranch?: string;
+        };
+      } = {
         title: undefined,
         description: trimmedDesc,
         column: "triage",
@@ -233,8 +244,11 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
         reviewLevel,
         priority,
         nodeId,
-        branch: branch.trim() === "" ? undefined : branch.trim(),
-        baseBranch: baseBranch.trim() === "" ? undefined : baseBranch.trim(),
+        branchSelection: {
+          mode: branchMode,
+          ...(isBranchNameRequired && branch.trim() ? { branchName: branch.trim() } : {}),
+          ...(baseBranch.trim() ? { baseBranch: baseBranch.trim() } : {}),
+        },
         ...(githubTrackingEnabled || githubRepoOverrideTrimmed !== ""
           ? {
               githubTracking: {
@@ -243,7 +257,9 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
               },
             }
           : {}),
-      });
+      };
+
+      const task = await onCreateTask(createInput);
 
       // Upload pending images as attachments
       if (pendingImages.length > 0) {
@@ -278,6 +294,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
       setReviewLevel(undefined);
       setPriority(DEFAULT_TASK_PRIORITY);
       setNodeId(undefined);
+      setBranchMode("project-default");
       setBranch("");
       setBaseBranch("");
 
@@ -288,7 +305,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
     } finally {
       setIsSubmitting(false);
     }
-  }, [description, dependencies, pendingImages, executorModel, validatorModel, planningModel, thinkingLevel, isSubmitting, onCreateTask, addToast, onClose, projectId, presetMode, selectedPresetId, selectedWorkflowSteps, workflowStepsExplicitlySet, selectedAgentId, reviewLevel, priority, nodeId, branch, baseBranch]);
+  }, [description, dependencies, pendingImages, executorModel, validatorModel, planningModel, thinkingLevel, isSubmitting, githubRepoOverrideInvalid, hasInvalidBranchSelection, onCreateTask, addToast, onClose, projectId, presetMode, selectedPresetId, selectedWorkflowSteps, workflowStepsExplicitlySet, selectedAgentId, reviewLevel, priority, nodeId, branchMode, isBranchNameRequired, branch, baseBranch, githubTrackingEnabled, githubRepoOverrideTrimmed]);
 
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -492,6 +509,8 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
             onPriorityChange={setPriority}
             branch={branch}
             onBranchChange={setBranch}
+            branchMode={branchMode}
+            onBranchModeChange={setBranchMode}
             baseBranch={baseBranch}
             onBaseBranchChange={setBaseBranch}
             nodeId={nodeId}
@@ -508,6 +527,10 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
 
         </div>
 
+        {hasInvalidBranchSelection && (
+          <div className="form-error new-task-branch-error">Branch name is required for this branch strategy.</div>
+        )}
+
         <div className="modal-actions">
           <button className="btn btn-sm" onClick={handleClose} disabled={isSubmitting}>
             Cancel
@@ -515,7 +538,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
           <button
             className="btn btn-primary btn-sm"
             onClick={handleSubmit}
-            disabled={!description.trim() || isSubmitting || githubRepoOverrideInvalid}
+            disabled={!description.trim() || isSubmitting || githubRepoOverrideInvalid || hasInvalidBranchSelection}
           >
             {isSubmitting ? "Creating..." : "Create Task"}
           </button>
