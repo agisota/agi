@@ -55,6 +55,7 @@ function createStore(task: Task, taskSequence?: Task[]) {
       globalPause: false,
       enginePaused: false,
       pollIntervalMs: 15_000,
+      merger: { mode: "deterministic" },
     } as Settings)),
     listTasks: vi.fn(async () => [task]),
     getTask: vi.fn(async () => {

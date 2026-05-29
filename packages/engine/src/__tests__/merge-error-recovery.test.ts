@@ -113,6 +113,9 @@ function makeStore({
       globalPause: false,
       enginePaused: false,
       pollIntervalMs: 15_000,
+      // These tests mock + assert aiMergeTask (the legacy merge path); pin the
+      // legacy merger so onMerge routes there rather than the AI merge path.
+      merger: { mode: "deterministic" },
       ...settings,
     })),
     listTasks: vi.fn(async () => listedTasks ?? taskSequence.filter((task): task is MockTask => Boolean(task))),

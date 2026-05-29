@@ -232,6 +232,8 @@ const baseSettings: Record<string, unknown> = {
   globalPause: false,
   enginePaused: false,
   pollIntervalMs: 15_000,
+  // onMerge tests mock + assert aiMergeTask (legacy path); pin legacy mode.
+  merger: { mode: "deterministic" },
   taskStuckTimeoutMs: undefined,
   memoryAutoSummarizeEnabled: false,
   memoryAutoSummarizeThresholdChars: 50_000,

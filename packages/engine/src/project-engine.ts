@@ -10,7 +10,7 @@ import type {
   ScheduledTask,
   AutomationRunResult,
 } from "@fusion/core";
-import { compareTasksByPriorityThenAgeAndId, getTaskHardMergeBlocker, sortTasksByPriorityThenAgeAndId } from "@fusion/core";
+import { compareTasksByPriorityThenAgeAndId, getTaskHardMergeBlocker, normalizeMergerMode, sortTasksByPriorityThenAgeAndId } from "@fusion/core";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { InProcessRuntime } from "./runtimes/in-process-runtime.js";
@@ -26,6 +26,7 @@ import { createFusionAuthStorage } from "./auth-storage.js";
 import { CronRunner, createAiPromptExecutor } from "./cron-runner.js";
 import type { RoutineRunner } from "./routine-runner.js";
 import { aiMergeTask, sweepStaleAutostashes, VerificationError } from "./merger.js";
+import { runAiMerge } from "./merger-ai.js";
 import { PRIORITY_MERGE } from "./concurrency.js";
 import { runtimeLog } from "./logger.js";
 import type { HeartbeatTriggerScheduler } from "./agent-heartbeat.js";
@@ -1753,19 +1754,26 @@ export class ProjectEngine {
 
             const usageLimitPauser = (this.runtime as any).usageLimitPauser;
 
-            const rawMerge = () => {
+            const rawMerge = async () => {
               this.activeMergeTaskId = taskId;
               this.mergeAbortController = new AbortController();
-              return aiMergeTask(store, cwd, taskId, {
+              const mergerOptions = {
                 manual: !!manualResolver,
                 pool,
                 usageLimitPauser,
                 agentStore,
                 signal: this.mergeAbortController.signal,
-                onSession: (session) => {
+                onSession: (session: { dispose: () => void }) => {
                   this.activeMergeSession = session;
                 },
-              });
+              };
+              // FN-5633: "ai" mode (default) uses the standalone AI merge path
+              // (clean-room worktree + AI merge + AI reviewer); "deterministic"
+              // keeps the legacy aiMergeTask pipeline.
+              const mergerMode = normalizeMergerMode((await store.getSettings().catch(() => ({}) as Settings)).merger?.mode);
+              return mergerMode === "ai"
+                ? runAiMerge(store, cwd, taskId, mergerOptions)
+                : aiMergeTask(store, cwd, taskId, mergerOptions);
             };
 
             let result: MergeResult;

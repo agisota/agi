@@ -4587,6 +4587,63 @@ export function SettingsModal({
               </details>
             </div>
             <div className="form-group">
+              <label htmlFor="mergerMode">AI merge</label>
+              <select
+                id="mergerMode"
+                className="select"
+                value={form.merger?.mode ?? "ai"}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, merger: { ...(f.merger ?? {}), mode: e.target.value as "ai" | "deterministic" } }))
+                }
+              >
+                <option value="ai">AI merge (default) — AI merges in a clean room, an AI reviewer audits with retries, then lands</option>
+                <option value="deterministic">Deterministic (legacy) — rebase / conflict-strategy / audit pipeline</option>
+              </select>
+              <details className="settings-option-details">
+                <summary>More details</summary>
+                <small>
+                  AI mode merges the task branch into an isolated clean-room checkout at the target
+                  branch&apos;s tip, has an AI reviewer audit the squash (with corrective retries —
+                  advisory concerns land with a logged warning, an unfixable correctness concern
+                  hard-fails), then fast-forwards the target branch and syncs your local checkout
+                  (AI reconciles a conflicting restore). Each task merges to its own target branch,
+                  or the default integration branch. <strong>The legacy merge settings below do not
+                  apply while AI merge is on.</strong>
+                </small>
+              </details>
+            </div>
+            {(form.merger?.mode ?? "ai") === "ai" && (
+              <>
+                <div className="form-group">
+                  <label htmlFor="mergerMaxReviewPasses">Max AI review passes</label>
+                  <input
+                    id="mergerMaxReviewPasses"
+                    type="number"
+                    min={0}
+                    max={10}
+                    value={form.merger?.maxReviewPasses ?? 3}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, merger: { ...(f.merger ?? {}), maxReviewPasses: e.target.value === "" ? undefined : Number(e.target.value) } }))
+                    }
+                  />
+                  <small>AI corrective rounds before landing the best result (advisory concern) or hard-failing (unfixable correctness concern). Default 3.</small>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="mergerReviewerModel">Reviewer model (optional)</label>
+                  <input
+                    id="mergerReviewerModel"
+                    type="text"
+                    placeholder="provider/modelId — defaults to the merger model"
+                    value={form.merger?.reviewerModel ?? ""}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, merger: { ...(f.merger ?? {}), reviewerModel: e.target.value || undefined } }))
+                    }
+                  />
+                  <small>Model for the read-only reviewer agent (a cheaper/faster model is fine). Leave blank to reuse the merger model.</small>
+                </div>
+              </>
+            )}
+            <div className="form-group">
               <label htmlFor="testMode" className="checkbox-label">
                 <input
                   id="testMode"
@@ -4757,7 +4814,7 @@ export function SettingsModal({
                 </small>
               </details>
             </div>
-            {form.mergeStrategy !== "pull-request" && (
+            {form.mergeStrategy !== "pull-request" && (form.merger?.mode ?? "ai") !== "ai" && (
               <>
                 <div className="form-group">
                   <label htmlFor="directMergeCommitStrategy">Direct merge commit routing</label>
@@ -4998,6 +5055,8 @@ export function SettingsModal({
                 <small>When enabled, lock files (package-lock.json, pnpm-lock.yaml, etc.), generated files (dist/*, *.gen.ts), and trivial whitespace conflicts are resolved automatically without AI intervention. Complex code conflicts still require AI review.</small>
               </details>
             </div>
+            {(form.merger?.mode ?? "ai") !== "ai" && (
+            <>
             <div className="form-group">
               <label htmlFor="smartConflictResolution" className="checkbox-label">
                 <input
@@ -5087,6 +5146,8 @@ export function SettingsModal({
                 Controls the post-merge audit gate. <strong>Warn</strong> (default) logs findings but auto-completes the merge. <strong>Block</strong> is the stricter opt-in mode that refuses to auto-complete merges with duplicate-subject or touched-file overlap risks. <strong>Off</strong> skips the audit entirely. Switching to Off is recommended only if you trust your branches don&apos;t silently drop edits.
               </small>
             </div>
+            </>
+            )}
             <div className="form-group">
               <label htmlFor="pushAfterMerge" className="checkbox-label">
                 <input

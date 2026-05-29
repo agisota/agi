@@ -313,6 +313,36 @@ export function normalizeMergeAuditAutoRecovery(value: unknown): MergeAuditAutoR
     : "ai-assisted";
 }
 
+export const MERGER_MODES = ["ai", "deterministic"] as const;
+
+/**
+ * Merge execution path (FN-5633).
+ *  - "ai" (default): the standalone AI merge path — a clean-room worktree where
+ *    an AI agent merges the task branch and an AI reviewer audits it (with
+ *    corrective retries) before a fast-forward landing. Bypasses the legacy
+ *    scaffolding entirely.
+ *  - "deterministic": the legacy `aiMergeTask` pipeline (prerebase /
+ *    conflict-strategy ladder / post-merge audit / transient self-heal).
+ */
+export type MergerMode = (typeof MERGER_MODES)[number];
+
+export function normalizeMergerMode(value: unknown): MergerMode {
+  return typeof value === "string" && (MERGER_MODES as readonly string[]).includes(value)
+    ? (value as MergerMode)
+    : "ai";
+}
+
+/** Settings for the AI merge path (FN-5633). */
+export interface MergerSettings {
+  /** Which merge path to use. Default: "ai". */
+  mode?: MergerMode;
+  /** Optional `provider/modelId` override for the read-only reviewer agent. */
+  reviewerModel?: string;
+  /** How many AI corrective rounds before landing the best result (advisory) or
+   *  hard-failing (blocking). Default: 3. */
+  maxReviewPasses?: number;
+}
+
 export const AUTO_RECOVERY_MODES = ["off", "deterministic-only", "programmatic", "ai-assisted"] as const;
 
 export type AutoRecoveryMode = (typeof AUTO_RECOVERY_MODES)[number];
@@ -3015,6 +3045,10 @@ export interface ProjectSettings {
   /** Strategy used when a merge conflict can't be resolved by AI. See
    *  {@link MergeConflictStrategy}. Default: "smart". */
   mergeConflictStrategy?: MergeConflictStrategy;
+  /** AI merge path configuration (FN-5633). See {@link MergerSettings}.
+   *  When mode is "ai" (default), the standalone AI merge path is used and the
+   *  legacy merge settings above/below it do not apply. */
+  merger?: MergerSettings;
   /** Minimum branch net line volume before the pre-commit diff-volume gate evaluates a file. Default applied at read site: 20. */
   mergeDiffVolumeMinLines?: number;
   /** Minimum staged/branch-net ratio required by the pre-commit diff-volume gate. Default applied at read site: 0.2. */
