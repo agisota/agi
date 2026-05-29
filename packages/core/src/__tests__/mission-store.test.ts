@@ -2948,6 +2948,90 @@ describe("MissionStore", () => {
     });
   });
 
+  describe("backfillFeatureAssertions", () => {
+    const makeLegacyFeature = (sliceId: string, input: { title: string; description?: string; acceptanceCriteria?: string }) => {
+      const feature = store.addFeature(sliceId, input);
+      const managed = store.listAssertionsForFeature(feature.id);
+      for (const assertion of managed) {
+        store.unlinkFeatureFromAssertion(feature.id, assertion.id);
+        store.deleteContractAssertion(assertion.id);
+      }
+      expect(store.listAssertionsForFeature(feature.id)).toHaveLength(0);
+      return feature;
+    };
+
+    it("repairs missing links using acceptance criteria, description, and fallback text", () => {
+      const mission = store.createMission({ title: "Repair Mission" });
+      const milestone = store.addMilestone(mission.id, { title: "MS" });
+      const slice = store.addSlice(milestone.id, { title: "SL" });
+
+      const fromAcceptance = makeLegacyFeature(slice.id, { title: "F-AC", acceptanceCriteria: "Ship AC" });
+      const fromDescription = makeLegacyFeature(slice.id, { title: "F-DESC", description: "Ship DESC" });
+      const fromFallback = makeLegacyFeature(slice.id, { title: "F-FALLBACK" });
+
+      const report = store.backfillFeatureAssertions({ dryRun: false });
+      expect(report.scanned).toBe(3);
+      expect(report.alreadyLinked).toBe(0);
+      expect(report.skippedErrors).toHaveLength(0);
+      expect(report.repaired).toHaveLength(3);
+
+      const acRow = report.repaired.find((row) => row.featureId === fromAcceptance.id)!;
+      const descRow = report.repaired.find((row) => row.featureId === fromDescription.id)!;
+      const fallbackRow = report.repaired.find((row) => row.featureId === fromFallback.id)!;
+
+      expect(acRow.milestoneId).toBe(milestone.id);
+      expect(acRow.textSource).toBe("acceptanceCriteria");
+      expect(store.listAssertionsForFeature(fromAcceptance.id)[0].assertion).toBe("Ship AC");
+
+      expect(descRow.textSource).toBe("description");
+      expect(store.listAssertionsForFeature(fromDescription.id)[0].assertion).toBe("Ship DESC");
+
+      expect(fallbackRow.textSource).toBe("fallback");
+      expect(store.listAssertionsForFeature(fromFallback.id)[0].assertion).toBe("Verify implementation of: F-FALLBACK");
+    });
+
+    it("skips already linked features and remains idempotent", () => {
+      const mission = store.createMission({ title: "Repair Mission" });
+      const milestone = store.addMilestone(mission.id, { title: "MS" });
+      const slice = store.addSlice(milestone.id, { title: "SL" });
+
+      const legacy = makeLegacyFeature(slice.id, { title: "Legacy", acceptanceCriteria: "Legacy AC" });
+      const alreadyLinked = store.addFeature(slice.id, { title: "Already Linked", acceptanceCriteria: "Keep" });
+
+      const firstRun = store.backfillFeatureAssertions({ dryRun: false });
+      expect(firstRun.scanned).toBe(2);
+      expect(firstRun.alreadyLinked).toBe(1);
+      expect(firstRun.repaired).toHaveLength(1);
+      expect(firstRun.repaired[0]?.featureId).toBe(legacy.id);
+
+      const linkedAssertionIds = store.listAssertionsForFeature(alreadyLinked.id).map((assertion) => assertion.id);
+      expect(linkedAssertionIds).toHaveLength(1);
+
+      const secondRun = store.backfillFeatureAssertions({ dryRun: false });
+      expect(secondRun.scanned).toBe(2);
+      expect(secondRun.alreadyLinked).toBe(2);
+      expect(secondRun.repaired).toHaveLength(0);
+    });
+
+    it("supports dry-run mode without writing links", () => {
+      const mission = store.createMission({ title: "Repair Mission" });
+      const milestone = store.addMilestone(mission.id, { title: "MS" });
+      const slice = store.addSlice(milestone.id, { title: "SL" });
+
+      const legacy = makeLegacyFeature(slice.id, { title: "Legacy", description: "legacy description" });
+      const beforeLinks = db.prepare("SELECT COUNT(*) as count FROM mission_feature_assertions").get() as { count: number };
+
+      const report = store.backfillFeatureAssertions({ dryRun: true });
+      expect(report.repaired).toHaveLength(1);
+      expect(report.repaired[0]?.featureId).toBe(legacy.id);
+      expect(report.repaired[0]?.assertionId).toBe("(dry-run)");
+      expect(report.repaired[0]?.textSource).toBe("description");
+
+      const afterLinks = db.prepare("SELECT COUNT(*) as count FROM mission_feature_assertions").get() as { count: number };
+      expect(afterLinks.count).toBe(beforeLinks.count);
+      expect(store.listAssertionsForFeature(legacy.id)).toHaveLength(0);
+    });
+  });
   // ── Loop State & Validator Run Schema Tests ───────────────────────────
 
   describe("Loop State & Validator Run Schema (v31)", () => {

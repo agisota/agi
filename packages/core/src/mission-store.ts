@@ -105,6 +105,27 @@ export interface MissionSummary {
   progressPercent: number;
 }
 
+export type MissionAssertionTextSource = "acceptanceCriteria" | "description" | "fallback";
+
+export interface MissionAssertionBackfillRepairRow {
+  featureId: string;
+  milestoneId: string;
+  assertionId: string;
+  textSource: MissionAssertionTextSource;
+}
+
+export interface MissionAssertionBackfillErrorRow {
+  featureId: string;
+  message: string;
+}
+
+export interface MissionAssertionBackfillReport {
+  scanned: number;
+  alreadyLinked: number;
+  repaired: MissionAssertionBackfillRepairRow[];
+  skippedErrors: MissionAssertionBackfillErrorRow[];
+}
+
 // ── Event Types ─────────────────────────────────────────────────────
 
 export interface MissionStoreEvents {
@@ -1865,6 +1886,23 @@ export class MissionStore extends EventEmitter<MissionStoreEvents> {
     this.recomputeSliceStatus(sliceId);
   }
 
+  private deriveFeatureAssertion(feature: MissionFeature): { assertionText: string; textSource: MissionAssertionTextSource } {
+    const acceptanceCriteria = feature.acceptanceCriteria?.trim();
+    if (acceptanceCriteria) {
+      return { assertionText: acceptanceCriteria, textSource: "acceptanceCriteria" };
+    }
+
+    const description = feature.description?.trim();
+    if (description) {
+      return { assertionText: description, textSource: "description" };
+    }
+
+    return {
+      assertionText: `Verify implementation of: ${feature.title}`,
+      textSource: "fallback",
+    };
+  }
+
   private ensureFeatureAssertion(feature: MissionFeature): void {
     const slice = this.getSlice(feature.sliceId);
     if (!slice) {
@@ -1872,9 +1910,7 @@ export class MissionStore extends EventEmitter<MissionStoreEvents> {
     }
 
     const milestoneId = slice.milestoneId;
-    const assertionText = feature.acceptanceCriteria?.trim()
-      || feature.description?.trim()
-      || `Verify implementation of: ${feature.title}`;
+    const { assertionText } = this.deriveFeatureAssertion(feature);
 
     const existing = this.listContractAssertions(milestoneId)
       .find((assertion) => assertion.sourceFeatureId === feature.id);
@@ -1896,6 +1932,80 @@ export class MissionStore extends EventEmitter<MissionStoreEvents> {
         assertion: assertionText,
       });
     }
+  }
+
+  /**
+   * Backfill assertion links for legacy features that predate the FN-5695 creation-path fix.
+   * Reuses deriveFeatureAssertion()/ensureFeatureAssertion text-source rules so create/update
+   * and repair flows stay aligned on canonical assertion content.
+   */
+  backfillFeatureAssertions(options?: { missionId?: string; dryRun?: boolean }): MissionAssertionBackfillReport {
+    const dryRun = options?.dryRun ?? true;
+    const missionFilter = options?.missionId;
+
+    const features = missionFilter
+      ? this.listMilestones(missionFilter)
+        .flatMap((milestone) => this.listSlices(milestone.id))
+        .flatMap((slice) => this.listFeatures(slice.id))
+      : this.listMissions()
+        .flatMap((mission) => this.listMilestones(mission.id))
+        .flatMap((milestone) => this.listSlices(milestone.id))
+        .flatMap((slice) => this.listFeatures(slice.id));
+
+    const report: MissionAssertionBackfillReport = {
+      scanned: features.length,
+      alreadyLinked: 0,
+      repaired: [],
+      skippedErrors: [],
+    };
+
+    for (const feature of features) {
+      try {
+        const linkedAssertions = this.listAssertionsForFeature(feature.id);
+        if (linkedAssertions.length > 0) {
+          report.alreadyLinked += 1;
+          continue;
+        }
+
+        const slice = this.getSlice(feature.sliceId);
+        if (!slice) {
+          throw new Error(`Slice ${feature.sliceId} not found`);
+        }
+
+        const milestoneId = slice.milestoneId;
+        const { assertionText, textSource } = this.deriveFeatureAssertion(feature);
+
+        if (dryRun) {
+          report.repaired.push({
+            featureId: feature.id,
+            milestoneId,
+            assertionId: "(dry-run)",
+            textSource,
+          });
+          continue;
+        }
+
+        const created = this.addContractAssertion(milestoneId, {
+          title: feature.title,
+          assertion: assertionText,
+          status: "pending",
+          sourceFeatureId: feature.id,
+        });
+        this.linkFeatureToAssertion(feature.id, created.id);
+
+        report.repaired.push({
+          featureId: feature.id,
+          milestoneId,
+          assertionId: created.id,
+          textSource,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        report.skippedErrors.push({ featureId: feature.id, message });
+      }
+    }
+
+    return report;
   }
 
   /**
