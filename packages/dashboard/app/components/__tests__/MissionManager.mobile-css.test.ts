@@ -201,3 +201,30 @@ describe("mobile split reversal CSS", () => {
     expect(desktopBlock).toContain("display: none");
   });
 });
+
+describe("Mission view overscroll containment", () => {
+  it("adds overscroll-behavior containment to every mission scroll container", () => {
+    const css = loadAllAppCss();
+
+    const inlineRule = css.match(/\.mission-manager--inline\s*\{[^}]*\}/)?.[0] ?? "";
+    const bodyRule = css.match(/\.mission-manager__body\s*\{[^}]*\}/)?.[0] ?? "";
+    const sidebarRule = css.match(/\.mission-manager__sidebar-list\s*\{[^}]*\}/)?.[0] ?? "";
+    const detailRule = css.match(/\.mission-manager__detail-pane\s*\{[^}]*\}/)?.[0] ?? "";
+    const eventsRule = css.match(/\.mission-events\s*\{[^}]*\}/)?.[0] ?? "";
+
+    expect(inlineRule).toContain("overscroll-behavior: contain;");
+    expect(bodyRule).toContain("overscroll-behavior: contain;");
+    expect(sidebarRule).toContain("overscroll-behavior: contain;");
+    expect(detailRule).toContain("overscroll-behavior: contain;");
+    expect(eventsRule).toContain("overscroll-behavior: contain;");
+  });
+
+  it("keeps webkit momentum scrolling on body and events containers", () => {
+    const css = loadAllAppCss();
+    const bodyRule = css.match(/\.mission-manager__body\s*\{[^}]*\}/)?.[0] ?? "";
+    const eventsRule = css.match(/\.mission-events\s*\{[^}]*\}/)?.[0] ?? "";
+
+    expect(bodyRule).toContain("-webkit-overflow-scrolling: touch;");
+    expect(eventsRule).toContain("-webkit-overflow-scrolling: touch;");
+  });
+});
