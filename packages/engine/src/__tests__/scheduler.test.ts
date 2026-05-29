@@ -12,6 +12,7 @@ import type { TaskStore, Task, TaskDetail } from "@fusion/core";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { schedulerLog } from "../logger.js";
+import { MissionExecutionLoop } from "../mission-execution-loop.js";
 
 const staleReporterReportMock = vi.fn();
 const backlogPressureReporterReportMock = vi.fn();
@@ -3695,6 +3696,116 @@ describe("Scheduler", () => {
 
       // Delegates to autopilot, which internally checks autoAdvance
       expect(mockAutopilot.handleTaskCompletion).toHaveBeenCalledWith("FN-001");
+    });
+
+    it("starts validator run through missionExecutionLoop when a linked task moves to done", async () => {
+      const feature = {
+        id: "F-001",
+        sliceId: "SL-001",
+        status: "in-progress",
+        loopState: "implementing",
+        taskId: "FN-001",
+      };
+      const missionStore = {
+        getFeatureByTaskId: vi.fn().mockReturnValue(feature),
+        updateFeatureStatus: vi.fn(),
+        getSlice: vi.fn().mockReturnValue({ id: "SL-001", milestoneId: "MS-001", status: "active" }),
+        getMilestone: vi.fn().mockReturnValue({ id: "MS-001", missionId: "M-001" }),
+        listAssertionsForFeature: vi.fn().mockReturnValue([
+          {
+            id: "CA-1",
+            milestoneId: "MS-001",
+            title: "Must pass",
+            assertion: "Should pass",
+            status: "pending",
+            orderIndex: 0,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          },
+        ]),
+        startValidatorRun: vi.fn().mockReturnValue({
+          id: "VR-001",
+          featureId: "F-001",
+          milestoneId: "MS-001",
+          sliceId: "SL-001",
+          status: "running",
+          triggerType: "task_completion",
+          implementationAttempt: 1,
+          validatorAttempt: 1,
+          startedAt: "2026-01-01T00:00:00Z",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+        }),
+        completeValidatorRun: vi.fn(),
+        recordValidatorFailures: vi.fn(),
+        createGeneratedFixFeature: vi.fn(),
+        triageFeature: vi.fn(),
+      };
+      const taskStore = createMockStore({
+        getTask: vi.fn().mockResolvedValue(createMockTask({
+          id: "FN-001",
+          title: "Mission task",
+          description: "done",
+          column: "done",
+          sliceId: "SL-001",
+          log: [],
+        })),
+      });
+      const missionExecutionLoop = new MissionExecutionLoop({
+        taskStore: taskStore as any,
+        missionStore: missionStore as any,
+        rootDir: "/tmp",
+      });
+
+      const scheduler = new Scheduler(taskStore, {
+        missionStore: missionStore as any,
+        missionExecutionLoop,
+      });
+      const startSpy = vi.spyOn(missionExecutionLoop, "start");
+
+      await (scheduler as any).handleMissionTaskMove("FN-001", "done");
+      await Promise.resolve();
+
+      expect(startSpy).toHaveBeenCalledTimes(1);
+      expect(missionStore.startValidatorRun).toHaveBeenCalledWith("F-001", "task_completion");
+      expect(startSpy.mock.invocationCallOrder[0]).toBeLessThan(
+        missionStore.startValidatorRun.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("keeps processTaskOutcome guarded when loop is not started", async () => {
+      const feature = {
+        id: "F-001",
+        sliceId: "SL-001",
+        status: "in-progress",
+        loopState: "implementing",
+        taskId: "FN-001",
+      };
+      const missionStore = {
+        getFeatureByTaskId: vi.fn().mockReturnValue(feature),
+        listAssertionsForFeature: vi.fn().mockReturnValue([
+          {
+            id: "CA-1",
+            milestoneId: "MS-001",
+            title: "Must pass",
+            assertion: "Should pass",
+            status: "pending",
+            orderIndex: 0,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          },
+        ]),
+        startValidatorRun: vi.fn(),
+      };
+      const loop = new MissionExecutionLoop({
+        taskStore: createMockStore() as any,
+        missionStore: missionStore as any,
+        rootDir: "/tmp",
+      });
+
+      await loop.processTaskOutcome("FN-001");
+
+      expect(missionStore.startValidatorRun).not.toHaveBeenCalled();
     });
 
     it("does not mark a feature done when the completed task is blocked", async () => {

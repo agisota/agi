@@ -524,6 +524,27 @@ describe("MissionExecutionLoop", () => {
       );
     });
 
+    it("skips duplicate trigger when feature already has active validation", async () => {
+      const feature = createMockFeature({ loopState: "implementing", taskId: "FN-001", sliceId: "SL-001" });
+      missionStore._setFeature(feature);
+      missionStore.getFeatureByTaskId = vi.fn().mockReturnValue(feature);
+      missionStore.listAssertionsForFeature = vi.fn().mockReturnValue([
+        { id: "CA-1", milestoneId: "MS-001", title: "Test assertion", assertion: "Should work", status: "pending" as const, orderIndex: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      ]);
+
+      loop = new MissionExecutionLoop({
+        taskStore: taskStore as any,
+        missionStore: missionStore as any,
+        rootDir: "/tmp",
+      });
+      loop.start();
+      (loop as any).activeValidations.add("F-001");
+
+      await loop.processTaskOutcome("FN-001");
+
+      expect(missionStore.startValidatorRun).not.toHaveBeenCalled();
+    });
+
     it("calls startValidatorRun without a board task ID", async () => {
       const feature = createMockFeature({ loopState: "implementing", taskId: "FN-001", sliceId: "SL-001" });
       missionStore._setFeature(feature);

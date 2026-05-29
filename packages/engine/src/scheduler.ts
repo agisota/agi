@@ -1757,6 +1757,13 @@ export class Scheduler {
       // This is called regardless of whether the slice is complete - the loop
       // handles the validation cycle independently
       if (this.options.missionExecutionLoop) {
+        if (!this.options.missionExecutionLoop.isRunning()) {
+          schedulerLog.warn(
+            `MissionExecutionLoop was not running during task completion for ${taskId}; starting loop before processing outcome`,
+          );
+          this.options.missionExecutionLoop.start();
+        }
+
         void this.options.missionExecutionLoop.processTaskOutcome(taskId).catch((err) => {
           schedulerLog.error(`Error in missionExecutionLoop.processTaskOutcome for ${taskId}:`, err);
         });

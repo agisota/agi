@@ -240,6 +240,11 @@ export class MissionExecutionLoop extends EventEmitter {
         return;
       }
 
+      if (this.activeValidations.has(feature.id)) {
+        loopLog.log(`Feature ${feature.id} already has an active validation; skipping duplicate trigger`);
+        return;
+      }
+
       // Get linked assertions for this feature
       const assertions = this.missionStore.listAssertionsForFeature(feature.id);
       if (assertions.length === 0) {
