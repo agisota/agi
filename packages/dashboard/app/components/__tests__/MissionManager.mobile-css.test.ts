@@ -42,6 +42,15 @@ describe("MissionManager mobile styles", () => {
     expect(section).toContain("word-break: break-word;");
   });
 
+  it("clamps stacked mission list descriptions on mobile", () => {
+    const css = loadAllAppCss();
+    const section = getMissionMobileSection(css);
+
+    expect(section).toContain(".mission-manager__body--stacked .mission-list__item-description,");
+    expect(section).toContain("display: -webkit-box;");
+    expect(section).toContain("-webkit-line-clamp: 2;");
+  });
+
   it("keeps mission detail mobile bottom padding content-only (no shared nav duplication)", () => {
     const css = loadAllAppCss();
     const section = getMissionMobileSection(css);

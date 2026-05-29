@@ -2490,6 +2490,15 @@
     padding: var(--space-md);
   }
 
+  .mission-manager__body--stacked .mission-list__item-description,
+  .mission-manager__body--stacked .mission-list__item-description .markdown-body {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow: hidden;
+  }
+
   .mission-list__drafts-header {
     flex-wrap: wrap;
   }
