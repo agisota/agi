@@ -876,31 +876,42 @@ describe("App backend-unreachable first-run flow", () => {
   });
 
   it("retries project loading and resumes setup wizard flow after connectivity recovers", async () => {
-    mockProjectsState.projects = [];
-    mockProjectsState.error = "Backend unavailable";
-    mockCurrentProjectState.currentProject = null;
+    vi.useFakeTimers();
 
-    mockRefreshProjects.mockImplementation(async () => {
-      mockProjectsState.error = null;
-    });
+    try {
+      mockProjectsState.projects = [];
+      mockProjectsState.error = "Backend unavailable";
+      mockCurrentProjectState.currentProject = null;
 
-    const { rerender } = render(<App />);
+      mockRefreshProjects.mockImplementation(async () => {
+        mockProjectsState.error = null;
+      });
 
-    await waitFor(() => {
+      const { rerender } = render(<App />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+
       expect(screen.getByRole("button", { name: "Retry Connection" })).toBeTruthy();
-    });
 
-    fireEvent.click(screen.getByRole("button", { name: "Retry Connection" }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Retry Connection" }));
+        await vi.advanceTimersByTimeAsync(1);
+      });
 
-    await waitFor(() => {
       expect(mockRefreshProjects).toHaveBeenCalledTimes(1);
-    });
 
-    rerender(<App />);
+      rerender(<App />);
 
-    await waitFor(() => {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
       expect(screen.getByText("Welcome to Fusion")).toBeTruthy();
-    }, { timeout: 5000 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
