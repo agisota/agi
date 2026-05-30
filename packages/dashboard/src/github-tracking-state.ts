@@ -28,16 +28,22 @@ interface TaskMovedEvent {
 export function decideIssueAction(
   from: Column,
   to: Column,
-): { action: "close" | "reopen"; stateReason: "completed" | "reopened" } | null {
+): { action: "close" | "reopen"; stateReason: "completed" | "not_planned" | "reopened" } | null {
   if (to === "done" && from !== "done") {
     return { action: "close", stateReason: "completed" };
   }
 
-  if (to === "archived" && (from === "done" || from === "in-review")) {
-    return { action: "close", stateReason: "completed" };
+  if (to === "archived") {
+    if (from === "done") {
+      return { action: "close", stateReason: "completed" };
+    }
+    if (from !== "archived") {
+      return { action: "close", stateReason: "not_planned" };
+    }
+    return null;
   }
 
-  if (from === "done" && to !== "done" && to !== "archived") {
+  if (from === "done" && to !== "done") {
     return { action: "reopen", stateReason: "reopened" };
   }
 

@@ -89,11 +89,11 @@ describe("decideIssueAction", () => {
   });
 
   it("closes on in-review -> archived", () => {
-    expect(decideIssueAction("in-review", "archived")).toEqual({ action: "close", stateReason: "completed" });
+    expect(decideIssueAction("in-review", "archived")).toEqual({ action: "close", stateReason: "not_planned" });
   });
 
-  it.each(["todo", "triage", "in-progress"] as const)("returns null for %s -> archived", (from) => {
-    expect(decideIssueAction(from, "archived")).toBeNull();
+  it.each(["todo", "triage", "in-progress"] as const)("returns close not_planned for %s -> archived", (from) => {
+    expect(decideIssueAction(from, "archived")).toEqual({ action: "close", stateReason: "not_planned" });
   });
 
   it.each([
@@ -172,6 +172,16 @@ describe("GitHubTrackingStateService", () => {
     await flushAsync();
 
     expect(mockSetIssueState).toHaveBeenCalledWith("owner", "repo", 42, "closed", "completed");
+    expect(store.logEntry).toHaveBeenCalledWith("FN-1", "Closed linked GitHub tracking issue", "owner/repo#42");
+  });
+
+  it("closes triage -> archived with not_planned", async () => {
+    service.start();
+
+    store.emit("task:moved", { task: createTask(), from: "triage", to: "archived" });
+    await flushAsync();
+
+    expect(mockSetIssueState).toHaveBeenCalledWith("owner", "repo", 42, "closed", "not_planned");
     expect(store.logEntry).toHaveBeenCalledWith("FN-1", "Closed linked GitHub tracking issue", "owner/repo#42");
   });
 
