@@ -229,6 +229,24 @@ function setupStatefulCreateRoomMock(options?: { createRejects?: boolean }) {
   return { createRoom };
 }
 
+async function renderRoomCreation(options?: { viewport?: "mobile" | "desktop"; createRejects?: boolean }) {
+  const viewportSpy = mockViewportMode(options?.viewport ?? "mobile");
+  const { createRoom } = setupStatefulCreateRoomMock({ createRejects: options?.createRejects });
+  setupMockChat({ sessions: [], filteredSessions: [] });
+  localStorage.setItem("fusion:chat-scope", "rooms");
+
+  const user = userEvent.setup({ delay: null });
+  render(<ChatView projectId="proj-123" addToast={vi.fn()} experimentalFeatures={{ chatRooms: true }} />);
+
+  await user.click(screen.getByTestId("chat-create-room-btn"));
+  const dialog = await screen.findByRole("dialog", { name: "Create room" });
+  fireEvent.change(within(dialog).getByLabelText("Room name"), { target: { value: "newroom" } });
+  await user.click(within(screen.getByTestId("create-room-member-list")).getByText("Alpha"));
+  await user.click(within(dialog).getByRole("button", { name: "Create room" }));
+
+  return { createRoom, viewportSpy };
+}
+
 function ensureMatchMedia() {
   if (!window.matchMedia) {
     Object.defineProperty(window, "matchMedia", {
@@ -1752,20 +1770,19 @@ describe("ChatView", () => {
         createMockSkill({ id: "skill-gamma", name: "gamma", relativePath: "skills/gamma.md" }),
       ]);
       setupMockChat({ activeSession: activeSessionFixture, messages: [] });
-
       render(<ChatView projectId="proj-123" addToast={vi.fn()} />);
 
       const textarea = screen.getByTestId("chat-input");
-      await userEvent.type(textarea, "/");
+      fireEvent.change(textarea, { target: { value: "/" } });
       await screen.findByRole("option", { name: /alpha/i });
 
       // Wrap to bottom from the first item.
-      await userEvent.keyboard("{ArrowUp}");
+      fireEvent.keyDown(textarea, { key: "ArrowUp" });
       expect(screen.getByRole("option", { name: /gamma/i })).toHaveClass(
         "chat-skill-menu-item--highlighted",
       );
 
-      await userEvent.keyboard("{Enter}");
+      fireEvent.keyDown(textarea, { key: "Enter" });
       expect(textarea).toHaveValue("/skill:gamma ");
     });
 
@@ -2904,25 +2921,10 @@ describe("ChatView sidebar structure", () => {
 
 describe("room creation", () => {
   it("opens the newly created room and collapses the mobile sidebar on success", async () => {
-    const viewportSpy = mockViewportMode("mobile");
-    const { createRoom } = setupStatefulCreateRoomMock();
-    setupMockChat({ sessions: [], filteredSessions: [] });
-    localStorage.setItem("fusion:chat-scope", "rooms");
+    const { createRoom, viewportSpy } = await renderRoomCreation({ viewport: "mobile" });
 
-    render(<ChatView projectId="proj-123" addToast={vi.fn()} experimentalFeatures={{ chatRooms: true }} />);
-
-    await userEvent.click(screen.getByTestId("chat-create-room-btn"));
-    const dialog = await screen.findByRole("dialog", { name: "Create room" });
-    await userEvent.type(within(dialog).getByLabelText("Room name"), "newroom");
-    await userEvent.click(within(screen.getByTestId("create-room-member-list")).getByText("Alpha"));
-    await userEvent.click(within(dialog).getByRole("button", { name: "Create room" }));
-
-    await waitFor(() => {
-      expect(createRoom).toHaveBeenCalledWith({ name: "newroom", memberAgentIds: ["agent-001"] });
-    });
-    await waitFor(() => {
-      expect(document.querySelector(".chat-sidebar")).toHaveClass("chat-sidebar--hidden");
-    });
+    expect(createRoom).toHaveBeenCalledWith({ name: "newroom", memberAgentIds: ["agent-001"] });
+    expect(document.querySelector(".chat-sidebar")).toHaveClass("chat-sidebar--hidden");
     expect(screen.queryByRole("dialog", { name: "Create room" })).toBeNull();
     expect(within(document.querySelector(".chat-room-thread-header") as HTMLElement).getByText("#newroom")).toBeInTheDocument();
 
@@ -2930,22 +2932,9 @@ describe("room creation", () => {
   });
 
   it("opens the newly created room on desktop without hiding the sidebar", async () => {
-    const viewportSpy = mockViewportMode("desktop");
-    const { createRoom } = setupStatefulCreateRoomMock();
-    setupMockChat({ sessions: [], filteredSessions: [] });
-    localStorage.setItem("fusion:chat-scope", "rooms");
+    const { createRoom, viewportSpy } = await renderRoomCreation({ viewport: "desktop" });
 
-    render(<ChatView projectId="proj-123" addToast={vi.fn()} experimentalFeatures={{ chatRooms: true }} />);
-
-    await userEvent.click(screen.getByTestId("chat-create-room-btn"));
-    const dialog = await screen.findByRole("dialog", { name: "Create room" });
-    await userEvent.type(within(dialog).getByLabelText("Room name"), "newroom");
-    await userEvent.click(within(screen.getByTestId("create-room-member-list")).getByText("Alpha"));
-    await userEvent.click(within(dialog).getByRole("button", { name: "Create room" }));
-
-    await waitFor(() => {
-      expect(createRoom).toHaveBeenCalledWith({ name: "newroom", memberAgentIds: ["agent-001"] });
-    });
+    expect(createRoom).toHaveBeenCalledWith({ name: "newroom", memberAgentIds: ["agent-001"] });
     expect(document.querySelector(".chat-sidebar")).not.toHaveClass("chat-sidebar--hidden");
     expect(screen.queryByRole("dialog", { name: "Create room" })).toBeNull();
     expect(within(document.querySelector(".chat-room-thread-header") as HTMLElement).getByText("#newroom")).toBeInTheDocument();
@@ -2954,22 +2943,9 @@ describe("room creation", () => {
   });
 
   it("keeps the modal open and sidebar visible when room creation fails", async () => {
-    const viewportSpy = mockViewportMode("mobile");
-    const { createRoom } = setupStatefulCreateRoomMock({ createRejects: true });
-    setupMockChat({ sessions: [], filteredSessions: [] });
-    localStorage.setItem("fusion:chat-scope", "rooms");
+    const { createRoom, viewportSpy } = await renderRoomCreation({ viewport: "mobile", createRejects: true });
 
-    render(<ChatView projectId="proj-123" addToast={vi.fn()} experimentalFeatures={{ chatRooms: true }} />);
-
-    await userEvent.click(screen.getByTestId("chat-create-room-btn"));
-    const dialog = await screen.findByRole("dialog", { name: "Create room" });
-    await userEvent.type(within(dialog).getByLabelText("Room name"), "newroom");
-    await userEvent.click(within(screen.getByTestId("create-room-member-list")).getByText("Alpha"));
-    await userEvent.click(within(dialog).getByRole("button", { name: "Create room" }));
-
-    await waitFor(() => {
-      expect(createRoom).toHaveBeenCalledWith({ name: "newroom", memberAgentIds: ["agent-001"] });
-    });
+    expect(createRoom).toHaveBeenCalledWith({ name: "newroom", memberAgentIds: ["agent-001"] });
     expect(screen.getByRole("dialog", { name: "Create room" })).toBeInTheDocument();
     expect(document.querySelector(".chat-sidebar")).not.toHaveClass("chat-sidebar--hidden");
     expect(screen.queryByText("#newroom")).toBeNull();
