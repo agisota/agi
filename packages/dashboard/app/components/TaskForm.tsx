@@ -121,6 +121,8 @@ export interface TaskFormProps {
   // Review level (0=None, 1=Plan Only, 2=Plan and Code, 3=Full)
   reviewLevel?: number;
   onReviewLevelChange?: (value: number | undefined) => void;
+  autoMerge?: boolean | undefined;
+  onAutoMergeChange?: (value: boolean | undefined) => void;
   executionMode?: TaskExecutionModeSelection;
   onExecutionModeChange?: (value: TaskExecutionModeSelection) => void;
   githubTrackingEnabled?: boolean;
@@ -196,6 +198,8 @@ export function TaskForm({
   autoExpandMoreOptionsOnSelection = true,
   reviewLevel,
   onReviewLevelChange,
+  autoMerge,
+  onAutoMergeChange,
   executionMode,
   onExecutionModeChange,
   githubTrackingEnabled,
@@ -214,6 +218,7 @@ export function TaskForm({
     (planningModel || "") !== "" ||
     (thinkingLevel || "") !== "" ||
     reviewLevel !== undefined ||
+    autoMerge !== undefined ||
     executionMode === "fast" ||
     (branch || "") !== "" ||
     (baseBranch || "") !== "" ||
@@ -293,6 +298,7 @@ export function TaskForm({
     (planningModel || "") !== "" ||
     (thinkingLevel || "") !== "" ||
     reviewLevel !== undefined ||
+    autoMerge !== undefined ||
     executionMode === "fast" ||
     (branch || "") !== "" ||
     (baseBranch || "") !== "" ||
@@ -1288,6 +1294,27 @@ export function TaskForm({
                   <option value="2">2 — Plan and Code</option>
                   <option value="3">3 — Full</option>
                 </select>
+              </div>
+            )}
+            {onAutoMergeChange && (
+              <div className="model-select-row">
+                <label htmlFor="task-automerge-select" className="model-select-label">Auto-merge</label>
+                <select
+                  id="task-automerge-select"
+                  data-testid="task-automerge-select"
+                  value={autoMerge === undefined ? "" : autoMerge ? "on" : "off"}
+                  onChange={(e) => {
+                    if (e.target.value === "on") return onAutoMergeChange(true);
+                    if (e.target.value === "off") return onAutoMergeChange(false);
+                    return onAutoMergeChange(undefined);
+                  }}
+                  disabled={disabled}
+                >
+                  <option value="">Default (Follow project setting)</option>
+                  <option value="on">Enabled</option>
+                  <option value="off">Disabled</option>
+                </select>
+                <small>Default follows the project auto-merge setting.</small>
               </div>
             )}
           </>

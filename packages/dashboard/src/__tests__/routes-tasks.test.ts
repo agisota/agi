@@ -1232,6 +1232,39 @@ describe("POST /tasks", () => {
     expect(store.createTask).not.toHaveBeenCalled();
   });
 
+  it("forwards autoMerge when provided", async () => {
+    const createdTask = { ...FAKE_TASK_DETAIL, column: "triage", autoMerge: true };
+    (store.createTask as ReturnType<typeof vi.fn>).mockResolvedValue(createdTask);
+
+    const res = await REQUEST(
+      buildApp(),
+      "POST",
+      "/api/tasks",
+      JSON.stringify({ description: "Test task", autoMerge: true }),
+      { "Content-Type": "application/json" },
+    );
+
+    expect(res.status).toBe(201);
+    expect(store.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({ autoMerge: true }),
+      expect.any(Object),
+    );
+  });
+
+  it("returns 400 for invalid autoMerge value via POST", async () => {
+    const res = await REQUEST(
+      buildApp(),
+      "POST",
+      "/api/tasks",
+      JSON.stringify({ description: "Test task", autoMerge: "true" }),
+      { "Content-Type": "application/json" },
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("autoMerge must be a boolean");
+    expect(store.createTask).not.toHaveBeenCalled();
+  });
+
   it("forwards priority when provided", async () => {
     const createdTask = {
       ...FAKE_TASK_DETAIL,

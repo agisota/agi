@@ -851,6 +851,57 @@ describe("NewTaskModal", () => {
     });
   });
 
+  describe("auto-merge selection payload", () => {
+    it("omits autoMerge from payload when default is selected", async () => {
+      const { props } = renderNewTaskModal();
+
+      fireEvent.change(screen.getByRole("textbox"), { target: { value: "Task default auto-merge" } });
+      fireEvent.click(screen.getByRole("button", { name: "Create Task" }));
+
+      await waitFor(() => {
+        expect(props.onCreateTask).toHaveBeenCalledWith(
+          expect.not.objectContaining({ autoMerge: expect.anything() }),
+        );
+      });
+    });
+
+    it("includes autoMerge true when Enabled is selected", async () => {
+      const { props } = renderNewTaskModal();
+
+      fireEvent.click(screen.getByTestId("task-form-more-options-toggle"));
+      await waitFor(() => {
+        expect(screen.getByTestId("task-automerge-select")).toBeTruthy();
+      });
+      fireEvent.change(screen.getByTestId("task-automerge-select"), { target: { value: "on" } });
+      fireEvent.change(screen.getByPlaceholderText("What needs to be done?"), { target: { value: "Task auto-merge on" } });
+      fireEvent.click(screen.getByRole("button", { name: "Create Task" }));
+
+      await waitFor(() => {
+        expect(props.onCreateTask).toHaveBeenCalledWith(
+          expect.objectContaining({ autoMerge: true }),
+        );
+      });
+    });
+
+    it("includes autoMerge false when Disabled is selected", async () => {
+      const { props } = renderNewTaskModal();
+
+      fireEvent.click(screen.getByTestId("task-form-more-options-toggle"));
+      await waitFor(() => {
+        expect(screen.getByTestId("task-automerge-select")).toBeTruthy();
+      });
+      fireEvent.change(screen.getByTestId("task-automerge-select"), { target: { value: "off" } });
+      fireEvent.change(screen.getByPlaceholderText("What needs to be done?"), { target: { value: "Task auto-merge off" } });
+      fireEvent.click(screen.getByRole("button", { name: "Create Task" }));
+
+      await waitFor(() => {
+        expect(props.onCreateTask).toHaveBeenCalledWith(
+          expect.objectContaining({ autoMerge: false }),
+        );
+      });
+    });
+  });
+
   describe("priority selection payload", () => {
     it("includes default normal priority in create payload", async () => {
       const { props } = renderNewTaskModal();

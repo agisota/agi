@@ -834,6 +834,7 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
         thinkingLevel,
         reviewLevel,
         executionMode,
+        autoMerge,
         priority,
         source,
         branch,
@@ -885,6 +886,10 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
       const validExecutionModes = ["standard", "fast"];
       if (executionMode !== undefined && executionMode !== null && !validExecutionModes.includes(executionMode)) {
         throw badRequest(`executionMode must be one of: ${validExecutionModes.join(", ")}`);
+      }
+
+      if (autoMerge !== undefined && typeof autoMerge !== "boolean") {
+        throw badRequest("autoMerge must be a boolean");
       }
 
       // Validate priority if provided.
@@ -1201,6 +1206,7 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
         summarize,
         reviewLevel: reviewLevel ?? undefined,
         executionMode: executionMode || undefined,
+        ...(typeof autoMerge === "boolean" ? { autoMerge } : {}),
         priority: priority ?? undefined,
         source: {
           ...normalizedTaskSource,

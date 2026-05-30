@@ -56,6 +56,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
   const [selectedWorkflowSteps, setSelectedWorkflowSteps] = useState<string[]>([]);
   const [workflowStepsExplicitlySet, setWorkflowStepsExplicitlySet] = useState(false);
   const [reviewLevel, setReviewLevel] = useState<number | undefined>(undefined);
+  const [autoMerge, setAutoMerge] = useState<boolean | undefined>(undefined);
   const [priority, setPriority] = useState<TaskPriority>(DEFAULT_TASK_PRIORITY);
   const [nodeId, setNodeId] = useState<string | undefined>(undefined);
   const [githubTrackingEnabled, setGithubTrackingEnabled] = useState(false);
@@ -161,6 +162,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
       selectedWorkflowSteps.length > 0 ||
       selectedAgentId !== null ||
       reviewLevel !== undefined ||
+      autoMerge !== undefined ||
       priority !== DEFAULT_TASK_PRIORITY ||
       nodeId !== undefined ||
       branchMode !== "project-default" ||
@@ -169,7 +171,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
       githubTrackingEnabled ||
       githubRepoOverrideTrimmed !== "";
     setHasDirtyState(isDirty);
-  }, [description, dependencies, pendingImages, executorModel, validatorModel, planningModel, thinkingLevel, selectedWorkflowSteps, selectedAgentId, reviewLevel, priority, nodeId, branchMode, branch, baseBranch, githubTrackingEnabled, githubRepoOverrideTrimmed]);
+  }, [description, dependencies, pendingImages, executorModel, validatorModel, planningModel, thinkingLevel, selectedWorkflowSteps, selectedAgentId, reviewLevel, autoMerge, priority, nodeId, branchMode, branch, baseBranch, githubTrackingEnabled, githubRepoOverrideTrimmed]);
 
   const handleClose = useCallback(async () => {
     if (hasDirtyState) {
@@ -197,6 +199,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
     setSelectedAgentId(null);
     setShowAgentPicker(false);
     setReviewLevel(undefined);
+    setAutoMerge(undefined);
     setPriority(DEFAULT_TASK_PRIORITY);
     setNodeId(undefined);
     setBranchMode("project-default");
@@ -242,6 +245,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
         planningModelId: planningModel && planningSlashIdx !== -1 ? planningModel.slice(planningSlashIdx + 1) : undefined,
         thinkingLevel: thinkingLevel !== "" ? thinkingLevel as "minimal" | "low" | "medium" | "high" : undefined,
         reviewLevel,
+        ...(autoMerge !== undefined ? { autoMerge } : {}),
         priority,
         nodeId,
         branchSelection: {
@@ -292,6 +296,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
       setSelectedAgentId(null);
       setShowAgentPicker(false);
       setReviewLevel(undefined);
+      setAutoMerge(undefined);
       setPriority(DEFAULT_TASK_PRIORITY);
       setNodeId(undefined);
       setBranchMode("project-default");
@@ -305,7 +310,7 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
     } finally {
       setIsSubmitting(false);
     }
-  }, [description, dependencies, pendingImages, executorModel, validatorModel, planningModel, thinkingLevel, isSubmitting, githubRepoOverrideInvalid, hasInvalidBranchSelection, onCreateTask, addToast, onClose, projectId, presetMode, selectedPresetId, selectedWorkflowSteps, workflowStepsExplicitlySet, selectedAgentId, reviewLevel, priority, nodeId, branchMode, isBranchNameRequired, branch, baseBranch, githubTrackingEnabled, githubRepoOverrideTrimmed]);
+  }, [description, dependencies, pendingImages, executorModel, validatorModel, planningModel, thinkingLevel, isSubmitting, githubRepoOverrideInvalid, hasInvalidBranchSelection, onCreateTask, addToast, onClose, projectId, presetMode, selectedPresetId, selectedWorkflowSteps, workflowStepsExplicitlySet, selectedAgentId, reviewLevel, autoMerge, priority, nodeId, branchMode, isBranchNameRequired, branch, baseBranch, githubTrackingEnabled, githubRepoOverrideTrimmed]);
 
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -505,6 +510,8 @@ export function NewTaskModal({ isOpen, onClose, projectId, tasks, onCreateTask, 
             onThinkingLevelChange={setThinkingLevel}
             reviewLevel={reviewLevel}
             onReviewLevelChange={setReviewLevel}
+            autoMerge={autoMerge}
+            onAutoMergeChange={setAutoMerge}
             priority={priority}
             onPriorityChange={setPriority}
             branch={branch}
