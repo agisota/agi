@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchConfig, fetchSettings, updateSettings, updateGlobalSettings } from "../api";
 import { setAutoReloadEnabled } from "../versionCheck";
 
@@ -63,6 +63,7 @@ export function useAppSettings(projectId?: string): UseAppSettingsResult {
   const [todosEnabled, setTodosEnabled] = useState(false);
   const [goalsEnabled, setGoalsEnabled] = useState(false);
   const [autoReloadOnVersionChange, setAutoReloadOnVersionChangeState] = useState(true);
+  const autoMergeRef = useRef(autoMerge);
 
   /**
    * Fetches config and settings from the backend and updates local state.
@@ -124,16 +125,23 @@ export function useAppSettings(projectId?: string): UseAppSettingsResult {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    autoMergeRef.current = autoMerge;
+  }, [autoMerge]);
+
   const toggleAutoMerge = useCallback(async () => {
-    const next = !autoMerge;
-    setAutoMerge(next);
+    const previousAutoMerge = autoMergeRef.current;
+    const nextAutoMerge = !previousAutoMerge;
+    autoMergeRef.current = nextAutoMerge;
+    setAutoMerge(nextAutoMerge);
 
     try {
-      await updateSettings({ autoMerge: next }, projectId);
+      await updateSettings({ autoMerge: nextAutoMerge }, projectId);
     } catch {
-      setAutoMerge(!next);
+      autoMergeRef.current = previousAutoMerge;
+      setAutoMerge(previousAutoMerge);
     }
-  }, [autoMerge, projectId]);
+  }, [projectId]);
 
   const toggleGlobalPause = useCallback(async () => {
     const next = !globalPaused;

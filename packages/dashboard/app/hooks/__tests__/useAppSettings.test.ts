@@ -75,6 +75,33 @@ describe("useAppSettings", () => {
     expect(mockUpdateSettings).toHaveBeenCalledWith({ autoMerge: true }, "proj_123");
   });
 
+  it("preserves consistent autoMerge state across rapid toggles", async () => {
+    const updateResolvers: Array<() => void> = [];
+    mockUpdateSettings.mockImplementation(
+      () => new Promise((resolve) => updateResolvers.push(() => resolve({} as never))),
+    );
+
+    const { result } = renderHook(() => useAppSettings("proj_123"));
+
+    await waitFor(() => {
+      expect(result.current.autoMerge).toBe(false);
+    });
+
+    await act(async () => {
+      const firstToggle = result.current.toggleAutoMerge();
+      const secondToggle = result.current.toggleAutoMerge();
+
+      expect(result.current.autoMerge).toBe(false);
+
+      updateResolvers.forEach((resolve) => resolve());
+      await Promise.all([firstToggle, secondToggle]);
+    });
+
+    expect(mockUpdateSettings).toHaveBeenNthCalledWith(1, { autoMerge: true }, "proj_123");
+    expect(mockUpdateSettings).toHaveBeenNthCalledWith(2, { autoMerge: false }, "proj_123");
+    expect(result.current.autoMerge).toBe(false);
+  });
+
   it("rolls back optimistic state when toggle update fails", async () => {
     mockUpdateSettings.mockRejectedValueOnce(new Error("network"));
 
