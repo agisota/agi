@@ -5544,6 +5544,19 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
     }
 
     await this.writeTaskJsonFile(dir, task);
+    if (fromColumn === "in-review" && toColumn === "todo" && moveSource === "user") {
+      const handoffAccepted = this.getCompletionHandoffAcceptedMarker(id);
+      const mergeRequest = this.getMergeRequestRecord(id);
+      if (handoffAccepted && mergeRequest && mergeRequest.state !== "succeeded" && mergeRequest.state !== "cancelled") {
+        if (mergeRequest.state === "queued" || mergeRequest.state === "running" || mergeRequest.state === "retrying" || mergeRequest.state === "manual-required") {
+          this.transitionMergeRequestState(id, "cancelled", {
+            attemptCount: mergeRequest.attemptCount,
+            lastError: mergeRequest.lastError ?? "cancelled-by-user-hard-cancel",
+          });
+        }
+      }
+      this.clearCompletionHandoffAcceptedMarker(id);
+    }
     if (toColumn === "done") {
       this.clearLinkedAgentTaskIds(id, task.updatedAt);
     }

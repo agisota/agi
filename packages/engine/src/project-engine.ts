@@ -40,6 +40,7 @@ import {
   extractFailingTestFiles,
 } from "./verification-followup-dedup.js";
 import { isTransientError } from "./transient-error-detector.js";
+import { classifyTransientMergeError } from "./transient-merge-error-classifier.js";
 import { TunnelProcessManager } from "./remote-access/tunnel-process-manager.js";
 import type {
   ExternalTunnelInfo,
@@ -289,6 +290,7 @@ export class ProjectEngine {
    *  Examples: "This operation was aborted", "socket hang up", `server_error`.
    *  After this cap, the task is parked failed for human visibility. */
   private static readonly MAX_AUTO_MERGE_TRANSIENT_RETRIES = 3;
+  private static readonly MERGE_REQUEST_RETRY_EXHAUSTED_AGE_MS = 30 * 60 * 1000;
   /** Cap on outer in-review→in-progress bounces caused by deterministic
    *  verification failures during auto-merge. After this many failed merges
    *  for the same task, we stop bouncing it back, mark it failed, and create
@@ -1448,6 +1450,27 @@ export class ProjectEngine {
         const shadowSettings = await store.getSettings();
         if (shadowSettings.mergeRequestContractShadowEnabled === true) {
           this.emitMergeRequestShadowDequeueParity(taskId, shadowCandidateTaskId);
+          const mergeRequest = store.getMergeRequestRecord(taskId);
+          if (mergeRequest?.state === "manual-required" || mergeRequest?.state === "cancelled" || mergeRequest?.state === "succeeded" || mergeRequest?.state === "exhausted") {
+            continue;
+          }
+          if (mergeRequest && (mergeRequest.state === "queued" || mergeRequest.state === "retrying")) {
+            if (mergeRequest.state === "retrying") {
+              store.transitionMergeRequestState(taskId, "queued", { attemptCount: mergeRequest.attemptCount, lastError: mergeRequest.lastError });
+            }
+            store.transitionMergeRequestState(taskId, "running", { attemptCount: mergeRequest.attemptCount, lastError: mergeRequest.lastError });
+          }
+          if (mergeRequest?.state === "running") {
+            const ageMs = Date.now() - Date.parse(mergeRequest.updatedAt);
+            if ((mergeRequest.attemptCount ?? 0) >= ProjectEngine.MAX_AUTO_MERGE_TRANSIENT_RETRIES && ageMs >= ProjectEngine.MERGE_REQUEST_RETRY_EXHAUSTED_AGE_MS) {
+              store.transitionMergeRequestState(taskId, "exhausted", {
+                attemptCount: mergeRequest.attemptCount,
+                lastError: mergeRequest.lastError ?? "merge-request-running-age-cap-exhausted",
+              });
+              await store.logEntry(taskId, "Merge-request retry cap reached in running state; marked merge request exhausted without executor rebound");
+              continue;
+            }
+          }
         }
         // pickNextMergeTaskId awaits store.getTask; re-check shutdown so we
         // don't start a merge whose queue entry was cleared by stop().
@@ -2313,6 +2336,32 @@ export class ProjectEngine {
                   continue;
                 }
                 if (this.isTransientMergeRetryExhausted(taskOnErr, errorMsg)) {
+                  const settings = await store.getSettings().catch(() => null);
+                  const useMergeRequestContract = settings?.mergeRequestContractShadowEnabled === true;
+                  if (useMergeRequestContract) {
+                    const record = store.getMergeRequestRecord(taskId);
+                    if (record && record.state !== "exhausted" && record.state !== "cancelled" && record.state !== "succeeded") {
+                      if (record.state === "running") {
+                        store.transitionMergeRequestState(taskId, "retrying", {
+                          attemptCount: record.attemptCount,
+                          lastError: errorMsg,
+                        });
+                      }
+                      const refreshed = store.getMergeRequestRecord(taskId);
+                      if (refreshed && refreshed.state === "retrying") {
+                        store.transitionMergeRequestState(taskId, "exhausted", {
+                          attemptCount: refreshed.attemptCount,
+                          lastError: errorMsg,
+                        });
+                      }
+                    }
+                    await store.logEntry(
+                      taskId,
+                      `Auto-merge transient retries exhausted (${ProjectEngine.MAX_AUTO_MERGE_TRANSIENT_RETRIES}/${ProjectEngine.MAX_AUTO_MERGE_TRANSIENT_RETRIES}); marked merge request exhausted without column rebound: ${errorMsg}`,
+                      "MergeTransientRetryExhausted",
+                    );
+                    continue;
+                  }
                   await store.logEntry(
                     taskId,
                     `Auto-merge transient retries exhausted (${ProjectEngine.MAX_AUTO_MERGE_TRANSIENT_RETRIES}/${ProjectEngine.MAX_AUTO_MERGE_TRANSIENT_RETRIES}); parking task as failed: ${errorMsg}`,
@@ -2343,6 +2392,32 @@ export class ProjectEngine {
                 continue;
               }
               if (this.isTransientMergeRetryExhausted(taskOnErr, errorMsg)) {
+                const settings = await store.getSettings().catch(() => null);
+                const useMergeRequestContract = settings?.mergeRequestContractShadowEnabled === true;
+                if (useMergeRequestContract) {
+                  const record = store.getMergeRequestRecord(taskId);
+                  if (record && record.state !== "exhausted" && record.state !== "cancelled" && record.state !== "succeeded") {
+                    if (record.state === "running") {
+                      store.transitionMergeRequestState(taskId, "retrying", {
+                        attemptCount: record.attemptCount,
+                        lastError: errorMsg,
+                      });
+                    }
+                    const refreshed = store.getMergeRequestRecord(taskId);
+                    if (refreshed && refreshed.state === "retrying") {
+                      store.transitionMergeRequestState(taskId, "exhausted", {
+                        attemptCount: refreshed.attemptCount,
+                        lastError: errorMsg,
+                      });
+                    }
+                  }
+                  await store.logEntry(
+                    taskId,
+                    `Auto-merge transient retries exhausted (${ProjectEngine.MAX_AUTO_MERGE_TRANSIENT_RETRIES}/${ProjectEngine.MAX_AUTO_MERGE_TRANSIENT_RETRIES}); marked merge request exhausted without column rebound: ${errorMsg}`,
+                    "MergeTransientRetryExhausted",
+                  );
+                  continue;
+                }
                 await store.logEntry(
                   taskId,
                   `Auto-merge transient retries exhausted (${ProjectEngine.MAX_AUTO_MERGE_TRANSIENT_RETRIES}/${ProjectEngine.MAX_AUTO_MERGE_TRANSIENT_RETRIES}); parking task as failed: ${errorMsg}`,
@@ -2388,7 +2463,7 @@ export class ProjectEngine {
   }
 
   private isTransientMergeRetryExhausted(task: Task | null, errorMsg: string): boolean {
-    if (!task || !isTransientError(errorMsg)) {
+    if (!task || (!isTransientError(errorMsg) && classifyTransientMergeError(errorMsg) === null)) {
       return false;
     }
     const current = task.mergeTransientRetryCount ?? 0;
@@ -2401,7 +2476,7 @@ export class ProjectEngine {
     taskOnErr: Task | null,
     errorMsg: string,
   ): Promise<boolean> {
-    if (!taskOnErr || !isTransientError(errorMsg)) {
+    if (!taskOnErr || (!isTransientError(errorMsg) && classifyTransientMergeError(errorMsg) === null)) {
       return false;
     }
 
@@ -2412,6 +2487,25 @@ export class ProjectEngine {
 
     const nextRetryCount = currentRetries + 1;
     const delayMs = 5000 * Math.pow(2, currentRetries);
+    const settings = await store.getSettings().catch(() => null);
+    const useMergeRequestContract = settings?.mergeRequestContractShadowEnabled === true;
+    if (useMergeRequestContract) {
+      const record = store.getMergeRequestRecord(taskId);
+      if (record && record.state !== "manual-required" && record.state !== "cancelled" && record.state !== "succeeded" && record.state !== "exhausted") {
+        if (record.state === "running") {
+          store.transitionMergeRequestState(taskId, "retrying", {
+            attemptCount: nextRetryCount,
+            lastError: errorMsg,
+          });
+        }
+        if (store.getMergeRequestRecord(taskId)?.state === "retrying") {
+          store.transitionMergeRequestState(taskId, "queued", {
+            attemptCount: nextRetryCount,
+            lastError: errorMsg,
+          });
+        }
+      }
+    }
     await store.updateTask(taskId, {
       mergeTransientRetryCount: nextRetryCount,
       status: null,

@@ -94,4 +94,22 @@ describe("TaskStore merge request record + completion handoff marker", () => {
     store.clearCompletionHandoffAcceptedMarker(taskId);
     expect(store.getCompletionHandoffAcceptedMarker(taskId)).toBeNull();
   });
+
+  it("cancels merge request and clears handoff marker on user hard-cancel from in-review to todo", async () => {
+    const taskId = await createTask();
+    await store.moveTask(taskId, "todo");
+    await store.moveTask(taskId, "in-progress");
+    await store.handoffToReview(taskId, {
+      ownerAgentId: "agent-test",
+      evidence: { reason: "fn_task_done", runId: "run-1", agentId: "agent-test" },
+    });
+
+    store.upsertMergeRequestRecord(taskId, { state: "queued", attemptCount: 1, lastError: "pending" });
+    store.setCompletionHandoffAcceptedMarker(taskId, { source: "executor:fn_task_done" });
+
+    await store.moveTask(taskId, "todo", { moveSource: "user" });
+
+    expect(store.getMergeRequestRecord(taskId)?.state).toBe("cancelled");
+    expect(store.getCompletionHandoffAcceptedMarker(taskId)).toBeNull();
+  });
 });

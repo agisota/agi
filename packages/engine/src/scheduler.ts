@@ -1296,13 +1296,19 @@ export class Scheduler {
           const filteredScope = await getFilteredFileScope(t.id);
           if (isCoordinationOnlyTask(t, filteredScope)) continue;
           if (filteredScope.length === 0) continue;
-          setActiveScopeLease(t.id, filteredScope, "in-review");
+
+          const handoffAccepted = settings.mergeRequestContractShadowEnabled === true
+            ? this.store.getCompletionHandoffAcceptedMarker(t.id) !== null
+            : false;
+          if (!handoffAccepted) {
+            setActiveScopeLease(t.id, filteredScope, "in-review");
+          }
 
           if (settings.mergeRequestContractShadowEnabled === true) {
             const mergeRequestRecord = this.store.getMergeRequestRecord(t.id);
             const { shadowExecutorLeaseApplied, shadowMergeLockApplied, shadowLeaseApplied } =
               computeShadowLeaseParityState(mergeRequestRecord?.state ?? null);
-            if (shadowLeaseApplied !== true) {
+            if (shadowLeaseApplied !== !handoffAccepted) {
               void this.store.recordRunAuditEvent?.({
                 taskId: t.id,
                 agentId: "scheduler",
@@ -1313,7 +1319,7 @@ export class Scheduler {
                 metadata: {
                   taskId: t.id,
                   legacyLeaseColumn: "in-review",
-                  legacyLeaseApplied: true,
+                  legacyLeaseApplied: !handoffAccepted,
                   shadowLeaseApplied,
                   shadowExecutorLeaseApplied,
                   shadowMergeLockApplied,

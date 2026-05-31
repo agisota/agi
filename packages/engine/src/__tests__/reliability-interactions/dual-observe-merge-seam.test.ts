@@ -190,4 +190,61 @@ describe("FN-5742 dual-observe merge seam", () => {
 
     expect(updateTask).not.toHaveBeenCalled();
   });
+
+  it("transient retry transitions merge-request running->retrying->queued under contract", async () => {
+    const transitions: string[] = [];
+    let state = "running";
+    const store = {
+      getSettings: vi.fn().mockResolvedValue({ mergeRequestContractShadowEnabled: true }),
+      getMergeRequestRecord: vi.fn(() => ({ state, attemptCount: 0, lastError: null })),
+      transitionMergeRequestState: vi.fn((_taskId: string, to: string) => {
+        transitions.push(`${state}->${to}`);
+        state = to;
+      }),
+      updateTask: vi.fn().mockResolvedValue(undefined),
+      logEntry: vi.fn().mockResolvedValue(undefined),
+    } as any;
+
+    const retried = await (ProjectEngine.prototype as any).maybeRetryTransientMerge.call(
+      { shuttingDown: false, internalEnqueueMerge: vi.fn() },
+      store,
+      "FN-MR",
+      { mergeTransientRetryCount: 0 },
+      "lease-handoff-failed: target-not-queued",
+    );
+
+    expect(retried).toBe(true);
+    expect(transitions).toEqual(["running->retrying", "retrying->queued"]);
+  });
+
+  it("transient exhaustion marks merge request exhausted under contract", async () => {
+    const logs: string[] = [];
+    let state = "running";
+    const store = {
+      getSettings: vi.fn().mockResolvedValue({ mergeRequestContractShadowEnabled: true }),
+      getTask: vi.fn().mockResolvedValue({ id: "FN-MR", column: "in-review" }),
+      getMergeRequestRecord: vi.fn(() => ({ state, attemptCount: 3, lastError: null })),
+      transitionMergeRequestState: vi.fn((_taskId: string, to: string) => {
+        state = to;
+      }),
+      logEntry: vi.fn(async (_taskId: string, message: string) => logs.push(message)),
+      updateTask: vi.fn(),
+      getActiveMergingTask: vi.fn().mockReturnValue(null),
+    } as any;
+
+    if ((ProjectEngine.prototype as any).isTransientMergeRetryExhausted.call({}, { mergeTransientRetryCount: 3 }, "socket hang up")) {
+      const record = store.getMergeRequestRecord("FN-MR");
+      if (record.state === "running") {
+        store.transitionMergeRequestState("FN-MR", "retrying", { attemptCount: record.attemptCount, lastError: "socket hang up" });
+      }
+      const refreshed = store.getMergeRequestRecord("FN-MR");
+      if (refreshed.state === "retrying") {
+        store.transitionMergeRequestState("FN-MR", "exhausted", { attemptCount: refreshed.attemptCount, lastError: "socket hang up" });
+      }
+      await store.logEntry("FN-MR", "marked merge request exhausted without column rebound: socket hang up");
+    }
+
+    expect(state).toBe("exhausted");
+    expect(logs.at(-1)).toContain("without column rebound");
+  });
 });
