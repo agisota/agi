@@ -2575,10 +2575,6 @@ export interface GlobalSettings {
    *  useful when the local dev process is the source of truth and shelling
    *  out to an outdated globally-installed binary is unwanted. */
   fnBinaryCheckEnabled?: boolean;
-  /** When false, hides the "Star on GitHub" button in the Settings modal
-   *  header. Defaults to true (visible). The button is also hidden once the
-   *  user has clicked it (tracked client-side in localStorage). */
-  showGitHubStarButton?: boolean;
   /** Global fallback GitHub tracking repo in `owner/repo` format (FN-3868).
    *  Used when a project has no githubTrackingDefaultRepo. */
   githubTrackingDefaultRepo?: string;

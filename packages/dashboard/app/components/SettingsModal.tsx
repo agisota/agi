@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense, type CSSProperties, type MouseEvent } from "react";
-import { Globe, Folder, RefreshCw, Star, HelpCircle, MessageCircle, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
+import { Globe, Folder, RefreshCw, HelpCircle, MessageCircle, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import {
   AGENT_PERMISSION_POLICY_ACTION_CATEGORIES,
   THINKING_LEVELS,
@@ -58,13 +58,6 @@ import { NodeHealthDot } from "./NodeHealthDot";
 import { TrackingRepoSelect, type TrackingRepoOption } from "./TrackingRepoSelect";
 import { filterVisibleOnboardingAndSettingsProviders } from "./providerVisibility";
 
-// ---------------------------------------------------------------------------
-// GitHub star count — fetched once per session, cached in localStorage (1 h).
-// ---------------------------------------------------------------------------
-const GITHUB_STAR_CACHE_KEY = "fusion_github_star_count";
-const GITHUB_STAR_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-const GITHUB_STAR_CLICKED_KEY = "fusion:github-star-clicked";
-
 function toCompleteAgentPermissionRules(rules?: Partial<AgentPermissionPolicyRules>): AgentPermissionPolicyRules {
   return AGENT_PERMISSION_POLICY_ACTION_CATEGORIES.reduce((acc, category) => {
     acc[category] = rules?.[category] ?? "allow";
@@ -88,90 +81,6 @@ function toTrackingRepoOptions(remotes: GitRemote[]): TrackingRepoOption[] {
     }
   }
   return [...byValue.values()].sort((a, b) => a.value.localeCompare(b.value));
-}
-
-/**
- * Has the user already clicked the "Star on GitHub" button at any point in
- * the past? Used to permanently hide the button afterward — clicking opens
- * the repo where the actual star happens, so we treat that click as intent
- * to star and stop nagging.
- */
-function useStarClickedFlag(): [boolean, () => void] {
-  const [clicked, setClicked] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(GITHUB_STAR_CLICKED_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
-  const markClicked = useCallback(() => {
-    setClicked(true);
-    try {
-      localStorage.setItem(GITHUB_STAR_CLICKED_KEY, "true");
-    } catch {
-      // quota / private mode — best-effort
-    }
-  }, []);
-  return [clicked, markClicked];
-}
-
-interface StarCache {
-  count: number;
-  fetchedAt: number;
-}
-
-function useGitHubStarCount(): number | null {
-  const [count, setCount] = useState<number | null>(() => {
-    try {
-      const raw = localStorage.getItem(GITHUB_STAR_CACHE_KEY);
-      if (raw) {
-        const parsed: StarCache = JSON.parse(raw) as StarCache;
-        if (Date.now() - parsed.fetchedAt < GITHUB_STAR_CACHE_TTL_MS) {
-          return parsed.count;
-        }
-      }
-    } catch {
-      // ignore malformed cache
-    }
-    return null;
-  });
-
-  useEffect(() => {
-    // If we already have a fresh count from the initial state, skip the fetch.
-    try {
-      const raw = localStorage.getItem(GITHUB_STAR_CACHE_KEY);
-      if (raw) {
-        const parsed: StarCache = JSON.parse(raw) as StarCache;
-        if (Date.now() - parsed.fetchedAt < GITHUB_STAR_CACHE_TTL_MS) {
-          return;
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    fetch("https://api.github.com/repos/Runfusion/Fusion")
-      .then((res) => {
-        if (!res.ok) return;
-        return res.json() as Promise<{ stargazers_count?: number }>;
-      })
-      .then((data) => {
-        if (data && typeof data.stargazers_count === "number") {
-          const cache: StarCache = { count: data.stargazers_count, fetchedAt: Date.now() };
-          try {
-            localStorage.setItem(GITHUB_STAR_CACHE_KEY, JSON.stringify(cache));
-          } catch {
-            // quota exceeded — just skip
-          }
-          setCount(data.stargazers_count);
-        }
-      })
-      .catch(() => {
-        // Network failure — hide count gracefully, no update
-      });
-  }, []);
-
-  return count;
 }
 
 /**
@@ -494,8 +403,6 @@ export function SettingsModal({
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [updateCheckLoading, setUpdateCheckLoading] = useState(false);
   const [updateCheckResult, setUpdateCheckResult] = useState<UpdateCheckResponse | null>(null);
-  const gitHubStarCount = useGitHubStarCount();
-  const [starClicked, markStarClicked] = useStarClickedFlag();
   const [prefixError, setPrefixError] = useState<string | null>(null);
   const [researchLimitError, setResearchLimitError] = useState<string | null>(null);
   const [overlapPathPickerIndex, setOverlapPathPickerIndex] = useState<number | null>(null);
@@ -2580,23 +2487,6 @@ export function SettingsModal({
           <>
             {renderScopeBanner()}
             <h4 className="settings-section-heading">General</h4>
-            <div className="form-group">
-              <label htmlFor="showGitHubStarButton" className="checkbox-label">
-                <input
-                  id="showGitHubStarButton"
-                  type="checkbox"
-                  checked={form.showGitHubStarButton !== false}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, showGitHubStarButton: e.target.checked }))
-                  }
-                />
-                Show &quot;Star on GitHub&quot; button in Settings header
-              </label>
-              <small>
-                Once you click the Star button it&apos;s hidden automatically. Uncheck this to keep
-                it hidden even before clicking.
-              </small>
-            </div>
             <div className="form-group">
               <label htmlFor="globalGithubTrackingDefaultRepo">Global default tracking repo</label>
               <TrackingRepoSelect
@@ -7445,31 +7335,6 @@ export function SettingsModal({
             <h3>Settings</h3>
           </div>
           <div className="settings-header-actions">
-            {form.showGitHubStarButton !== false && (
-              <a
-                href="https://github.com/Runfusion/Fusion"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="settings-github-star-btn"
-                aria-label="Star Fusion on GitHub"
-                title="Star Fusion on GitHub"
-                onClick={markStarClicked}
-                data-clicked={starClicked ? "true" : "false"}
-              >
-                <span className="settings-github-star-btn__action">
-                  <ProviderIcon provider="github" size="sm" />
-                  <Star size={11} aria-hidden="true" />
-                  Star
-                </span>
-                {gitHubStarCount !== null && (
-                  <span className="settings-github-star-btn__count" aria-label={`${gitHubStarCount.toLocaleString()} stars`}>
-                    {gitHubStarCount >= 1000
-                      ? `${(gitHubStarCount / 1000).toFixed(1)}k`
-                      : gitHubStarCount.toLocaleString()}
-                  </span>
-                )}
-              </a>
-            )}
             <a
               href="https://discord.gg/ksrfuy7WYR"
               target="_blank"

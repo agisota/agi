@@ -793,6 +793,7 @@ describe("SettingsModal", () => {
       await waitForSettingsModalReady();
 
       expect(screen.getByRole("checkbox", { name: "Save tool output in agent logs" })).toBeChecked();
+      expect(screen.queryByRole("checkbox", { name: /Show "Star on GitHub" button in Settings header/i })).toBeNull();
     });
 
     it("reflects persisted unchecked value from global settings", async () => {
@@ -1528,14 +1529,14 @@ describe("SettingsModal", () => {
   });
 
   describe("settings header actions", () => {
-    it("renders Help, Discord, and GitHub star controls", async () => {
+    it("renders Help and Discord controls, without GitHub star", async () => {
       renderModal();
       await waitForSettingsModalReady();
 
       const headerActions = document.querySelector(".settings-header-actions");
       expect(headerActions).toBeInTheDocument();
 
-      expect(within(headerActions as HTMLElement).getByRole("link", { name: "Star Fusion on GitHub" })).toBeInTheDocument();
+      expect(within(headerActions as HTMLElement).queryByRole("link", { name: "Star Fusion on GitHub" })).toBeNull();
       expect(within(headerActions as HTMLElement).getByRole("link", { name: "Join our Discord" })).toBeInTheDocument();
       expect(within(headerActions as HTMLElement).getByRole("link", { name: "Help and discussions" })).toBeInTheDocument();
     });
