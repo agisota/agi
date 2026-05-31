@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { describe, expect, it, afterEach } from "vitest";
-import { resolveBranchGroupMergeRouting } from "../group-merge-coordinator.js";
+import { evaluateBranchGroupPromotion, resolveBranchGroupMergeRouting } from "../group-merge-coordinator.js";
 
 const dirs: string[] = [];
 
@@ -22,6 +22,99 @@ function makeRepo(): string {
 
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
+});
+
+describe("evaluateBranchGroupPromotion", () => {
+  const baseGroup = {
+    id: "BG-1",
+    branchName: "fusion/groups/planning-x",
+    autoMerge: true,
+    status: "open" as const,
+  };
+
+  const baseSettings: {
+    autoMerge: boolean;
+    globalPause: boolean;
+    enginePaused: boolean;
+  } = {
+    autoMerge: true,
+    globalPause: false,
+    enginePaused: false,
+  };
+
+  it("returns eligible when pauses are off and automerge resolves true", () => {
+    const decision = evaluateBranchGroupPromotion({
+      group: baseGroup,
+      settings: baseSettings,
+    });
+
+    expect(decision).toEqual({
+      eligible: true,
+      reason: "eligible",
+      groupAutoMerge: true,
+    });
+  });
+
+  it("returns group-automerge-disabled when group autoMerge is false", () => {
+    const decision = evaluateBranchGroupPromotion({
+      group: { ...baseGroup, autoMerge: false },
+      settings: baseSettings,
+    });
+
+    expect(decision).toEqual({
+      eligible: false,
+      reason: "group-automerge-disabled",
+      groupAutoMerge: false,
+    });
+  });
+
+  it("returns settings-automerge-disabled when settings autoMerge is false", () => {
+    const withDefaultedGroup = evaluateBranchGroupPromotion({
+      group: { ...baseGroup, autoMerge: undefined as unknown as boolean },
+      settings: { ...baseSettings, autoMerge: false },
+    });
+    expect(withDefaultedGroup).toEqual({
+      eligible: false,
+      reason: "settings-automerge-disabled",
+      groupAutoMerge: false,
+    });
+
+    const withExplicitGroupTrue = evaluateBranchGroupPromotion({
+      group: { ...baseGroup, autoMerge: true },
+      settings: { ...baseSettings, autoMerge: false },
+    });
+    expect(withExplicitGroupTrue).toEqual({
+      eligible: false,
+      reason: "settings-automerge-disabled",
+      groupAutoMerge: true,
+    });
+  });
+
+  it("returns global-pause before other gates", () => {
+    const decision = evaluateBranchGroupPromotion({
+      group: { ...baseGroup, autoMerge: true },
+      settings: { ...baseSettings, globalPause: true, autoMerge: false },
+    });
+
+    expect(decision).toEqual({
+      eligible: false,
+      reason: "global-pause",
+      groupAutoMerge: true,
+    });
+  });
+
+  it("returns engine-paused before automerge gate when global pause is off", () => {
+    const decision = evaluateBranchGroupPromotion({
+      group: { ...baseGroup, autoMerge: true },
+      settings: { ...baseSettings, enginePaused: true, autoMerge: false },
+    });
+
+    expect(decision).toEqual({
+      eligible: false,
+      reason: "engine-paused",
+      groupAutoMerge: true,
+    });
+  });
 });
 
 describe("resolveBranchGroupMergeRouting", () => {

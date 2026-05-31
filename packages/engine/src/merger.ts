@@ -128,7 +128,7 @@ import {
 } from "./merger-integration-worktree.js";
 import { acquireTaskWorktree } from "./worktree-acquisition.js";
 import { resolveIntegrationBranch } from "./integration-branch.js";
-import { isGroupPromotionAutoMergeEligible, resolveBranchGroupMergeRouting } from "./group-merge-coordinator.js";
+import { evaluateBranchGroupPromotion, resolveBranchGroupMergeRouting } from "./group-merge-coordinator.js";
 import { advanceIntegrationBranchRef, IntegrationBranchConcurrentAdvanceError } from "./merger-ref-update-advance.js";
 import { syncWorktreeToHead, type SyncWorktreeResult } from "./worktree-ref-sync.js";
 import { appendAutoWidenedScopeToPrompt, evaluateScopeAutoWiden } from "./merger-scope-auto-widen.js";
@@ -7444,9 +7444,32 @@ export async function aiMergeTask(
     } catch {
       // best-effort persistence
     }
+
+    const promotionEligibility = evaluateBranchGroupPromotion({
+      group: groupRouting.branchGroup,
+      settings,
+    });
+    try {
+      await (store as any).recordRunAuditEvent?.({
+        taskId,
+        agentId: "merger",
+        runId: `merge-${taskId}`,
+        domain: "git",
+        mutationType: "merge:branch-group-promotion-gated",
+        target: taskId,
+        metadata: {
+          groupId: groupRouting.branchGroup.id,
+          branchName: groupRouting.branchGroup.branchName,
+          groupAutoMerge: promotionEligibility.groupAutoMerge,
+          effectiveEligible: promotionEligibility.eligible,
+          reason: promotionEligibility.reason,
+        },
+      });
+    } catch {
+      // best-effort audit
+    }
   };
   if (groupRouting) {
-    const promotionEligibility = isGroupPromotionAutoMergeEligible(groupRouting.branchGroup, settings);
     const auditRunId = `merge-${taskId}`;
     try {
       await (store as any).recordRunAuditEvent?.({
@@ -7461,21 +7484,6 @@ export async function aiMergeTask(
           branchName: groupRouting.branchGroup.branchName,
           mergeTargetBranch: mergeTarget.branch,
           mergeTargetSource: mergeTarget.source,
-        },
-      });
-      await (store as any).recordRunAuditEvent?.({
-        taskId,
-        agentId: "merger",
-        runId: auditRunId,
-        domain: "git",
-        mutationType: "merge:branch-group-promotion-gated",
-        target: taskId,
-        metadata: {
-          groupId: groupRouting.branchGroup.id,
-          branchName: groupRouting.branchGroup.branchName,
-          groupAutoMerge: promotionEligibility.groupAutoMerge,
-          effectiveEligible: promotionEligibility.eligible,
-          reason: promotionEligibility.reason,
         },
       });
     } catch {

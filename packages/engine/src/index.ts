@@ -58,7 +58,9 @@ export {
 } from "./integration-branch.js";
 export {
   resolveBranchGroupMergeRouting,
+  evaluateBranchGroupPromotion,
   type BranchGroupMergeRouting,
+  type BranchGroupPromotionDecision,
 } from "./group-merge-coordinator.js";
 export {
   resolveMergeIntegrationRoot,

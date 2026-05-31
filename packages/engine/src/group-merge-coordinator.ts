@@ -11,28 +11,40 @@ export interface BranchGroupMergeRouting {
   mergeTarget: MergeTargetResolution;
 }
 
-export type BranchGroupPromotionEligibilityReason =
-  | "group-automerge-disabled"
-  | "global-pause"
-  | "engine-paused"
-  | "settings-automerge-disabled"
-  | "eligible";
+export interface BranchGroupPromotionDecision {
+  eligible: boolean;
+  groupAutoMerge: boolean;
+  reason:
+    | "group-automerge-disabled"
+    | "settings-automerge-disabled"
+    | "global-pause"
+    | "engine-paused"
+    | "eligible";
+}
 
-export function isGroupPromotionAutoMergeEligible(
-  group: Pick<BranchGroup, "autoMerge">,
-  settings: Pick<Settings, "autoMerge" | "globalPause" | "enginePaused">,
-): { eligible: boolean; reason: BranchGroupPromotionEligibilityReason; groupAutoMerge: boolean } {
-  const groupAutoMerge = resolveEffectiveGroupAutoMerge(group, settings);
-  if (!groupAutoMerge) {
-    return { eligible: false, reason: "group-automerge-disabled", groupAutoMerge };
-  }
-  if (settings.globalPause) {
+/**
+ * Evaluates branch-group → default-branch PROMOTION eligibility only.
+ * This does not perform promotion and does not govern member → group-integration
+ * routing, which stays on the FN-5782 task-level auto-merge path.
+ */
+export function evaluateBranchGroupPromotion(input: {
+  group: Pick<BranchGroup, "id" | "branchName" | "autoMerge" | "status">;
+  settings: Pick<Settings, "autoMerge" | "globalPause" | "enginePaused">;
+}): BranchGroupPromotionDecision {
+  const groupAutoMerge = resolveEffectiveGroupAutoMerge(input.group, input.settings);
+  if (input.settings.globalPause) {
     return { eligible: false, reason: "global-pause", groupAutoMerge };
   }
-  if (settings.enginePaused) {
+  if (input.settings.enginePaused) {
     return { eligible: false, reason: "engine-paused", groupAutoMerge };
   }
-  if (!settings.autoMerge) {
+  if (!groupAutoMerge) {
+    if (input.group.autoMerge === false) {
+      return { eligible: false, reason: "group-automerge-disabled", groupAutoMerge };
+    }
+    return { eligible: false, reason: "settings-automerge-disabled", groupAutoMerge };
+  }
+  if (!input.settings.autoMerge) {
     return { eligible: false, reason: "settings-automerge-disabled", groupAutoMerge };
   }
   return { eligible: true, reason: "eligible", groupAutoMerge };
