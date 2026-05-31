@@ -197,6 +197,69 @@ export type TaskWorktreeClassificationResult =
   | { ok: true }
   | { ok: false; classification: TaskWorktreeClassification; reason: string };
 
+export type NestedWorktreeRootDetectionResult =
+  | { reanchored: true; root: string }
+  | { reanchored: false; reason: string };
+
+export async function detectNestedWorktreeRoot(
+  rootDir: string,
+  worktreePath: string,
+  settings?: Pick<Settings, "worktreesDir">,
+): Promise<NestedWorktreeRootDetectionResult> {
+  if (!existsSync(worktreePath)) {
+    return { reanchored: false, reason: "worktree_missing" };
+  }
+
+  if (!isInsideWorktreesDir(rootDir, worktreePath, settings)) {
+    return { reanchored: false, reason: "worktree_outside_configured_dir" };
+  }
+
+  const canonicalRootDir = canonicalizePath(rootDir);
+  const canonicalWorktreePath = canonicalizePath(worktreePath);
+
+  let topLevelRaw = "";
+  try {
+    const result = await execAsync("git rev-parse --show-toplevel", {
+      cwd: worktreePath,
+      encoding: "utf-8",
+      timeout: 10_000,
+      maxBuffer: 1024 * 1024,
+    });
+    topLevelRaw = getExecStdout(result).trim();
+  } catch (error) {
+    return { reanchored: false, reason: `top_level_probe_failed:${error instanceof Error ? error.message : String(error)}` };
+  }
+
+  if (!topLevelRaw) {
+    return { reanchored: false, reason: "top_level_empty" };
+  }
+
+  const canonicalTopLevel = canonicalizePath(topLevelRaw);
+  if (canonicalTopLevel === canonicalWorktreePath) {
+    return { reanchored: false, reason: "already_at_toplevel" };
+  }
+
+  if (canonicalTopLevel === canonicalRootDir) {
+    return { reanchored: false, reason: "toplevel_is_repo_root" };
+  }
+
+  if (!isInsideWorktreesDir(rootDir, canonicalTopLevel, settings)) {
+    return { reanchored: false, reason: "toplevel_outside_configured_dir" };
+  }
+
+  const relFromTopLevel = relative(canonicalTopLevel, canonicalWorktreePath);
+  const nestedUnderTopLevel = relFromTopLevel !== "" && !relFromTopLevel.startsWith("..") && !isAbsolute(relFromTopLevel);
+  if (!nestedUnderTopLevel) {
+    return { reanchored: false, reason: "not_nested_under_toplevel" };
+  }
+
+  if (!await isRegisteredGitWorktree(rootDir, canonicalTopLevel)) {
+    return { reanchored: false, reason: "toplevel_not_registered_worktree" };
+  }
+
+  return { reanchored: true, root: canonicalTopLevel };
+}
+
 /**
  * Language-agnostic liveness/classification gate for task worktrees.
  */

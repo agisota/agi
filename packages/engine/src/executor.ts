@@ -46,7 +46,7 @@ import { resolveSandboxBackend } from "./sandbox/index.js";
 import type { SandboxBackend } from "./sandbox/types.js";
 import { ModelRegistry, SessionManager, type ToolDefinition, type AgentSession } from "@earendil-works/pi-coding-agent";
 import { PRIORITY_EXECUTE, type AgentSemaphore } from "./concurrency.js";
-import { RemovalReason, classifyTaskWorktree, describeRegisteredWorktrees, getRegisteredWorktreePaths, isGitRepository, isInsideWorktreesDir, isRegisteredGitWorktree, removeWorktree, type WorktreePool } from "./worktree-pool.js";
+import { RemovalReason, classifyTaskWorktree, describeRegisteredWorktrees, detectNestedWorktreeRoot, getRegisteredWorktreePaths, isGitRepository, isInsideWorktreesDir, isRegisteredGitWorktree, removeWorktree, type WorktreePool } from "./worktree-pool.js";
 import { attemptBranchAutocorrect } from "./branch-autocorrect.js";
 import { ActiveSessionWorktreeRemovalError } from "./worktree-backend.js";
 import {
@@ -3380,9 +3380,18 @@ export class TaskExecutor {
       if (!livenessFailure && shouldGate) {
         const classification = await classifyTaskWorktree(this.rootDir, worktreePath);
         if (!classification.ok) {
-          livenessClassification = classification.classification;
-          livenessFailureReason = classification.reason;
-          livenessFailure = `not_usable_task_worktree:${classification.classification}`;
+          const reanchor = await detectNestedWorktreeRoot(this.rootDir, worktreePath, settings);
+          if (reanchor.reanchored) {
+            await this.store.updateTask(task.id, { worktree: reanchor.root });
+            await this.store.logEntry(task.id, `Re-anchored nested task.worktree from ${worktreePath} to ${reanchor.root}`, undefined, this.getRunContextFor(task.id));
+            await this.emitWorktreeReanchoredAudit(task.id, worktreePath, reanchor.root, "executor-liveness-gate");
+            worktreePath = reanchor.root;
+            observedWorktreeRealpath = canonicalizePath(reanchor.root);
+          } else {
+            livenessClassification = classification.classification;
+            livenessFailureReason = classification.reason;
+            livenessFailure = `not_usable_task_worktree:${classification.classification}`;
+          }
         }
       }
 
@@ -5916,6 +5925,7 @@ export class TaskExecutor {
   private async verifyWorktreeInvariants(
     task: Task,
     worktreePathOverride?: string,
+    allowReanchor = true,
   ): Promise<{ ok: true } | { ok: false; reason: "wrong_toplevel" | "wrong_branch" | "no_commits"; observed: string; expected: string }> {
     const settings = await this.store.getSettings();
     const branchName = task.branch || canonicalFusionBranchName(task.id);
@@ -5972,6 +5982,16 @@ export class TaskExecutor {
           !isInsideWorktreesDir(this.rootDir, observedTopLevel, settings) ||
           observedTopLevel !== expectedWorktreeRealpath
         ) {
+          if (allowReanchor && observedTopLevel !== expectedRoot && isInsideWorktreesDir(this.rootDir, observedTopLevel, settings)) {
+            const reanchor = await detectNestedWorktreeRoot(this.rootDir, worktreePath, settings);
+            if (reanchor.reanchored) {
+              await this.store.updateTask(task.id, { worktree: reanchor.root });
+              executorLog.log(`${task.id}: re-anchored nested task.worktree ${worktreePath} -> ${reanchor.root}`);
+              await this.store.logEntry(task.id, `Re-anchored nested task.worktree from ${worktreePath} to ${reanchor.root}`, undefined, this.getRunContextFor(task.id));
+              await this.emitWorktreeReanchoredAudit(task.id, worktreePath, reanchor.root, "verify-worktree-invariants");
+              return this.verifyWorktreeInvariants(task, reanchor.root, false);
+            }
+          }
           return {
             ok: false,
             reason: "wrong_toplevel",
@@ -9165,6 +9185,32 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
       );
     }
     return true;
+  }
+
+  private async emitWorktreeReanchoredAudit(
+    taskId: string,
+    fromPath: string,
+    toPath: string,
+    source: "verify-worktree-invariants" | "executor-liveness-gate",
+  ): Promise<void> {
+    const runContext = this.getRunContextFor(taskId);
+    if (!runContext?.runId || !runContext.agentId) return;
+    const auditor = createRunAuditor(this.store, {
+      runId: runContext.runId,
+      agentId: runContext.agentId,
+      taskId,
+      phase: "execute",
+    });
+    await auditor.git({
+      type: "worktree:reanchored",
+      target: toPath,
+      metadata: {
+        taskId,
+        fromPath,
+        toPath,
+        source,
+      },
+    });
   }
 
   private async emitStaleLockAudit(

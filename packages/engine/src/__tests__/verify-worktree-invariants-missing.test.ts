@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "./executor-test-helpers.js";
 import { TaskExecutor } from "../executor.js";
-import { createMockStore, mockedExistsSync, resetExecutorMocks } from "./executor-test-helpers.js";
+import { createMockStore, mockedExecSync, mockedExistsSync, resetExecutorMocks } from "./executor-test-helpers.js";
 
 describe("FN-009: verifyWorktreeInvariants with missing worktree directory", () => {
   let executor: TaskExecutor;
@@ -68,6 +68,66 @@ describe("FN-009: verifyWorktreeInvariants with missing worktree directory", () 
     // We verify that existsSync was called by checking it was configured.
     expect(mockedExistsSync).toHaveBeenCalled();
     expect(result).toBeDefined();
+  });
+
+  it("re-anchors nested task worktree to registered root and passes invariants", async () => {
+    const task = {
+      id: "FN-9004",
+      title: "Test",
+      description: "Test",
+      column: "in-progress",
+      worktree: "/repo/.worktrees/gentle-flame/packages/core",
+      branch: "fusion/fn-9004",
+      dependencies: [],
+      steps: [],
+      currentStep: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    mockedExistsSync.mockReturnValue(true);
+    mockedExecSync.mockImplementation((cmd: string) => {
+      if (cmd.includes("rev-parse --show-toplevel")) return Buffer.from("/repo/.worktrees/gentle-flame\n");
+      if (cmd.includes("worktree list --porcelain")) {
+        return Buffer.from("worktree /repo\nbranch refs/heads/main\n\nworktree /repo/.worktrees/gentle-flame\nbranch refs/heads/fusion/fn-9004\n");
+      }
+      if (cmd.includes("rev-parse --abbrev-ref HEAD")) return Buffer.from("fusion/fn-9004\n");
+      if (cmd.includes("rev-list --count")) return Buffer.from("1\n");
+      return Buffer.from("");
+    });
+
+    const result = await (executor as any).verifyWorktreeInvariants(task);
+
+    expect(result).toEqual({ ok: true });
+    expect(store.updateTask).toHaveBeenCalledWith("FN-9004", { worktree: "/repo/.worktrees/gentle-flame" });
+  });
+
+  it("preserves wrong_toplevel for non-reanchorable mismatch", async () => {
+    const task = {
+      id: "FN-9005",
+      title: "Test",
+      description: "Test",
+      column: "in-progress",
+      worktree: "/repo/.worktrees/gentle-flame/packages/core",
+      branch: "fusion/fn-9005",
+      dependencies: [],
+      steps: [],
+      currentStep: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    mockedExistsSync.mockReturnValue(true);
+    mockedExecSync.mockImplementation((cmd: string) => {
+      if (cmd.includes("rev-parse --show-toplevel")) return Buffer.from("/repo\n");
+      return Buffer.from("");
+    });
+
+    const result = await (executor as any).verifyWorktreeInvariants(task);
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("wrong_toplevel");
+    expect(store.updateTask).not.toHaveBeenCalledWith("FN-9005", expect.objectContaining({ worktree: expect.any(String) }));
   });
 
   it("preserves validation failure when worktree path is null", async () => {

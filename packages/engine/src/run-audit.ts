@@ -93,6 +93,7 @@ export type GitMutationType =
   | "worktree:remove"
   | "worktree:reuse"
   | "worktree:incomplete-detected"
+  | "worktree:reanchored"
   | "worktree:auto-recovered"
   /**
    * worktrunk run-audit metadata shape:

@@ -103,6 +103,39 @@ describe("reliability interactions: FN-4935 executor liveness gate", () => {
     expect(events.some((event) => (event.type === "worktree:incomplete-detected" || event.mutationType === "worktree:incomplete-detected") && event.metadata?.source === "executor-liveness-gate" && event.metadata?.terminalAction === "requeue-todo")).toBe(true);
   });
 
+  it("re-anchors nested subdir classification failures instead of requeueing", async () => {
+    vi.spyOn(worktreeAcquisition, "acquireTaskWorktree").mockResolvedValue({
+      worktreePath: "/repo/.worktrees/gentle-flame/packages/core",
+      branch: "fusion/fn-4935-t",
+      source: "existing",
+      hydrated: true,
+      isResume: true,
+    });
+    vi.spyOn(worktreePool, "classifyTaskWorktree").mockResolvedValue({ ok: false, classification: "incomplete", reason: "missing .git metadata" });
+    const reanchorSpy = vi.spyOn(worktreePool, "detectNestedWorktreeRoot").mockResolvedValue({ reanchored: true, root: "/repo/.worktrees/gentle-flame" });
+    mockedExecSync.mockImplementation((cmd: string) => {
+      if (cmd.includes("rev-parse HEAD")) return Buffer.from("abc123\n");
+      if (cmd.includes("rev-parse --show-toplevel")) return Buffer.from("/repo/.worktrees/gentle-flame\n");
+      if (cmd.includes("rev-parse --abbrev-ref HEAD")) return Buffer.from("fusion/fn-4935-t\n");
+      if (cmd.includes("rev-list --count")) return Buffer.from("1\n");
+      return Buffer.from("");
+    });
+
+    const store = createMockStore();
+    const executor = new TaskExecutor(store as any, "/repo");
+    await executor.execute(makeTask());
+
+    expect(reanchorSpy).toHaveBeenCalled();
+    expect(store.updateTask).toHaveBeenCalledWith("FN-4935-T", expect.objectContaining({ worktree: "/repo/.worktrees/gentle-flame" }));
+    expect(store.logEntry).toHaveBeenCalledWith("FN-4935-T", expect.stringContaining("Re-anchored nested task.worktree"), undefined, expect.anything());
+    expect(
+      store.logEntry.mock.calls.some(
+        (call: unknown[]) => call[0] === "FN-4935-T" && typeof call[1] === "string" && call[1].includes("not_usable_task_worktree"),
+      ),
+    ).toBe(false);
+    expect(mockedCreateFnAgent).toHaveBeenCalled();
+  });
+
   it.each([
     "missing",
     "incomplete",
