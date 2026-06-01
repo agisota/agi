@@ -134,7 +134,7 @@ import {
   createTaskLogTool as sharedCreateTaskLogTool,
 } from "./agent-tools.js";
 import { getTaskCompletionBlockerForStore } from "./task-completion.js";
-import { normalizeStreamingDeltaFromEvent } from "./streaming-delta.js";
+import { createStreamingDeltaNormalizer } from "./streaming-delta.js";
 import {
   getEnabledPluginTools,
   getResearchGuidanceForSurface,
@@ -8286,17 +8286,20 @@ Backward compat fallback: if JSON is unavailable, you may still begin output wit
       this.setActiveWorkflowStepSession(task.id, session, worktreePath);
 
       let output = "";
+      const deltaNormalizer = createStreamingDeltaNormalizer();
       session.subscribe((event) => {
         if (event.type === "message_update") {
           const msgEvent = event.assistantMessageEvent;
           if (msgEvent.type === "text_delta") {
-            // Repair dropped sentence-boundary spaces for all providers at the shared engine delta chokepoint.
-            const delta = normalizeStreamingDeltaFromEvent(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "text");
+            // Repair dropped sentence-boundary spaces at the shared engine delta chokepoint,
+            // including tool-call cross-message boundaries (see streaming-delta.ts).
+            const delta = deltaNormalizer.normalize(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "text");
             output += delta;
             agentLogger.onText(delta);
           } else if (msgEvent.type === "thinking_delta") {
-            // Repair dropped sentence-boundary spaces for all providers at the shared engine delta chokepoint.
-            const delta = normalizeStreamingDeltaFromEvent(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "thinking");
+            // Repair dropped sentence-boundary spaces at the shared engine delta chokepoint,
+            // including tool-call cross-message boundaries (see streaming-delta.ts).
+            const delta = deltaNormalizer.normalize(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "thinking");
             agentLogger.onThinking(delta);
           }
         }

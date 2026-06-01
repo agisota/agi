@@ -69,7 +69,7 @@ function findPreviousBlockText(
   return "";
 }
 
-export function normalizeStreamingDeltaFromEvent(
+function derivePreviousTextFromEvent(
   partial: StreamingPartialMessage | undefined,
   contentIndex: number,
   delta: string,
@@ -87,5 +87,45 @@ export function normalizeStreamingDeltaFromEvent(
     previousText = findPreviousBlockText(partial, contentIndex, kind);
   }
 
-  return normalizeStreamingDelta(previousText, delta);
+  return previousText;
+}
+
+export function createStreamingDeltaNormalizer(): {
+  normalize: (
+    partial: StreamingPartialMessage | undefined,
+    contentIndex: number,
+    delta: string,
+    kind: "text" | "thinking",
+  ) => string;
+} {
+  let lastTextTail = "";
+  let lastThinkingTail = "";
+
+  return {
+    normalize(partial, contentIndex, delta, kind) {
+      const derivedPreviousText = derivePreviousTextFromEvent(partial, contentIndex, delta, kind);
+      const previousText = derivedPreviousText || (kind === "text" ? lastTextTail : lastThinkingTail);
+      const result = normalizeStreamingDelta(previousText, delta);
+
+      if (result) {
+        const tail = result.slice(-1);
+        if (kind === "text") {
+          lastTextTail = tail;
+        } else {
+          lastThinkingTail = tail;
+        }
+      }
+
+      return result;
+    },
+  };
+}
+
+export function normalizeStreamingDeltaFromEvent(
+  partial: StreamingPartialMessage | undefined,
+  contentIndex: number,
+  delta: string,
+  kind: "text" | "thinking",
+): string {
+  return normalizeStreamingDelta(derivePreviousTextFromEvent(partial, contentIndex, delta, kind), delta);
 }

@@ -58,7 +58,7 @@ import {
 import { resolvePermanentAgentToolDecision } from "./permanent-agent-gating.js";
 import type { SystemPromptLayers } from "./prompt-layers.js";
 import { READONLY_ALLOWLIST, filterCustomToolsForReadonly, isReadonlyAllowed } from "./workflow-step-tool-policy.js";
-import { normalizeStreamingDeltaFromEvent } from "./streaming-delta.js";
+import { createStreamingDeltaNormalizer } from "./streaming-delta.js";
 
 const RTK_ACCEPTED_REWRITE_EXIT_CODES = new Set([0, 3]);
 const RTK_EXPECTED_PASSTHROUGH_EXIT_CODES = new Set([1, 2]);
@@ -2118,15 +2118,18 @@ export async function createFnAgent(options: AgentOptions): Promise<AgentResult>
       sessionManager as unknown as SessionManagerLike,
     );
     (targetSession as any).__fusionMemoryAppendAvailable = options.customTools?.some((tool) => tool.name === FN_MEMORY_APPEND_TOOL_NAME) === true;
+    const deltaNormalizer = createStreamingDeltaNormalizer();
     targetSession.subscribe((event) => {
       if (event.type === "message_update") {
         const msgEvent = event.assistantMessageEvent;
         if (msgEvent.type === "text_delta") {
-          // Repair dropped sentence-boundary spaces for all providers at the shared engine delta chokepoint.
-          options.onText?.(normalizeStreamingDeltaFromEvent(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "text"));
+          // Repair dropped sentence-boundary spaces at the shared engine delta chokepoint,
+          // including tool-call cross-message boundaries (see streaming-delta.ts).
+          options.onText?.(deltaNormalizer.normalize(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "text"));
         } else if (msgEvent.type === "thinking_delta") {
-          // Repair dropped sentence-boundary spaces for all providers at the shared engine delta chokepoint.
-          options.onThinking?.(normalizeStreamingDeltaFromEvent(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "thinking"));
+          // Repair dropped sentence-boundary spaces at the shared engine delta chokepoint,
+          // including tool-call cross-message boundaries (see streaming-delta.ts).
+          options.onThinking?.(deltaNormalizer.normalize(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "thinking"));
         }
       }
       if (event.type === "tool_execution_start") {
@@ -2285,15 +2288,18 @@ export async function createFnAgent(options: AgentOptions): Promise<AgentResult>
   );
 
   // Wire up event listeners
+  const deltaNormalizer = createStreamingDeltaNormalizer();
   promptableSession.subscribe((event) => {
     if (event.type === "message_update") {
       const msgEvent = event.assistantMessageEvent;
       if (msgEvent.type === "text_delta") {
-        // Repair dropped sentence-boundary spaces for all providers at the shared engine delta chokepoint.
-        options.onText?.(normalizeStreamingDeltaFromEvent(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "text"));
+        // Repair dropped sentence-boundary spaces at the shared engine delta chokepoint,
+        // including tool-call cross-message boundaries (see streaming-delta.ts).
+        options.onText?.(deltaNormalizer.normalize(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "text"));
       } else if (msgEvent.type === "thinking_delta") {
-        // Repair dropped sentence-boundary spaces for all providers at the shared engine delta chokepoint.
-        options.onThinking?.(normalizeStreamingDeltaFromEvent(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "thinking"));
+        // Repair dropped sentence-boundary spaces at the shared engine delta chokepoint,
+        // including tool-call cross-message boundaries (see streaming-delta.ts).
+        options.onThinking?.(deltaNormalizer.normalize(msgEvent.partial, msgEvent.contentIndex, msgEvent.delta, "thinking"));
       }
     }
     if (event.type === "tool_execution_start") {
