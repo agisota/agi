@@ -1496,7 +1496,7 @@ function createAbortError(): Error {
   return error;
 }
 
-async function runGenerationWithTimeout<T>(session: Session, operation: () => Promise<T>): Promise<T> {
+async function runGenerationWithTimeout<T>(session: Session, operation: (abortSignal: AbortSignal) => Promise<T>): Promise<T> {
   const existing = activeGenerations.get(session.id);
   if (existing) {
     clearTimeout(existing.timer);
@@ -1510,8 +1510,9 @@ async function runGenerationWithTimeout<T>(session: Session, operation: () => Pr
     setSessionError(session, "AI generation timed out. You can retry or start a new session.");
     abortController.abort();
   }, GENERATION_TIMEOUT_MS);
+  const generationRecord = { abortController, timer };
 
-  activeGenerations.set(session.id, { abortController, timer });
+  activeGenerations.set(session.id, generationRecord);
 
   const abortPromise = new Promise<never>((_, reject) => {
     abortController.signal.addEventListener(
@@ -1522,7 +1523,7 @@ async function runGenerationWithTimeout<T>(session: Session, operation: () => Pr
   });
 
   try {
-    return await Promise.race([operation(), abortPromise]);
+    return await Promise.race([operation(abortController.signal), abortPromise]);
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       if (!timeoutTriggered && !session.error) {
@@ -1532,7 +1533,9 @@ async function runGenerationWithTimeout<T>(session: Session, operation: () => Pr
     throw error;
   } finally {
     clearTimeout(timer);
-    activeGenerations.delete(session.id);
+    if (activeGenerations.get(session.id) === generationRecord) {
+      activeGenerations.delete(session.id);
+    }
   }
 }
 
@@ -1542,12 +1545,15 @@ async function continueAgentConversation(session: Session, message: string): Pro
   }
 
   try {
-    await runGenerationWithTimeout(session, async () => {
+    await runGenerationWithTimeout(session, async (abortSignal) => {
       // Clear thinking output for this turn
       session.thinkingOutput = "";
 
-    // Send message to agent using .prompt() - it will stream thinking via onThinking callback
-    await session.agent.session.prompt(message);
+      // Send message to agent using .prompt() - it will stream thinking via onThinking callback.
+      // Pass abort signal so timeout/user-stop can cancel the underlying prompt when supported.
+      await (session.agent.session.prompt as (input: string, options?: { signal?: AbortSignal }) => Promise<void>)(message, {
+        signal: abortSignal,
+      });
 
     // Get the response text from the agent's state
     interface AgentMessage {
@@ -1611,10 +1617,11 @@ async function continueAgentConversation(session: Session, message: string): Pro
           );
           try {
             session.thinkingOutput = "";
-            await session.agent.session.prompt(
+            await (session.agent.session.prompt as (input: string, options?: { signal?: AbortSignal }) => Promise<void>)(
               "Your previous response could not be parsed as JSON. " +
-              'Please respond with ONLY a valid JSON object: either {"type":"question","data":{...}} ' +
-              'or {"type":"complete","data":{...}}. No markdown, no explanation, just the JSON.'
+                'Please respond with ONLY a valid JSON object: either {"type":"question","data":{...}} ' +
+                'or {"type":"complete","data":{...}}. No markdown, no explanation, just the JSON.',
+              { signal: abortSignal },
             );
             
             // Get the new response text
@@ -1908,6 +1915,20 @@ function formatRefineRequestForAgent(summary: PlanningSummary): string {
   ].join("\n\n");
 }
 
+function didSubmitSameAnswer(
+  session: Session,
+  responses: Record<string, unknown>,
+): boolean {
+  if (!session.currentQuestion) {
+    return false;
+  }
+  const lastEntry = session.history[session.history.length - 1];
+  if (!lastEntry || lastEntry.question.id !== session.currentQuestion.id) {
+    return false;
+  }
+  return JSON.stringify(lastEntry.response) === JSON.stringify(responses);
+}
+
 export async function submitResponse(
   sessionId: string,
   responses: Record<string, unknown>,
@@ -1926,6 +1947,13 @@ export async function submitResponse(
   if (store && !session.store) session.store = store;
   if (rootDir && !session.rootDir) session.rootDir = rootDir;
 
+  if (activeGenerations.has(session.id)) {
+    if (didSubmitSameAnswer(session, responses)) {
+      throw new GenerationInProgressError("Generation already in progress for this response");
+    }
+    throw new GenerationInProgressError("Generation already in progress");
+  }
+
   if (!session.currentQuestion) {
     if (!isRefineRequest(responses) || !session.summary) {
       throw new InvalidSessionStateError("No active question in session");
@@ -1938,22 +1966,26 @@ export async function submitResponse(
     const refineMessage = formatRefineRequestForAgent(session.summary);
     await continueAgentConversation(session, refineMessage);
   } else {
-    // Record the response
-    session.history.push({
-      question: session.currentQuestion,
+    const currentQuestion = session.currentQuestion;
+    const historyEntry = {
+      question: currentQuestion,
       response: responses,
       thinkingOutput: session.lastGeneratedThinking || "",
-    });
+    };
+
     session.error = undefined;
     persistSession(session, "generating");
 
     if (!session.agent) {
-      const replayHistory = session.history.slice(0, -1);
-      await ensureSessionAgent(session, rootDir, replayHistory, promptOverrides, store);
+      await ensureSessionAgent(session, rootDir, session.history, promptOverrides, store);
     }
 
-    const message = formatResponseForAgent(session.currentQuestion, responses);
+    const message = formatResponseForAgent(currentQuestion, responses);
     await continueAgentConversation(session, message);
+
+    if (!session.error) {
+      session.history.push(historyEntry);
+    }
   }
 
   // Return the current state (will be updated via SSE)
@@ -2491,6 +2523,25 @@ export function __setPlanningNtfyHelpers(mock: PlanningNtfyHelpers | undefined):
   planningNtfyHelpers = mock;
 }
 
+/** Test-only helper for validating generation tracking behavior. */
+export function __getActiveGenerationForTests(sessionId: string):
+  | { abortController: AbortController; timer: NodeJS.Timeout }
+  | undefined {
+  return activeGenerations.get(sessionId);
+}
+
+/** Test-only helper for exercising generation timeout orchestration directly. */
+export async function __runGenerationWithTimeoutForTests<T>(
+  sessionId: string,
+  operation: (abortSignal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const session = getSession(sessionId);
+  if (!session) {
+    throw new SessionNotFoundError(`Planning session ${sessionId} not found or expired`);
+  }
+  return runGenerationWithTimeout(session, operation);
+}
+
 // ── Custom Errors ───────────────────────────────────────────────────────────
 
 export class RateLimitError extends Error {
@@ -2511,5 +2562,12 @@ export class InvalidSessionStateError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "InvalidSessionStateError";
+  }
+}
+
+export class GenerationInProgressError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GenerationInProgressError";
   }
 }

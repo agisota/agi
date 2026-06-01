@@ -6,7 +6,7 @@ import {
   type TaskPriority,
   type TaskStore,
 } from "@fusion/core";
-import { ApiError, badRequest, notFound, rateLimited } from "../api-error.js";
+import { ApiError, badRequest, conflict, notFound, rateLimited } from "../api-error.js";
 import { writeSSEEvent, type SessionBufferedEvent } from "../sse-buffer.js";
 import type { AiSessionStore } from "../ai-session-store.js";
 import type { ApiRoutesContext } from "./types.js";
@@ -773,6 +773,8 @@ export function registerPlanningSubtaskRoutes(ctx: ApiRoutesContext, deps: Plann
         throw notFound(err instanceof Error ? err.message : String(err));
       } else if (err instanceof Error && err.name === "InvalidSessionStateError") {
         throw badRequest(err instanceof Error ? err.message : String(err));
+      } else if (err instanceof Error && err.name === "GenerationInProgressError") {
+        throw conflict(err instanceof Error ? err.message : String(err));
       } else {
         rethrowAsApiError(err, "Failed to process response");
       }

@@ -27,11 +27,14 @@ import {
   __setCreateFnAgent,
   __setPlanningDiagnostics,
   __setPlanningNtfyHelpers,
+  __getActiveGenerationForTests,
+  __runGenerationWithTimeoutForTests,
   rehydrateFromStore,
   setAiSessionStore,
   RateLimitError,
   SessionNotFoundError,
   InvalidSessionStateError,
+  GenerationInProgressError,
   parseAgentResponse,
   buildDepthPromptSuffix,
   generateSubtasksFromPlanning,
@@ -835,6 +838,43 @@ describe("planning module", () => {
   });
 
   describe("submitResponse", () => {
+    it("rejects overlapping submit for same question and keeps one history entry", async () => {
+      const mockIp = getUniqueIp();
+      const { sessionId } = await createSession(mockIp, initialPlan, MOCK_TASK_STORE, TEST_ROOT_DIR);
+      const session = getSession(sessionId);
+      expect(session?.currentQuestion?.id).toBe("q-scope");
+      expect(session?.agent).toBeDefined();
+
+      let releasePrompt: (() => void) | undefined;
+      const promptMock = vi.fn(
+        (_message: string, options?: { signal?: AbortSignal }) =>
+          new Promise<void>((resolve) => {
+            expect(options?.signal).toBeDefined();
+            releasePrompt = resolve;
+          }),
+      );
+
+      if (!session?.agent) {
+        throw new Error("Expected session agent");
+      }
+      session.agent.session.prompt = promptMock as any;
+
+      const firstSubmit = submitResponse(sessionId, { "q-scope": "medium" }, TEST_ROOT_DIR);
+      await vi.waitFor(() => {
+        expect(promptMock).toHaveBeenCalledTimes(1);
+      });
+
+      await expect(submitResponse(sessionId, { "q-scope": "medium" }, TEST_ROOT_DIR)).rejects.toThrow(
+        GenerationInProgressError,
+      );
+
+      expect(getSession(sessionId)?.history).toHaveLength(0);
+      releasePrompt?.();
+      const firstResponse = await firstSubmit;
+      expect(firstResponse.type).toBe("question");
+      expect(getSession(sessionId)?.history).toHaveLength(0);
+    });
+
     it("processes response and returns next question", async () => {
       const mockIp = getUniqueIp();
       const { sessionId } = await createSession(mockIp, initialPlan, MOCK_TASK_STORE, TEST_ROOT_DIR);
@@ -1341,6 +1381,71 @@ describe("planning module", () => {
   });
 
   describe("generation controls", () => {
+    it("older generation cleanup does not remove newer active entry", async () => {
+      const { sessionId } = await createSession(getUniqueIp(), initialPlan, MOCK_TASK_STORE, TEST_ROOT_DIR);
+
+      let resolveFirst: (() => void) | undefined;
+      const firstGeneration = __runGenerationWithTimeoutForTests(sessionId, async () =>
+        new Promise<void>((resolve) => {
+          resolveFirst = resolve;
+        }),
+      );
+
+      await vi.waitFor(() => {
+        expect(__getActiveGenerationForTests(sessionId)).toBeDefined();
+      });
+      const firstRecord = __getActiveGenerationForTests(sessionId);
+
+      let resolveSecond: (() => void) | undefined;
+      const secondGeneration = __runGenerationWithTimeoutForTests(sessionId, async () =>
+        new Promise<void>((resolve) => {
+          resolveSecond = resolve;
+        }),
+      );
+
+      await vi.waitFor(() => {
+        const current = __getActiveGenerationForTests(sessionId);
+        expect(current).toBeDefined();
+        expect(current).not.toBe(firstRecord);
+      });
+      const secondRecord = __getActiveGenerationForTests(sessionId);
+
+      await expect(firstGeneration).rejects.toThrow("Generation aborted");
+      expect(__getActiveGenerationForTests(sessionId)).toBe(secondRecord);
+
+      resolveSecond?.();
+      await secondGeneration;
+      expect(__getActiveGenerationForTests(sessionId)).toBeUndefined();
+      resolveFirst?.();
+    });
+
+    it("timeout path never leaves persisted session in generating", async () => {
+      vi.useFakeTimers();
+      try {
+        const store = new MockAiSessionStore();
+        setAiSessionStore(store as any);
+
+        const hangingAgent = {
+          session: {
+            state: { messages: [] as Array<{ role: string; content: string }> },
+            prompt: vi.fn(() => new Promise<void>(() => {})),
+            dispose: vi.fn(),
+          },
+        };
+        __setCreateFnAgent(async () => hangingAgent as any);
+
+        const sessionId = await createSessionWithAgent(getUniqueIp(), initialPlan, TEST_ROOT_DIR, MOCK_TASK_STORE);
+
+        await vi.advanceTimersByTimeAsync(GENERATION_TIMEOUT_MS + 10);
+        await flushAsyncWork();
+
+        expect(getSession(sessionId)?.error).toContain("timed out");
+        expect(store.rows.get(sessionId)?.status).toBe("error");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("returns false when stopping unknown session", () => {
       expect(stopGeneration("missing-session")).toBe(false);
     });
@@ -1372,6 +1477,42 @@ describe("planning module", () => {
 
       await flushAsyncWork();
       expect(getSession(sessionId)?.error).toContain("Generation stopped by user");
+
+      resolvePrompt?.();
+    });
+
+    it("does not append history when generation is aborted", async () => {
+      let resolvePrompt: (() => void) | undefined;
+      const hangingAgent = {
+        session: {
+          state: { messages: [] as Array<{ role: string; content: string }> },
+          prompt: vi.fn(
+            () =>
+              new Promise<void>((resolve) => {
+                resolvePrompt = resolve;
+              }),
+          ),
+          dispose: vi.fn(),
+        },
+      };
+      __setCreateFnAgent(async () => hangingAgent as any);
+
+      const sessionId = await createSessionWithAgent(getUniqueIp(), initialPlan, TEST_ROOT_DIR, MOCK_TASK_STORE);
+      await vi.waitFor(() => {
+        expect(hangingAgent.session.prompt).toHaveBeenCalledTimes(1);
+      });
+
+      const submitPromise = submitResponse(sessionId, { "q-scope": "medium" }, TEST_ROOT_DIR);
+      await vi.waitFor(() => {
+        expect(hangingAgent.session.prompt).toHaveBeenCalledTimes(2);
+      });
+
+      expect(getSession(sessionId)?.history).toHaveLength(0);
+      expect(stopGeneration(sessionId)).toBe(true);
+
+      const response = await submitPromise;
+      expect(response.type).toBe("question");
+      expect(getSession(sessionId)?.history).toHaveLength(0);
 
       resolvePrompt?.();
     });
