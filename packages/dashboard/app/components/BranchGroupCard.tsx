@@ -1,6 +1,6 @@
 import "./BranchGroupCard.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, CircleDashed, ExternalLink, GitBranch, GitPullRequest, Loader2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, CircleDashed, ExternalLink, GitBranch, GitPullRequest, Loader2 } from "lucide-react";
 import type { BranchGroupSummary } from "../api";
 import { apiGetBranchGroup, apiPromoteBranchGroup } from "../api";
 import { subscribeSse } from "../sse-bus";
@@ -15,6 +15,7 @@ export function BranchGroupCard({ groupId, projectId }: BranchGroupCardProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [promoting, setPromoting] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   const loadGroup = useCallback(async () => {
     try {
@@ -33,6 +34,29 @@ export function BranchGroupCard({ groupId, projectId }: BranchGroupCardProps) {
     setLoading(true);
     void loadGroup();
   }, [loadGroup]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const syncCollapsed = (matches: boolean) => {
+      setCollapsed(matches);
+    };
+
+    syncCollapsed(mediaQuery.matches);
+    const onMediaChange = (event: MediaQueryListEvent) => {
+      syncCollapsed(event.matches);
+    };
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", onMediaChange);
+      return () => mediaQuery.removeEventListener("change", onMediaChange);
+    }
+
+    mediaQuery.addListener(onMediaChange);
+    return () => mediaQuery.removeListener(onMediaChange);
+  }, []);
 
   useEffect(() => {
     const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
@@ -83,24 +107,37 @@ export function BranchGroupCard({ groupId, projectId }: BranchGroupCardProps) {
           <GitBranch size={14} />
           <strong>{group.branchName}</strong>
         </div>
-        <span className="badge branch-group-card-badge">Group {group.id}</span>
+        <div className="branch-group-card-header-meta">
+          <span className="badge branch-group-card-badge">Group {group.id}</span>
+          <button
+            type="button"
+            className="btn btn-icon"
+            onClick={() => setCollapsed((value) => !value)}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand branch group" : "Collapse branch group"}
+          >
+            {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          </button>
+        </div>
       </header>
       <div className="branch-group-card-progress-text">{completionText}</div>
       <div className="branch-group-card-progress" role="progressbar" aria-valuenow={group.completion.landed} aria-valuemin={0} aria-valuemax={group.completion.total}>
         <span className="branch-group-card-progress-fill" style={{ width: `${completionPercent}%` }} />
       </div>
 
-      <ul className="branch-group-card-members">
-        {group.members.map((member) => (
-          <li key={member.taskId} className="branch-group-card-member">
-            <span className={`status-dot ${member.landed ? "status-dot--online" : "status-dot--pending"}`} />
-            <span className="branch-group-card-member-title">{member.taskId} · {member.title}</span>
-            <span className="branch-group-card-member-status">{member.landed ? <CheckCircle2 size={14} /> : <CircleDashed size={14} />}</span>
-          </li>
-        ))}
-      </ul>
+      {!collapsed && (
+        <ul className="branch-group-card-members">
+          {group.members.map((member) => (
+            <li key={member.taskId} className="branch-group-card-member">
+              <span className={`status-dot ${member.landed ? "status-dot--online" : "status-dot--pending"}`} />
+              <span className="branch-group-card-member-title">{member.taskId} · {member.title}</span>
+              <span className="branch-group-card-member-status">{member.landed ? <CheckCircle2 size={14} /> : <CircleDashed size={14} />}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      {complete && (
+      {!collapsed && complete && (
         <div className="branch-group-card-actions">
           {group.prUrl && (
             <a className="btn" href={group.prUrl} target="_blank" rel="noreferrer">

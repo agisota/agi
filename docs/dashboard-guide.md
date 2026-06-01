@@ -1135,6 +1135,7 @@ UI surfaces:
 - Task cards show grouped/shared branch metadata for grouped tasks.
 - Clicking either grouped badge opens the dedicated **Group Task Modal** for that branch group.
 - Task detail renders a branch-group card with member landed progress.
+- In Task Detail Logs on mobile, the branch-group card includes a collapse/expand toggle so logs can reclaim vertical space while keeping group summary progress visible.
 
 The Group Task Modal shows shared branch name/status, member list (`taskId`, title, column, landed state), quick links to open each member task detail, completion progress (`X of Y members finished`), and tracked PR state when present. It live-refreshes from the same dashboard task-update stream and ignores stale cross-project events.
 

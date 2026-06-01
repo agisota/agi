@@ -1137,6 +1137,54 @@ describe("AgentLogViewer", () => {
       expect(viewer.scrollTop).toBe(1000);
       expect(screen.queryByTestId("agent-log-return-to-live")).toBeNull();
     });
+
+    it("re-pins to bottom on resize while following", () => {
+      const resizeCallbacks: Array<() => void> = [];
+      const originalResizeObserver = globalThis.ResizeObserver;
+
+      class ResizeObserverMock {
+        constructor(callback: ResizeObserverCallback) {
+          resizeCallbacks.push(() => callback([], this as unknown as ResizeObserver));
+        }
+
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+
+      Object.defineProperty(globalThis, "ResizeObserver", {
+        configurable: true,
+        value: ResizeObserverMock,
+      });
+
+      try {
+        const entries = [
+          makeEntry({ text: "first", timestamp: "2026-01-01T00:00:00Z" }),
+          makeEntry({ text: "second", timestamp: "2026-01-01T00:00:01Z" }),
+        ];
+        const { container } = render(<AgentLogViewer entries={entries} loading={false} />);
+        const viewer = getScrollContainer(container);
+
+        Object.defineProperty(viewer, "scrollHeight", { configurable: true, value: 1200 });
+        Object.defineProperty(viewer, "clientHeight", { configurable: true, value: 200 });
+        viewer.scrollTop = 980;
+        fireEvent.scroll(viewer);
+
+        viewer.scrollTop = 640;
+        resizeCallbacks.forEach((callback) => callback());
+
+        expect(viewer.scrollTop).toBe(1200);
+      } finally {
+        if (originalResizeObserver) {
+          Object.defineProperty(globalThis, "ResizeObserver", {
+            configurable: true,
+            value: originalResizeObserver,
+          });
+        } else {
+          delete (globalThis as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+        }
+      }
+    });
   });
 
   describe("pagination placement", () => {

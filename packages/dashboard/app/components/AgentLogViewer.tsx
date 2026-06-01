@@ -393,6 +393,27 @@ export function AgentLogViewer({
     setIsFollowing(true);
   }, []);
 
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (!isFollowing) {
+        return;
+      }
+      container.scrollTop = container.scrollHeight;
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isFollowing]);
+
   // Escape key handler to exit fullscreen mode
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape" && isFullscreen) {

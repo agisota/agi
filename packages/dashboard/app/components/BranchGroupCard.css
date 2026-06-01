@@ -21,8 +21,26 @@
   gap: var(--space-xs);
 }
 
+.branch-group-card-header-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
 .branch-group-card-badge {
   background: var(--surface-elevated);
+}
+
+.branch-group-card-header-meta .btn {
+  flex-shrink: 0;
+}
+
+.branch-group-card-header-meta .btn-icon {
+  padding: calc(var(--space-xs) / 2);
+}
+
+.branch-group-card-header-meta .btn-icon svg {
+  display: block;
 }
 
 .branch-group-card-progress-text {
@@ -79,5 +97,10 @@
   .branch-group-card-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .branch-group-card-header-meta {
+    width: 100%;
+    justify-content: space-between;
   }
 }

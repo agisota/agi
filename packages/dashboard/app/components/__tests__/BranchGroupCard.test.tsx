@@ -17,6 +17,8 @@ vi.mock("../../sse-bus", () => ({
 
 vi.mock("lucide-react", () => ({
   CheckCircle2: () => null,
+  ChevronDown: () => null,
+  ChevronRight: () => null,
   CircleDashed: () => null,
   ExternalLink: () => null,
   GitBranch: () => null,
@@ -92,5 +94,21 @@ describe("BranchGroupCard", () => {
     });
     render(<BranchGroupCard groupId="BG-1" />);
     expect(await screen.findByRole("link", { name: /pr #9/i })).toBeInTheDocument();
+  });
+
+  it("shows members by default and collapses via toggle", async () => {
+    apiGetBranchGroup.mockResolvedValue({ group: makeGroup() });
+    render(<BranchGroupCard groupId="BG-1" />);
+
+    expect(await screen.findByText("FN-1 · one")).toBeInTheDocument();
+
+    const toggle = screen.getByRole("button", { name: /collapse branch group/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByRole("button", { name: /expand branch group/i })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("FN-1 · one")).toBeNull();
+    expect(screen.getByText("1 of 2 members finished")).toBeInTheDocument();
   });
 });
