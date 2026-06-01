@@ -109,6 +109,7 @@ Planning Mode now includes branch controls on the summary screen before you crea
   - `Create custom new branch`
 - **Branch name** is required when using `existing` or `custom new` strategies.
 - **Merge target / base branch (optional)** uses a dropdown of existing local branches (with common names like `main`/`master`/`trunk`/`develop` listed first) plus a **Custom…** fallback when you need to type a branch that is not local yet.
+- **Description** supports a `Markdown`/`Plain` toggle in the summary header row: `Plain` keeps the editable textarea, while `Markdown` renders formatted preview (`react-markdown` + GFM) in the same footprint for easier review before task creation.
 
 These values are sent with the Planning Mode create-task request as `branchSelection`, so created tasks persist branch/base-branch settings consistently with other branch-aware task creation flows.
 

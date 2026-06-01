@@ -1,5 +1,7 @@
 import "./PlanningModeModal.css";
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { Task, PlanningQuestion, PlanningSummary, TaskPriority } from "@fusion/core";
 import { DEFAULT_TASK_PRIORITY, TASK_PRIORITIES, getErrorMessage } from "@fusion/core";
 import {
@@ -2422,6 +2424,7 @@ function SummaryView({
   isLoading,
 }: SummaryViewProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [renderMarkdown, setRenderMarkdown] = useState(false);
   const [selectedDependencies, setSelectedDependencies] = useState<string[]>(
     summary.suggestedDependencies
   );
@@ -2466,17 +2469,34 @@ function SummaryView({
               <button
                 type="button"
                 className="planning-expand-btn"
+                aria-pressed={renderMarkdown}
+                aria-label={renderMarkdown ? "Show raw text" : "Show formatted markdown"}
+                title={renderMarkdown ? "Show raw text" : "Show formatted markdown"}
+                data-testid="planning-description-markdown-toggle"
+                onClick={() => setRenderMarkdown(!renderMarkdown)}
+              >
+                {renderMarkdown ? "Plain" : "Markdown"}
+              </button>
+              <button
+                type="button"
+                className="planning-expand-btn"
                 onClick={() => setIsExpanded(!isExpanded)}
               >
                 {isExpanded ? "Collapse" : "Expand"}
               </button>
             </label>
-            <textarea
-              ref={descriptionAutosizeRef}
-              className={`planning-textarea ${isExpanded ? "expanded" : ""}`}
-              value={summary.description}
-              onChange={(e) => onSummaryChange({ ...summary, description: e.target.value })}
-            />
+            {renderMarkdown ? (
+              <div className={`planning-description-preview markdown-body ${isExpanded ? "expanded" : ""}`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary.description}</ReactMarkdown>
+              </div>
+            ) : (
+              <textarea
+                ref={descriptionAutosizeRef}
+                className={`planning-textarea ${isExpanded ? "expanded" : ""}`}
+                value={summary.description}
+                onChange={(e) => onSummaryChange({ ...summary, description: e.target.value })}
+              />
+            )}
           </div>
 
           <div className="task-detail-section">

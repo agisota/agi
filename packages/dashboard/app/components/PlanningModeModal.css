@@ -606,6 +606,22 @@
   box-shadow: var(--focus-ring);
 }
 
+.planning-description-preview {
+  width: 100%;
+  min-height: calc(var(--space-md) * 7.5);
+  max-height: calc(var(--space-2xl) * 20);
+  padding: var(--space-md);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  overflow-y: auto;
+}
+
+.planning-description-preview.expanded {
+  min-height: calc(var(--space-md) * 12.5);
+}
+
 .planning-comment-section {
   margin-top: var(--space-lg);
 }
@@ -940,7 +956,7 @@
 .planning-summary-form .form-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-sm);
   padding: var(--space-lg);
   background: var(--card);
   border: 1px solid var(--border);

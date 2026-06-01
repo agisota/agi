@@ -728,4 +728,58 @@ describe("PlanningModeModal", () => {
     });
   });
 
+  describe("Summary markdown preview toggle", () => {
+    it("toggles description between plain textarea and formatted markdown preview", async () => {
+      mockConnectPlanningStream.mockImplementationOnce((_sessionId: string, _projectId: string | undefined, handlers: any) => {
+        setTimeout(() => {
+          handlers.onSummary?.({
+            ...mockSummary,
+            description: "## Heading\n\n- item\n\n**bold**",
+          });
+        }, 10);
+
+        return {
+          close: vi.fn(),
+          isConnected: vi.fn().mockReturnValue(true),
+        };
+      });
+
+      const { container } = render(
+        <PlanningModeModal
+          isOpen={true}
+          onClose={mockOnClose}
+          onTaskCreated={mockOnTaskCreated}
+          onTasksCreated={vi.fn()}
+          tasks={mockTasks}
+        />,
+      );
+
+      fireEvent.change(screen.getByPlaceholderText(/e.g., Build a user authentication/), {
+        target: { value: "Build auth system" },
+      });
+      fireEvent.click(screen.getByText("Start Planning"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Planning Complete!")).toBeDefined();
+      });
+
+      expect(container.querySelector(".planning-textarea")).not.toBeNull();
+      expect(container.querySelector(".planning-description-preview")).toBeNull();
+
+      fireEvent.click(screen.getByTestId("planning-description-markdown-toggle"));
+
+      await waitFor(() => {
+        expect(container.querySelector(".planning-description-preview")).not.toBeNull();
+        expect(screen.getByRole("heading", { level: 2, name: "Heading" })).toBeDefined();
+        expect(container.querySelector("strong")?.textContent).toBe("bold");
+      });
+
+      fireEvent.click(screen.getByTestId("planning-description-markdown-toggle"));
+
+      await waitFor(() => {
+        expect(container.querySelector(".planning-textarea")).not.toBeNull();
+      });
+    });
+  });
+
 });
