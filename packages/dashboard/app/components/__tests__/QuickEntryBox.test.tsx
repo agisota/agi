@@ -295,6 +295,28 @@ describe("QuickEntryBox", () => {
     expect((textarea as HTMLTextAreaElement).rows).toBe(2);
   });
 
+  it("focuses the quick-entry textarea on mount at desktop width", async () => {
+    mockDesktopViewport();
+    renderQuickEntryBox({});
+    const textarea = screen.getByTestId("quick-entry-input");
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(textarea);
+    });
+  });
+
+  it("does not focus the quick-entry textarea on mount at mobile width", async () => {
+    const innerWidthSpy = vi.spyOn(window, "innerWidth", "get").mockReturnValue(375);
+    renderQuickEntryBox({});
+    const textarea = screen.getByTestId("quick-entry-input");
+
+    await waitFor(() => {
+      expect(document.activeElement).not.toBe(textarea);
+    });
+
+    innerWidthSpy.mockRestore();
+  });
+
   it("textarea spans full container width (FN-1608)", () => {
     mockDesktopViewport();
     renderQuickEntryBox({});
@@ -641,6 +663,26 @@ describe("QuickEntryBox", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(textarea);
     });
+  });
+
+  it("does not restore focus after successful creation at mobile width", async () => {
+    const innerWidthSpy = vi.spyOn(window, "innerWidth", "get").mockReturnValue(375);
+    const { props } = renderQuickEntryBox({});
+    const textarea = screen.getByTestId("quick-entry-input");
+
+    fireEvent.focus(textarea);
+    fireEvent.change(textarea, { target: { value: "Task to create" } });
+    fireEvent.keyDown(textarea, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(props.onCreate).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(document.activeElement).not.toBe(textarea);
+    });
+
+    innerWidthSpy.mockRestore();
   });
 
   describe("Rich creation features", () => {

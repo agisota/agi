@@ -16,6 +16,7 @@ import { NodeHealthDot } from "./NodeHealthDot";
 import { ProviderIcon } from "./ProviderIcon";
 
 const STORAGE_KEY = "kb-quick-entry-text";
+const MOBILE_BREAKPOINT_PX = 768;
 const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 interface PendingImage {
@@ -329,7 +330,9 @@ export function QuickEntryBox({ onCreate, addToast, tasks = [], availableModels,
     if (!isSubmitting && description === "" && textareaRef.current) {
       // Use setTimeout to ensure focus happens after React re-enables the textarea
       const focusTimeout = setTimeout(() => {
-        textareaRef.current?.focus();
+        if (typeof window !== "undefined" && window.innerWidth > MOBILE_BREAKPOINT_PX) {
+          textareaRef.current?.focus();
+        }
       }, 0);
       return () => clearTimeout(focusTimeout);
     }
