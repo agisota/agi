@@ -8226,10 +8226,49 @@ export function forceAcquireSessionLock(sessionId: string, tabId: string): Promi
 }
 
 export async function deleteAiSession(id: string): Promise<void> {
-  await fetch(buildApiUrl(`/ai-sessions/${encodeURIComponent(id)}`), {
+  const url = buildApiUrl(`/ai-sessions/${encodeURIComponent(id)}`);
+  const res = await fetch(url, {
     method: "DELETE",
     headers: withTokenHeader(),
   });
+
+  if (res.ok || res.status === 404) {
+    return;
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+  const bodyText = await res.text();
+  const isJson = contentType.includes("application/json");
+  const isHtml = contentType.includes("text/html") || looksLikeHtml(bodyText);
+
+  if (isHtml) {
+    throw new Error(
+      `API returned HTML instead of JSON for ${url}. ` +
+      `The endpoint may not be properly configured. (${res.status} ${res.statusText})`
+    );
+  }
+
+  if (!isJson) {
+    const preview = bodyText.length > 160 ? `${bodyText.slice(0, 160)}...` : bodyText;
+    throw new Error(
+      `API returned ${contentType || "an unknown content type"} instead of JSON for ${url}. ` +
+      `(${res.status} ${res.statusText})${preview ? ` Response: ${preview}` : ""}`
+    );
+  }
+
+  let data: unknown;
+  try {
+    data = bodyText ? JSON.parse(bodyText) : null;
+  } catch {
+    throw new Error(`API returned invalid JSON for ${url}. (${res.status} ${res.statusText})`);
+  }
+
+  const payload = data as { error?: string; details?: Record<string, unknown> } | null;
+  throw new ApiRequestError(
+    payload?.error || `Request failed for ${url}: ${res.status} ${res.statusText}`,
+    res.status,
+    payload?.details,
+  );
 }
 
 export function pingSession(sessionId: string, projectId?: string): Promise<{ ok: boolean }> {

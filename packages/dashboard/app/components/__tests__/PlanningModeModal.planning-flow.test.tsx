@@ -9,7 +9,7 @@ vi.mock("../../hooks/useNavigationHistory", async (importOriginal) => {
 });
 import { act, render, renderHook, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import * as api from "../../api";
-import { PlanningModeModal } from "../PlanningModeModal";
+import { PlanningModeModal, dedupeSessionsById } from "../PlanningModeModal";
 import { TaskDetailModal } from "../TaskDetailModal";
 import { useSessionLock } from "../../hooks/useSessionLock";
 import { getSessionTabId } from "../../utils/getSessionTabId";
@@ -46,6 +46,7 @@ import {
   mockRejectPlan,
   mockRefineTask,
   mockFetchAiSessions,
+  mockDeleteAiSession,
   mockConfirm,
   mockUseViewportMode,
   mockUseMobileKeyboard,
@@ -58,6 +59,16 @@ import {
   getMediaBlocks,
   mockViewport,
 } from "./PlanningModeModal.test-helpers";
+
+const mockAddToast = vi.fn();
+
+vi.mock("../../hooks/useToast", () => ({
+  useToast: () => ({
+    addToast: mockAddToast,
+    removeToast: vi.fn(),
+    toasts: [],
+  }),
+}));
 
 vi.mock("../../api", () => ({
   startPlanning: (...args: any[]) => mockStartPlanning(...args),
@@ -95,6 +106,7 @@ vi.mock("../../api", () => ({
   updateGlobalSettings: vi.fn().mockResolvedValue({}),
   duplicateTask: vi.fn().mockResolvedValue({}),
   fetchAiSessions: (...args: any[]) => mockFetchAiSessions(...args),
+  deleteAiSession: (...args: any[]) => mockDeleteAiSession(...args),
 }));
 
 vi.mock("../../hooks/useConfirm", () => ({
@@ -121,6 +133,7 @@ describe("PlanningModeModal", () => {
     vi.clearAllMocks();
     mockConfirm.mockReset();
     mockConfirm.mockResolvedValue(true);
+    mockAddToast.mockReset();
     MockEventSource.reset();
     vi.stubGlobal("EventSource", MockEventSource as any);
     window.sessionStorage.clear();
@@ -139,6 +152,7 @@ describe("PlanningModeModal", () => {
     mockStartPlanningBreakdown.mockResolvedValue({ sessionId: "session-123", subtasks: [] });
     mockFetchAiSession.mockResolvedValue(null);
     mockFetchAiSessions.mockResolvedValue([]);
+    mockDeleteAiSession.mockResolvedValue(undefined);
     mockParseConversationHistory.mockImplementation((raw: string) => {
       if (!raw) return [];
       try {
@@ -2092,4 +2106,214 @@ describe("PlanningModeModal", () => {
     });
   });
 
+  describe("Session history", () => {
+    it("renders only one row when fetch and SSE deliver the same session id", async () => {
+      mockFetchAiSessions.mockResolvedValueOnce([
+        {
+          id: "session-dup",
+          type: "planning",
+          status: "complete",
+          title: "Duplicate session",
+          projectId: null,
+          lockedByTab: null,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          archived: false,
+        },
+      ]);
+
+      render(
+        <PlanningModeModal
+          isOpen={true}
+          onClose={mockOnClose}
+          onTaskCreated={mockOnTaskCreated}
+          onTasksCreated={vi.fn()}
+          tasks={mockTasks}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getAllByText("Duplicate session")).toHaveLength(1);
+      });
+      await waitFor(() => {
+        expect(MockEventSource.instances).toHaveLength(1);
+      });
+
+      act(() => {
+        MockEventSource.instances[0]?.emit("ai_session:updated", {
+          id: "session-dup",
+          type: "planning",
+          status: "complete",
+          title: "Duplicate session",
+          projectId: null,
+          lockedByTab: null,
+          updatedAt: "2026-01-02T00:00:00.000Z",
+          archived: false,
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByText("Duplicate session")).toHaveLength(1);
+      });
+    });
+
+    it("removes a session after a successful delete", async () => {
+      mockFetchAiSessions.mockResolvedValueOnce([
+        {
+          id: "session-delete",
+          type: "planning",
+          status: "complete",
+          title: "Delete me",
+          projectId: null,
+          lockedByTab: null,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          archived: false,
+        },
+      ]);
+
+      render(
+        <PlanningModeModal
+          isOpen={true}
+          onClose={mockOnClose}
+          onTaskCreated={mockOnTaskCreated}
+          onTasksCreated={vi.fn()}
+          tasks={mockTasks}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Delete me")).toBeDefined();
+      });
+
+      const sidebar = screen.getByLabelText("Planning sessions");
+      fireEvent.click(within(sidebar).getAllByTitle("Delete session")[0]!);
+      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => {
+        expect(mockDeleteAiSession).toHaveBeenCalledWith("session-delete");
+        expect(screen.queryByText("Delete me")).toBeNull();
+      });
+    });
+
+    it("reconciles the session row and shows a toast when delete fails", async () => {
+      const sessions = [
+        {
+          id: "session-delete-fail",
+          type: "planning",
+          status: "complete",
+          title: "Still here",
+          projectId: null,
+          lockedByTab: null,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          archived: false,
+        },
+      ];
+      mockFetchAiSessions.mockResolvedValueOnce(sessions).mockResolvedValueOnce(sessions);
+      mockDeleteAiSession.mockRejectedValueOnce(new Error("Delete failed"));
+
+      render(
+        <PlanningModeModal
+          isOpen={true}
+          onClose={mockOnClose}
+          onTaskCreated={mockOnTaskCreated}
+          onTasksCreated={vi.fn()}
+          tasks={mockTasks}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Still here")).toBeDefined();
+      });
+
+      const sidebar = screen.getByLabelText("Planning sessions");
+      fireEvent.click(within(sidebar).getAllByTitle("Delete session")[0]!);
+      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => {
+        expect(mockDeleteAiSession).toHaveBeenCalledWith("session-delete-fail");
+        expect(mockAddToast).toHaveBeenCalledWith("Delete failed", "error");
+        expect(mockFetchAiSessions).toHaveBeenCalledTimes(2);
+        expect(screen.getByText("Still here")).toBeDefined();
+      });
+    });
+  });
+
+  describe("dedupeSessionsById export", () => {
+    it("keeps the newest session for duplicate ids while preserving stable order on ties", () => {
+      expect(
+        dedupeSessionsById([
+          {
+            id: "session-a",
+            type: "planning",
+            status: "complete",
+            title: "older",
+            projectId: null,
+            lockedByTab: null,
+            updatedAt: "2026-01-01T00:00:00.000Z",
+            archived: false,
+          },
+          {
+            id: "session-b",
+            type: "planning",
+            status: "complete",
+            title: "peer",
+            projectId: null,
+            lockedByTab: null,
+            updatedAt: "2026-01-02T00:00:00.000Z",
+            archived: false,
+          },
+          {
+            id: "session-a",
+            type: "planning",
+            status: "complete",
+            title: "newer",
+            projectId: null,
+            lockedByTab: null,
+            updatedAt: "2026-01-03T00:00:00.000Z",
+            archived: false,
+          },
+          {
+            id: "session-c",
+            type: "planning",
+            status: "complete",
+            title: "tie-first",
+            projectId: null,
+            lockedByTab: null,
+            updatedAt: "2026-01-02T00:00:00.000Z",
+            archived: false,
+          },
+        ]),
+      ).toEqual([
+        {
+          id: "session-a",
+          type: "planning",
+          status: "complete",
+          title: "newer",
+          projectId: null,
+          lockedByTab: null,
+          updatedAt: "2026-01-03T00:00:00.000Z",
+          archived: false,
+        },
+        {
+          id: "session-b",
+          type: "planning",
+          status: "complete",
+          title: "peer",
+          projectId: null,
+          lockedByTab: null,
+          updatedAt: "2026-01-02T00:00:00.000Z",
+          archived: false,
+        },
+        {
+          id: "session-c",
+          type: "planning",
+          status: "complete",
+          title: "tie-first",
+          projectId: null,
+          lockedByTab: null,
+          updatedAt: "2026-01-02T00:00:00.000Z",
+          archived: false,
+        },
+      ]);
+    });
+  });
 });

@@ -51,6 +51,7 @@ import { useMobileKeyboard } from "../hooks/useMobileKeyboard";
 import { useNavigationHistoryContext } from "../hooks/useNavigationHistory";
 import { useMobileScrollLock } from "../hooks/useMobileScrollLock";
 import { useAutosizeTextarea } from "../hooks/useAutosizeTextarea";
+import { useToast } from "../hooks/useToast";
 import { getSessionTabId } from "../utils/getSessionTabId";
 
 interface PlanningModeModalProps {
@@ -100,6 +101,36 @@ function normalizePlanningSummary(summary: PlanningSummary): PlanningSummary {
 
 function areStringArraysEqual(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function parseSessionUpdatedAt(updatedAt: string): number {
+  const parsed = Date.parse(updatedAt);
+  return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
+}
+
+export function dedupeSessionsById(sessions: AiSessionSummary[]): AiSessionSummary[] {
+  const byId = new Map<string, { session: AiSessionSummary; updatedAtMs: number; firstSeen: number }>();
+
+  sessions.forEach((session, index) => {
+    const updatedAtMs = parseSessionUpdatedAt(session.updatedAt);
+    const existing = byId.get(session.id);
+    if (!existing) {
+      byId.set(session.id, { session, updatedAtMs, firstSeen: index });
+      return;
+    }
+
+    if (updatedAtMs > existing.updatedAtMs) {
+      byId.set(session.id, {
+        session,
+        updatedAtMs,
+        firstSeen: existing.firstSeen,
+      });
+    }
+  });
+
+  return [...byId.values()]
+    .sort((left, right) => right.updatedAtMs - left.updatedAtMs || left.firstSeen - right.firstSeen)
+    .map(({ session }) => session);
 }
 
 function buildCompactPlanningSubtaskDrafts(
@@ -260,6 +291,7 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
   useModalResizePersist(modalRef, isOpen, "fusion:planning-modal-size");
   const viewportMode = useViewportMode();
   const isMobile = viewportMode === "mobile";
+  const { addToast } = useToast();
   const { pushNav } = useNavigationHistoryContext();
 
   const { keyboardOverlap, viewportHeight, viewportOffsetTop, keyboardOpen } =
@@ -892,10 +924,8 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
         includeCompleted: true,
         includeArchived: showArchived,
       });
-      const planning = all
-        .filter((s) => s.type === "planning")
-        .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-      setPlanningSessions(planning);
+      const planning = all.filter((s) => s.type === "planning");
+      setPlanningSessions(dedupeSessionsById(planning));
     } catch {
       // Best-effort: list errors should not block the modal
     } finally {
@@ -941,11 +971,7 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
       try {
         const updated = JSON.parse(e.data) as AiSessionSummary;
         if (updated.type !== "planning") return;
-        setPlanningSessions((prev) => {
-          const idx = prev.findIndex((s) => s.id === updated.id);
-          const next = idx >= 0 ? [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)] : [updated, ...prev];
-          return next.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-        });
+        setPlanningSessions((prev) => dedupeSessionsById([updated, ...prev]));
       } catch {
         // ignore malformed payload
       }
@@ -954,7 +980,7 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
     const handleDeleted = (e: MessageEvent) => {
       try {
         const id = JSON.parse(e.data) as string;
-        setPlanningSessions((prev) => prev.filter((s) => s.id !== id));
+        setPlanningSessions((prev) => dedupeSessionsById(prev.filter((s) => s.id !== id)));
       } catch {
         // ignore malformed payload
       }
@@ -1135,8 +1161,11 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
 
       try {
         await deleteAiSession(sessionId);
-      } catch {
-        // best-effort: SSE will reconcile if the delete actually succeeded
+      } catch (err) {
+        addToast(getErrorMessage(err) || "Failed to delete session", "error");
+        void refreshSessionsList();
+        setPendingDeleteId(null);
+        return;
       }
 
       // Broadcast completion so sibling consumers (BackgroundTasksIndicator's
@@ -1150,7 +1179,7 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
         timestamp: Date.now(),
       });
 
-      setPlanningSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      setPlanningSessions((prev) => dedupeSessionsById(prev.filter((s) => s.id !== sessionId)));
 
       if (selectedSessionId === sessionId) {
         streamConnectionRef.current?.close();
@@ -1161,7 +1190,7 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
       }
       setPendingDeleteId(null);
     },
-    [broadcastCompleted, planningSessions, projectId, resetDetailState, selectedSessionId, sessionTabId],
+    [addToast, broadcastCompleted, planningSessions, projectId, refreshSessionsList, resetDetailState, selectedSessionId, sessionTabId],
   );
 
   const handleArchiveSession = useCallback(
@@ -1184,9 +1213,9 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
       // unarchiving keep it visible with the new flag flipped.
       setPlanningSessions((prev) => {
         if (!wasArchived && !showArchived) {
-          return prev.filter((s) => s.id !== sessionId);
+          return dedupeSessionsById(prev.filter((s) => s.id !== sessionId));
         }
-        return prev.map((s) => (s.id === sessionId ? { ...s, archived: !wasArchived } : s));
+        return dedupeSessionsById(prev.map((s) => (s.id === sessionId ? { ...s, archived: !wasArchived } : s)));
       });
       if (!wasArchived && selectedSessionId === sessionId && !showArchived) {
         // The currently-open archived session is no longer in the visible list;
@@ -1661,7 +1690,7 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
       onTasksCreated(result.tasks);
       // Server cleans up the planning session after task creation; mirror that
       // locally so reopen doesn't try to load a 404 and the footer count drops.
-      setPlanningSessions((prev) => prev.filter((s) => s.id !== completedSessionId));
+      setPlanningSessions((prev) => dedupeSessionsById(prev.filter((s) => s.id !== completedSessionId)));
       broadcastCompleted({
         sessionId: completedSessionId,
         status: "complete",
@@ -1850,9 +1879,6 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
                           .then((response) => {
                             draftSessionIdRef.current = response.sessionId;
                             setPlanningSessions((prev) => {
-                              if (prev.some((s) => s.id === response.sessionId)) {
-                                return prev;
-                              }
                               const draft: AiSessionSummary = {
                                 id: response.sessionId,
                                 type: "planning",
@@ -1864,9 +1890,7 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
                                 updatedAt: new Date().toISOString(),
                                 archived: false,
                               };
-                              return [draft, ...prev].sort(
-                                (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
-                              );
+                              return dedupeSessionsById([draft, ...prev]);
                             });
                             setSelectedSessionId(response.sessionId);
                           })
