@@ -5,6 +5,7 @@ A comprehensive guide to creating Fusion plugins that extend the task board with
 ## Table of Contents
 
 1. [Getting Started](#1-getting-started)
+   - [External authoring guide](./plugins/external-authoring.md)
 2. [Plugin Manifest Reference](#2-plugin-manifest-reference)
 3. [Plugin Settings Schema](#3-plugin-settings-schema)
 4. [Available Hooks and Signatures](#4-available-hooks-and-signatures)
@@ -44,14 +45,17 @@ Fusion plugins extend the task board with custom functionality:
 
 ### Quick Start
 
-Create a new plugin using the scaffold command:
+External authors should use the standalone scaffold and dev loop (see the [External Plugin Authoring guide](./plugins/external-authoring.md)):
 
 ```bash
-fn plugin create my-first-plugin
+fn plugin new my-first-plugin
 cd my-first-plugin
 pnpm install
+fn plugin dev .
 pnpm test
 ```
+
+The legacy `fn plugin create` scaffold remains available for workspace-bound examples.
 
 ### Optional AI Security Scan (Opt-in)
 
@@ -1175,6 +1179,8 @@ This keeps regressions durable while preserving clear ownership boundaries acros
 ---
 
 ## 13. Publishing Plugins
+
+For end-to-end standalone packaging, `pnpm pack`, and installing on another machine, follow the [External Plugin Authoring guide](./plugins/external-authoring.md).
 
 ### Package Requirements
 

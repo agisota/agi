@@ -77,10 +77,13 @@ describe("plugin-scaffold", () => {
 
       const packageContents = readFileSync(join(outputDir, "package.json"), "utf-8");
       const indexContents = readFileSync(join(outputDir, "src/index.ts"), "utf-8");
+      const readmeContents = readFileSync(join(outputDir, "README.md"), "utf-8");
       expect(packageContents).not.toContain("@fusion/");
       expect(packageContents).not.toContain("workspace:");
       expect(indexContents).not.toContain("@fusion/");
       expect(indexContents).not.toContain("workspace:");
+      expect(readmeContents).toContain("fn plugin dev .");
+      expect(readmeContents).toContain("fn plugin dev . --once");
 
       const tsconfig = JSON.parse(readFileSync(join(outputDir, "tsconfig.json"), "utf-8")) as {
         extends?: string;

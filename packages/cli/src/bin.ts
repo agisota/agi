@@ -139,6 +139,7 @@ async function loadCommandHandlers() {
   const { runChatInteractive } = await import("./commands/chat.js");
   const { runPluginList, runPluginInstall, runPluginUninstall, runPluginEnable, runPluginDisable, runPluginSetupStatus, runPluginSetup, runPluginAvailable, runPluginSettings, runPluginRescan } = await import("./commands/plugin.js");
   const { runPluginCreate, runPluginNew } = await import("./commands/plugin-scaffold.js");
+  const { runPluginDev } = await import("./commands/plugin-dev.js");
   const { runSkillsSearch, runSkillsInstall } = await import("./commands/skills.js");
   const { runResearchCreate, runResearchList, runResearchShow, runResearchExport, runResearchCancel, runResearchRetry } = await import("./commands/research.js");
   const { runExperimentFinalize } = await import("./commands/experiment-finalize.js");
@@ -236,6 +237,7 @@ async function loadCommandHandlers() {
     runPluginRescan,
     runPluginCreate,
     runPluginNew,
+    runPluginDev,
     runSkillsSearch,
     runSkillsInstall,
     runResearchCreate,
@@ -394,6 +396,7 @@ PR:
                                       Install or uninstall plugin setup binaries/runtimes
   fn plugin create <name>           Scaffold a new plugin project
   fn plugin new <name>              Scaffold a standalone publishable plugin project
+  fn plugin dev <path>              Build, install, and hot-reload a plugin locally
   fn skills search <query>            Search skills.sh for agent skills
   fn skills search <query> --limit 5  Limit results
   fn skills install <owner/repo>      Install skills from a source
@@ -665,6 +668,7 @@ async function main() {
     runPluginRescan,
     runPluginCreate,
     runPluginNew,
+    runPluginDev,
     runSkillsSearch,
     runSkillsInstall,
     runResearchCreate,
@@ -1785,9 +1789,19 @@ async function main() {
             });
             break;
           }
+          case "dev": {
+            const pluginPath = args[2];
+            if (!pluginPath) { console.error("Usage: fn plugin dev <path> [--once] [--ai-scan]"); process.exit(1); }
+            await runPluginDev(pluginPath, {
+              once: args.includes("--once"),
+              aiScan: args.includes("--ai-scan"),
+              projectName,
+            });
+            break;
+          }
           default:
             console.error(`Unknown subcommand: plugin ${sub || ""}`);
-            console.log("Try: fn plugin list | install | add (alias for install) | uninstall | enable | disable | available | settings | rescan | setup-status | setup | create | new");
+            console.log("Try: fn plugin list | install | add (alias for install) | uninstall | enable | disable | available | settings | rescan | setup-status | setup | create | new | dev");
             process.exit(1);
         }
         break;

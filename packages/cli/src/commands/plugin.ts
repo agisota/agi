@@ -92,7 +92,7 @@ async function getProjectPath(projectName?: string): Promise<string> {
 /**
  * Create a PluginStore for the given project.
  */
-async function createPluginStore(
+export async function createPluginStore(
   projectName?: string,
   options?: { centralGlobalDir?: string },
 ): Promise<PluginStore> {
@@ -114,7 +114,7 @@ async function createPluginStore(
 /**
  * Create a PluginLoader for the given project.
  */
-async function createPluginLoader(
+export async function createPluginLoader(
   pluginStore: PluginStore,
   projectName?: string,
 ): Promise<{ store: PluginStore; loader: PluginLoader }> {
@@ -233,7 +233,7 @@ export async function resolvePluginEntryFile(pluginDir: string): Promise<string>
 /**
  * Load plugin manifest from a local path.
  */
-async function loadManifestFromPath(
+export async function loadManifestFromPath(
   pluginPath: string,
 ): Promise<{ manifest: import("@fusion/core").PluginManifest; path: string }> {
   const absoluteInputPath = resolve(pluginPath);

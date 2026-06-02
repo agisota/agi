@@ -987,9 +987,10 @@ fn plugin enable <id>
 fn plugin disable <id>
 fn plugin create <name>
 fn plugin new <name> [--output <dir>] [--scope <scope>]
+fn plugin dev <path> [--once] [--ai-scan]
 ```
 
-Subcommands: `list|ls`, `install`, `rescan`, `trust`, `untrust`, `verify`, `uninstall`, `enable`, `disable`, `create`, `new`.
+Subcommands: `list|ls`, `install`, `rescan`, `trust`, `untrust`, `verify`, `uninstall`, `enable`, `disable`, `create`, `new`, `dev`.
 
 Scope semantics:
 - `fn plugin install` / `fn plugin uninstall` are **global** operations
