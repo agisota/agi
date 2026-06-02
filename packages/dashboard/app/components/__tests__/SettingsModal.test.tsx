@@ -227,10 +227,9 @@ function renderModal(props: Partial<ComponentProps<typeof SettingsModal>> = {}) 
 }
 
 async function waitForSettingsModalReady() {
-  await waitFor(() => {
-    expect(mockFetchSettings).toHaveBeenCalled();
-    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
-  });
+  await screen.findByRole("button", { name: /^Save$/i });
+  expect(mockFetchSettings).toHaveBeenCalled();
+  expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
 }
 
 const MODEL_FIXTURE = [
@@ -259,6 +258,8 @@ async function expectSettingPersists({ section, label, kind, value, scope, expec
     if ((control as HTMLInputElement).checked !== shouldBeChecked) {
       await user.click(control);
     }
+  } else if (kind === "select") {
+    await user.selectOptions(control, String(value));
   } else {
     await user.clear(control);
     await user.type(control, String(value));
@@ -266,13 +267,18 @@ async function expectSettingPersists({ section, label, kind, value, scope, expec
 
   await user.click(screen.getByRole("button", { name: /^Save$/i }));
 
-  const expectedPayload = expect.objectContaining({ [expectedKey]: value });
   if (scope === "global") {
-    await waitFor(() => expect(mockUpdateGlobalSettings).toHaveBeenCalledWith(expectedPayload));
+    await waitFor(() => expect(mockUpdateGlobalSettings).toHaveBeenCalled());
+    expect(mockUpdateGlobalSettings.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ [expectedKey]: value }),
+    );
     return;
   }
 
-  await waitFor(() => expect(mockUpdateSettings).toHaveBeenCalledWith(expectedPayload));
+  await waitFor(() => expect(mockUpdateSettings).toHaveBeenCalled());
+  expect(mockUpdateSettings.mock.calls[0]?.[0]).toEqual(
+    expect.objectContaining({ [expectedKey]: value }),
+  );
 }
 
 async function assertProjectModelSavePayload(provider: string, modelId: string, expectedKeys: string[]) {
@@ -975,27 +981,25 @@ describe("SettingsModal", () => {
       expect(screen.getByRole("option", { name: "Require changelog update (existing changelog)" })).toBeInTheDocument();
     });
 
-    it("saves completion documentation mode through project settings", async () => {
-      renderModal({ initialSection: "general" });
-      await waitForSettingsModalReady();
-
-      await userEvent.selectOptions(
-        screen.getByLabelText("Completion Documentation Automation"),
-        "changeset",
-      );
-      await userEvent.click(screen.getByRole("button", { name: "Save" }));
-
-      await waitFor(() => {
-        expect(mockUpdateSettings).toHaveBeenCalled();
-      });
-
-      const projectPayload = mockUpdateSettings.mock.calls[0]?.[0] as Record<string, unknown>;
-      expect(projectPayload.completionDocumentationMode).toBe("changeset");
-
-      if (mockUpdateGlobalSettings.mock.calls.length > 0) {
-        const globalPayload = mockUpdateGlobalSettings.mock.calls[0]?.[0] as Record<string, unknown>;
-        expect(globalPayload.completionDocumentationMode).toBeUndefined();
-      }
+    it.each<PersistSettingInput>([
+      {
+        section: "Project General",
+        label: "Completion Documentation Automation",
+        kind: "select",
+        value: "changeset",
+        scope: "project",
+        expectedKey: "completionDocumentationMode",
+      },
+      {
+        section: "Project General",
+        label: "Auto-cleanup old chats",
+        kind: "select",
+        value: 14,
+        scope: "project",
+        expectedKey: "chatAutoCleanupDays",
+      },
+    ])("persists $expectedKey through the expected settings scope", async (input) => {
+      await expectSettingPersists(input);
     });
 
     it("saves ephemeral agent toggle in project settings payload", async () => {
@@ -1084,22 +1088,12 @@ describe("SettingsModal", () => {
       expect(ephemeralToggle.checked).toBe(true);
     });
 
-    it("renders and saves chat auto-cleanup retention", async () => {
+    it("renders chat auto-cleanup retention with the default off value", async () => {
       renderModal({ initialSection: "general" });
       await waitForSettingsModalReady();
 
       const cleanupSelect = screen.getByLabelText("Auto-cleanup old chats") as HTMLSelectElement;
       expect(cleanupSelect.value).toBe("0");
-
-      await userEvent.selectOptions(cleanupSelect, "14");
-      await userEvent.click(screen.getByRole("button", { name: "Save" }));
-
-      await waitFor(() => {
-        expect(mockUpdateSettings).toHaveBeenCalled();
-      });
-
-      const payload = mockUpdateSettings.mock.calls[0][0] as Record<string, unknown>;
-      expect(payload.chatAutoCleanupDays).toBe(14);
     });
 
     it("renders and saves mail auto-prune retention", async () => {
@@ -1307,9 +1301,7 @@ describe("SettingsModal", () => {
       await waitForSettingsModalReady();
 
       const repoSelect = screen.getByRole("combobox", { name: "Project default tracking repo" }) as HTMLSelectElement;
-      await waitFor(() => {
-        expect(within(repoSelect).getByRole("option", { name: "octo/repo" })).toBeInTheDocument();
-      });
+      expect(await within(repoSelect).findByRole("option", { name: "octo/repo" })).toBeInTheDocument();
 
       await userEvent.selectOptions(repoSelect, "octo/repo");
       await userEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -2443,9 +2435,7 @@ describe("SettingsModal", () => {
 
       await userEvent.click(screen.getByRole("tab", { name: "Pi Extensions" }));
 
-      await waitFor(() => {
-        expect(screen.getByTestId("pi-extensions-manager")).toBeInTheDocument();
-      });
+      expect(await screen.findByTestId("pi-extensions-manager")).toBeInTheDocument();
       expect(screen.queryByTestId("plugin-manager")).not.toBeInTheDocument();
       expect(screen.getByRole("tabpanel", { name: "Pi Extensions" })).toBeVisible();
       expect(document.getElementById("plugins-panel-fusion-plugins")).toHaveAttribute("hidden");
@@ -2877,20 +2867,38 @@ describe("SettingsModal", () => {
       expect(await screen.findByText("Memory")).toBeDefined();
     });
 
-    it("shows the memory toggle with default enabled", async () => {
-      renderModal();
-
-      await waitFor(() => {
-        expect(mockFetchSettings).toHaveBeenCalled();
+    describe("with default Memory render", () => {
+      beforeEach(async () => {
+        renderModal({ initialSection: "memory" });
+        await screen.findByRole("checkbox", { name: /enable memory tools/i });
       });
 
-      // Click the Memory section in the sidebar
-      await userEvent.click(await screen.findByText("Memory"));
+      it("shows the memory toggle with default enabled", () => {
+        const checkbox = screen.getByRole("checkbox", { name: /enable memory tools/i });
+        expect(checkbox).toBeDefined();
+        expect(checkbox).toBeChecked();
+      });
 
-      const checkbox = screen.getByRole("checkbox", { name: /enable memory tools/i });
-      expect(checkbox).toBeDefined();
-      // Default is enabled, so checkbox should be checked
-      expect(checkbox).toBeChecked();
+      it("toggles the memory setting when checkbox is clicked", async () => {
+        const checkbox = screen.getByRole("checkbox", { name: /enable memory tools/i });
+        expect(checkbox).toBeChecked();
+
+        await userEvent.click(checkbox);
+        expect(checkbox).not.toBeChecked();
+
+        await userEvent.click(checkbox);
+        expect(checkbox).toBeChecked();
+      });
+
+      it("loads and shows memory editor content when navigating to Memory", async () => {
+        await waitFor(() => {
+          expect(mockFetchMemoryFiles).toHaveBeenCalledWith(undefined);
+          expect(mockFetchMemoryFile).toHaveBeenCalledWith(".fusion/memory/DREAMS.md", undefined);
+        });
+
+        await screen.findByLabelText("Editor for .fusion/memory/DREAMS.md");
+        expect(getMemoryEditorView(".fusion/memory/DREAMS.md").state.doc.toString()).toContain("Existing dreams");
+      });
     });
 
     it("shows memory toggle unchecked when memoryEnabled is false", async () => {
@@ -2911,28 +2919,6 @@ describe("SettingsModal", () => {
       const checkbox = screen.getByRole("checkbox", { name: /enable memory tools/i });
       expect(checkbox).toBeDefined();
       expect(checkbox).not.toBeChecked();
-    });
-
-    it("toggles the memory setting when checkbox is clicked", async () => {
-      renderModal();
-
-      await waitFor(() => {
-        expect(mockFetchSettings).toHaveBeenCalled();
-      });
-
-      // Click the Memory section in the sidebar
-      await userEvent.click(await screen.findByText("Memory"));
-
-      const checkbox = screen.getByRole("checkbox", { name: /enable memory tools/i });
-      expect(checkbox).toBeChecked();
-
-      // Uncheck it
-      await userEvent.click(checkbox);
-      expect(checkbox).not.toBeChecked();
-
-      // Check it again
-      await userEvent.click(checkbox);
-      expect(checkbox).toBeChecked();
     });
 
     it("truncates long memory file option labels to keep native dropdown width bounded", async () => {
@@ -3097,26 +3083,6 @@ describe("SettingsModal", () => {
       return view;
     };
 
-    it("loads and shows memory editor content when navigating to Memory", async () => {
-      renderModal();
-
-      await waitFor(() => {
-        expect(mockFetchSettings).toHaveBeenCalled();
-      });
-
-      expect(mockFetchMemoryFiles).not.toHaveBeenCalled();
-
-      await userEvent.click(await screen.findByText("Memory"));
-
-      await waitFor(() => {
-        expect(mockFetchMemoryFiles).toHaveBeenCalledWith(undefined);
-        expect(mockFetchMemoryFile).toHaveBeenCalledWith(".fusion/memory/DREAMS.md", undefined);
-      });
-
-      await screen.findByLabelText("Editor for .fusion/memory/DREAMS.md");
-      expect(getMemoryEditorView(".fusion/memory/DREAMS.md").state.doc.toString()).toContain("Existing dreams");
-    });
-
     it("shows loading state while memory is being fetched", async () => {
       let resolveMemory: ((value: { content: string }) => void) | undefined;
       mockFetchMemoryFile.mockReturnValueOnce(
@@ -3137,9 +3103,7 @@ describe("SettingsModal", () => {
 
       resolveMemory?.({ content: "# Loaded" });
 
-      await waitFor(() => {
-        expect(screen.getByLabelText("Editor for .fusion/memory/DREAMS.md")).toBeDefined();
-      });
+      expect(await screen.findByLabelText("Editor for .fusion/memory/DREAMS.md")).toBeDefined();
     });
 
     it("supports editing and saving memory content", async () => {
@@ -3241,117 +3205,86 @@ describe("SettingsModal", () => {
   });
 
   describe("Merge section", () => {
-    it("shows push-after-merge toggle and keeps Push Remote hidden by default", async () => {
-      renderModal();
-
-      await waitFor(() => {
-        expect(mockFetchSettings).toHaveBeenCalled();
+    describe("with default Merge render", () => {
+      beforeEach(async () => {
+        renderModal({ initialSection: "merge" });
+        await screen.findByRole("checkbox", { name: /push to remote after merge/i });
       });
 
-      await userEvent.click(screen.getAllByText("Merge")[0]);
-
-      const pushAfterMergeToggle = screen.getByRole("checkbox", {
-        name: /push to remote after merge/i,
-      });
-      expect(pushAfterMergeToggle).not.toBeChecked();
-      expect(screen.queryByLabelText("Push Remote")).not.toBeInTheDocument();
-    });
-
-    it("merge option descriptions are hidden behind disclosure by default", async () => {
-      renderModal();
-
-      await waitForSettingsModalReady();
-      await userEvent.click(screen.getAllByText("Merge")[0]);
-
-      const autoMergeDescription = screen.getByText(/When enabled, tasks that pass review are automatically merged/i);
-      const disclosure = autoMergeDescription.closest("details");
-
-      expect(disclosure).not.toBeNull();
-      expect(disclosure).not.toHaveAttribute("open");
-      expect(autoMergeDescription).not.toBeVisible();
-    });
-
-    it("merge option descriptions are revealed when clicking More details", async () => {
-      renderModal();
-
-      await waitForSettingsModalReady();
-      await userEvent.click(screen.getAllByText("Merge")[0]);
-
-      const moreDetailsSummaries = screen.getAllByText("More details");
-      await userEvent.click(moreDetailsSummaries[0]);
-
-      expect(screen.getByText(/When enabled, tasks that pass review are automatically merged/i)).toBeVisible();
-    });
-
-    it("loads workflow revision fork checkbox from project settings", async () => {
-      renderModal({ initialSection: "merge" });
-      await waitForSettingsModalReady();
-
-      const checkbox = screen.getByRole("checkbox", {
-        name: /fork scope-mismatched workflow revisions into follow-up tasks/i,
-      });
-      expect(checkbox).toBeChecked();
-    });
-
-    it("saves workflow revision fork checkbox changes", async () => {
-      renderModal({ initialSection: "merge" });
-      await waitForSettingsModalReady();
-
-      const checkbox = screen.getByRole("checkbox", {
-        name: /fork scope-mismatched workflow revisions into follow-up tasks/i,
-      });
-      await userEvent.click(checkbox);
-      await userEvent.click(screen.getByRole("button", { name: "Save" }));
-
-      await waitFor(() => {
-        expect(mockUpdateSettings).toHaveBeenCalledTimes(1);
+      it("shows push-after-merge toggle and keeps Push Remote hidden by default", () => {
+        const pushAfterMergeToggle = screen.getByRole("checkbox", {
+          name: /push to remote after merge/i,
+        });
+        expect(pushAfterMergeToggle).not.toBeChecked();
+        expect(screen.queryByLabelText("Push Remote")).not.toBeInTheDocument();
       });
 
-      const payload = mockUpdateSettings.mock.calls[0][0] as Record<string, unknown>;
-      expect(payload.workflowRevisionForkOnScopeMismatch).toBe(false);
-    });
+      it("merge option descriptions are hidden behind disclosure by default", () => {
+        const autoMergeDescription = screen.getByText(/When enabled, tasks that pass review are automatically merged/i);
+        const disclosure = autoMergeDescription.closest("details");
 
-    it("shows Push Remote input when push-after-merge is enabled", async () => {
-      renderModal();
-
-      await waitFor(() => {
-        expect(mockFetchSettings).toHaveBeenCalled();
+        expect(disclosure).not.toBeNull();
+        expect(disclosure).not.toHaveAttribute("open");
+        expect(autoMergeDescription).not.toBeVisible();
       });
 
-      await userEvent.click(screen.getAllByText("Merge")[0]);
-      await userEvent.click(
-        screen.getByRole("checkbox", { name: /push to remote after merge/i }),
-      );
+      it("merge option descriptions are revealed when clicking More details", async () => {
+        const moreDetailsSummaries = screen.getAllByText("More details");
+        await userEvent.click(moreDetailsSummaries[0]);
 
-      expect(screen.getByLabelText("Push Remote")).toBeInTheDocument();
-      expect(screen.getByPlaceholderText("origin")).toBeInTheDocument();
-    });
-
-    it("includes pushAfterMerge and pushRemote in the save payload", async () => {
-      renderModal();
-
-      await waitFor(() => {
-        expect(mockFetchSettings).toHaveBeenCalled();
+        expect(screen.getByText(/When enabled, tasks that pass review are automatically merged/i)).toBeVisible();
       });
 
-      await userEvent.click(screen.getAllByText("Merge")[0]);
-      await userEvent.click(
-        screen.getByRole("checkbox", { name: /push to remote after merge/i }),
-      );
-
-      const pushRemoteInput = screen.getByLabelText("Push Remote");
-      await userEvent.clear(pushRemoteInput);
-      await userEvent.type(pushRemoteInput, "upstream main");
-
-      await userEvent.click(screen.getByText("Save"));
-
-      await waitFor(() => {
-        expect(mockUpdateSettings).toHaveBeenCalledTimes(1);
+      it("loads workflow revision fork checkbox from project settings", () => {
+        const checkbox = screen.getByRole("checkbox", {
+          name: /fork scope-mismatched workflow revisions into follow-up tasks/i,
+        });
+        expect(checkbox).toBeChecked();
       });
 
-      const payload = mockUpdateSettings.mock.calls[0][0];
-      expect(payload.pushAfterMerge).toBe(true);
-      expect(payload.pushRemote).toBe("upstream main");
+      it("saves workflow revision fork checkbox changes", async () => {
+        const checkbox = screen.getByRole("checkbox", {
+          name: /fork scope-mismatched workflow revisions into follow-up tasks/i,
+        });
+        await userEvent.click(checkbox);
+        await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => {
+          expect(mockUpdateSettings).toHaveBeenCalledTimes(1);
+        });
+
+        const payload = mockUpdateSettings.mock.calls[0][0] as Record<string, unknown>;
+        expect(payload.workflowRevisionForkOnScopeMismatch).toBe(false);
+      });
+
+      it("shows Push Remote input when push-after-merge is enabled", async () => {
+        await userEvent.click(
+          screen.getByRole("checkbox", { name: /push to remote after merge/i }),
+        );
+
+        expect(screen.getByLabelText("Push Remote")).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("origin")).toBeInTheDocument();
+      });
+
+      it("includes pushAfterMerge and pushRemote in the save payload", async () => {
+        await userEvent.click(
+          screen.getByRole("checkbox", { name: /push to remote after merge/i }),
+        );
+
+        const pushRemoteInput = screen.getByLabelText("Push Remote");
+        await userEvent.clear(pushRemoteInput);
+        await userEvent.type(pushRemoteInput, "upstream main");
+
+        await userEvent.click(screen.getByText("Save"));
+
+        await waitFor(() => {
+          expect(mockUpdateSettings).toHaveBeenCalledTimes(1);
+        });
+
+        const payload = mockUpdateSettings.mock.calls[0][0];
+        expect(payload.pushAfterMerge).toBe(true);
+        expect(payload.pushRemote).toBe("upstream main");
+      });
     });
 
     describe("verificationFixRetries", () => {
@@ -3870,9 +3803,7 @@ describe("SettingsModal", () => {
         const advancedDetails = screen.getByText(/Advanced \(Named Tunnel\)/i, { selector: "summary" }).closest("details") as HTMLDetailsElement;
         advancedDetails.open = true;
         fireEvent(advancedDetails, new Event("toggle"));
-        await waitFor(() => {
-          expect(screen.getByLabelText("Tunnel name")).toBeInTheDocument();
-        });
+        expect(await screen.findByLabelText("Tunnel name")).toBeInTheDocument();
       }
       await userEvent.clear(screen.getByLabelText("Tunnel name"));
       await userEvent.type(screen.getByLabelText("Tunnel name"), "cf-team");
@@ -3909,9 +3840,7 @@ describe("SettingsModal", () => {
       if (!screen.queryByLabelText("Tunnel name")) {
         await userEvent.click(namedTunnelSummary);
       }
-      await waitFor(() => {
-        expect(screen.getByLabelText("Tunnel name")).toBeInTheDocument();
-      });
+      expect(await screen.findByLabelText("Tunnel name")).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("button", { name: "Start Tunnel" }));
       await waitFor(() => {
@@ -3934,9 +3863,7 @@ describe("SettingsModal", () => {
       expect(screen.getByLabelText("Tailscale")).toBeChecked();
 
       await userEvent.click(screen.getByRole("button", { name: "Start Tunnel" }));
-      await waitFor(() => {
-        expect(screen.getByText("https://tail.example", { selector: ".remote-status-url" })).toBeInTheDocument();
-      });
+      expect(await screen.findByText("https://tail.example", { selector: ".remote-status-url" })).toBeInTheDocument();
     });
 
     it("shows cloudflared available indicator when Cloudflare is selected and cloudflared is installed", async () => {
@@ -4030,13 +3957,9 @@ describe("SettingsModal", () => {
         expect(mockUpdateRemoteSettings).toHaveBeenCalled();
         expect(mockStartRemoteTunnel).toHaveBeenCalledTimes(1);
       });
-      await waitFor(() => {
-        expect(screen.getByText("starting")).toBeInTheDocument();
-      });
+      expect(await screen.findByText("starting")).toBeInTheDocument();
 
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: "Stop Tunnel" })).toBeInTheDocument();
-      });
+      expect(await screen.findByRole("button", { name: "Stop Tunnel" })).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("button", { name: "Stop Tunnel" }));
       await waitFor(() => {
@@ -4046,9 +3969,7 @@ describe("SettingsModal", () => {
       await waitFor(() => {
         expect(mockStopRemoteTunnel).toHaveBeenCalledTimes(2);
       });
-      await waitFor(() => {
-        expect(screen.getByText("Tunnel crashed")).toBeInTheDocument();
-      });
+      expect(await screen.findByText("Tunnel crashed")).toBeInTheDocument();
     });
 
     it("shows external tunnel panel with actions when external tunnel is detected", async () => {
