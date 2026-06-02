@@ -21,6 +21,7 @@ describe("maybeAutoLaunchOnboarding backward-compat e2e guard", () => {
         cwd: "/repo/demo",
         isTTY: true,
         pathExists,
+        cliOnboardingCompleted: false,
         runOnboard,
       }),
     ).resolves.toBeUndefined();
@@ -38,6 +39,7 @@ describe("maybeAutoLaunchOnboarding backward-compat e2e guard", () => {
         centralDbPath: "/virtual/central.db",
         isTTY: false,
         pathExists: () => false,
+        cliOnboardingCompleted: false,
         runOnboard,
       }),
     ).resolves.toBeUndefined();
@@ -74,6 +76,7 @@ describe("maybeAutoLaunchOnboarding backward-compat e2e guard", () => {
         centralDbPath: "/virtual/central.db",
         isTTY: true,
         pathExists: () => false,
+        cliOnboardingCompleted: false,
         runOnboard,
       }),
     ).resolves.toBeUndefined();
@@ -92,6 +95,7 @@ describe("maybeAutoLaunchOnboarding backward-compat e2e guard", () => {
         isTTY: true,
         env: { FUSION_SKIP_ONBOARDING: "true" },
         pathExists: () => false,
+        cliOnboardingCompleted: false,
         runOnboard,
       }),
     ).resolves.toBeUndefined();
@@ -110,6 +114,7 @@ describe("maybeAutoLaunchOnboarding backward-compat e2e guard", () => {
         centralDbPath: "/virtual/central.db",
         isTTY: true,
         pathExists: () => false,
+        cliOnboardingCompleted: false,
         runOnboard,
       }),
     ).resolves.toBeUndefined();
@@ -130,6 +135,7 @@ describe("maybeAutoLaunchOnboarding backward-compat e2e guard", () => {
         centralDbPath: "/virtual/central.db",
         isTTY: true,
         pathExists: () => false,
+        cliOnboardingCompleted: false,
         runOnboard,
       }),
     ).resolves.toBeUndefined();
@@ -151,6 +157,7 @@ describe("maybeAutoLaunchOnboarding backward-compat e2e guard", () => {
         cwd: "/workspace/demo",
         isTTY: true,
         pathExists,
+        cliOnboardingCompleted: false,
         runOnboard,
       }),
     ).resolves.toBeUndefined();

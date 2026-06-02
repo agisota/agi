@@ -17,6 +17,7 @@ describe("onboard autolaunch backward-compat guard", () => {
         args: ["task", "list"],
         centralDbExists: true,
         projectInitialized: true,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: false, reason: "central-db-and-project-exist" });
@@ -29,6 +30,7 @@ describe("onboard autolaunch backward-compat guard", () => {
         args: ["task", "list"],
         centralDbExists: true,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: false, reason: "central-db-exists" });
@@ -41,6 +43,7 @@ describe("onboard autolaunch backward-compat guard", () => {
         args: ["task", "list"],
         centralDbExists: false,
         projectInitialized: true,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: true, reason: "central-db-missing" });
@@ -53,6 +56,7 @@ describe("onboard autolaunch backward-compat guard", () => {
         args: ["task", "list"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: false,
       }),
     ).toEqual({ launch: false, reason: "non-tty" });
@@ -66,6 +70,7 @@ describe("onboard autolaunch backward-compat guard", () => {
           args: [command],
           centralDbExists: false,
           projectInitialized: false,
+          cliOnboardingCompleted: false,
           isTTY: true,
         }),
       ).toEqual({ launch: false, reason: "command-skip" });
@@ -85,6 +90,7 @@ describe("onboard autolaunch backward-compat guard", () => {
         args: ["task", "list"],
         centralDbPath: "/virtual/central.db",
         pathExists: () => false,
+        cliOnboardingCompleted: false,
         runOnboard,
       }),
     ).resolves.toBeUndefined();
@@ -104,6 +110,7 @@ describe("onboard autolaunch backward-compat guard", () => {
       cwd: "/workspace/demo",
       isTTY: true,
       pathExists,
+      cliOnboardingCompleted: false,
       runOnboard,
     });
 
@@ -123,6 +130,7 @@ describe("onboard autolaunch backward-compat guard", () => {
         centralDbPath: "/virtual/central.db",
         isTTY: true,
         pathExists: () => false,
+        cliOnboardingCompleted: false,
         runOnboard,
       }),
     ).resolves.toBeUndefined();

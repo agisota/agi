@@ -72,13 +72,15 @@ On successful completion, Fusion records `cliOnboardingCompletedAt` in global
 settings.
 
 Auto-launch behavior: before interactive commands, Fusion auto-launches onboarding
-only when the central DB at `getDefaultCentralDbPath()` is missing. Auto-launch
-is skipped for `serve`, `daemon`, non-TTY runs, `--skip-onboarding`, and
-`FUSION_SKIP_ONBOARDING`.
+only when the central DB at `getDefaultCentralDbPath()` is missing and CLI
+onboarding has not already completed. Auto-launch is skipped for `serve`,
+`daemon`, non-TTY runs, `--skip-onboarding`, `FUSION_SKIP_ONBOARDING`, and once
+`cliOnboardingCompletedAt` is set.
 
 Backward-compatibility guard: existing setups are never blocked — when central DB
-already exists (including the central-DB + registered-project case), onboarding
-does not auto-launch.
+already exists (including the central-DB + registered-project case), or when the
+CLI onboarding completion marker exists even if the central DB step was skipped,
+onboarding does not auto-launch.
 
 ---
 

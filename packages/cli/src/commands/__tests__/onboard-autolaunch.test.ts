@@ -13,6 +13,7 @@ describe("shouldAutoLaunchOnboarding", () => {
         args: ["task", "list"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: true, reason: "central-db-missing" });
@@ -25,9 +26,51 @@ describe("shouldAutoLaunchOnboarding", () => {
         args: ["dashboard"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: true, reason: "central-db-missing" });
+  });
+
+  it("skips when onboarding completion marker is present", () => {
+    expect(
+      shouldAutoLaunchOnboarding({
+        command: "task",
+        args: ["task", "list"],
+        centralDbExists: false,
+        projectInitialized: false,
+        cliOnboardingCompleted: true,
+        isTTY: true,
+      }),
+    ).toEqual({ launch: false, reason: "onboarding-complete-marker" });
+  });
+
+  it("keeps non-TTY precedence over onboarding completion marker", () => {
+    expect(
+      shouldAutoLaunchOnboarding({
+        command: "task",
+        args: ["task", "list"],
+        centralDbExists: false,
+        projectInitialized: false,
+        cliOnboardingCompleted: true,
+        isTTY: false,
+      }),
+    ).toEqual({ launch: false, reason: "non-tty" });
+  });
+
+  it("keeps command skip precedence over onboarding completion marker", () => {
+    for (const command of ["serve", "daemon"]) {
+      expect(
+        shouldAutoLaunchOnboarding({
+          command,
+          args: [command],
+          centralDbExists: false,
+          projectInitialized: false,
+          cliOnboardingCompleted: true,
+          isTTY: true,
+        }),
+      ).toEqual({ launch: false, reason: "command-skip" });
+    }
   });
 
   it("skips when skip flag is present in args", () => {
@@ -39,6 +82,7 @@ describe("shouldAutoLaunchOnboarding", () => {
         args,
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: false, reason: "skip-flag" });
@@ -51,6 +95,7 @@ describe("shouldAutoLaunchOnboarding", () => {
         args: ["task", "list"],
         centralDbExists: true,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: false, reason: "central-db-exists" });
@@ -63,6 +108,7 @@ describe("shouldAutoLaunchOnboarding", () => {
         args: ["task", "list"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: false,
       }),
     ).toEqual({ launch: false, reason: "non-tty" });
@@ -75,6 +121,7 @@ describe("shouldAutoLaunchOnboarding", () => {
         args: ["serve"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: false, reason: "command-skip" });
@@ -85,6 +132,7 @@ describe("shouldAutoLaunchOnboarding", () => {
         args: ["daemon"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: false, reason: "command-skip" });
@@ -97,6 +145,7 @@ describe("shouldAutoLaunchOnboarding", () => {
         args: ["onboard"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: false, reason: "onboard-command" });
@@ -109,6 +158,7 @@ describe("shouldAutoLaunchOnboarding", () => {
         args: ["task", "list"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
         env: { FUSION_SKIP_ONBOARDING: "1" },
       }),
@@ -130,6 +180,7 @@ describe("maybeAutoLaunchOnboarding", () => {
       centralDbPath: "/virtual/fusion-central.db",
       isTTY: true,
       pathExists: () => false,
+      cliOnboardingCompleted: false,
       runOnboard,
     });
 
@@ -145,10 +196,51 @@ describe("maybeAutoLaunchOnboarding", () => {
       centralDbPath: "/virtual/fusion-central.db",
       isTTY: true,
       pathExists: () => true,
+      cliOnboardingCompleted: false,
       runOnboard,
     });
 
     expect(runOnboard).not.toHaveBeenCalled();
+  });
+
+  it("does not invoke runOnboard when injected marker is complete", async () => {
+    const runOnboard = vi.fn();
+
+    await maybeAutoLaunchOnboarding({
+      command: "task",
+      args: ["task", "list"],
+      centralDbPath: "/virtual/fusion-central.db",
+      isTTY: true,
+      pathExists: () => false,
+      loadOnboardingComplete: () => true,
+      runOnboard,
+    });
+
+    expect(runOnboard).not.toHaveBeenCalled();
+  });
+
+  it("treats marker resolver failure as incomplete and emits diagnostic", async () => {
+    const runOnboard = vi.fn();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await maybeAutoLaunchOnboarding({
+      command: "task",
+      args: ["task", "list"],
+      centralDbPath: "/virtual/fusion-central.db",
+      isTTY: true,
+      pathExists: () => false,
+      loadOnboardingComplete: () => {
+        throw new Error("settings unavailable");
+      },
+      runOnboard,
+    });
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "[onboard-autolaunch] onboarding marker probe failed; treating as incomplete: settings unavailable",
+      ),
+    );
+    expect(runOnboard).toHaveBeenCalledTimes(1);
   });
 
   it("swallows runOnboard errors and emits diagnostic", async () => {
@@ -162,6 +254,7 @@ describe("maybeAutoLaunchOnboarding", () => {
         centralDbPath: "/virtual/fusion-central.db",
         isTTY: true,
         pathExists: () => false,
+        cliOnboardingCompleted: false,
         runOnboard,
       }),
     ).resolves.toBeUndefined();

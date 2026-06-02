@@ -20,6 +20,7 @@ describe("onboard bypass reasons", () => {
         args: ["task", "list", "--skip-onboarding"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: false, reason: "skip-flag" });
@@ -30,6 +31,7 @@ describe("onboard bypass reasons", () => {
       args: ["task", "list", "--skip-onboarding"],
       isTTY: true,
       pathExists: () => false,
+      cliOnboardingCompleted: false,
       runOnboard,
     });
     expect(runOnboard).not.toHaveBeenCalled();
@@ -42,6 +44,7 @@ describe("onboard bypass reasons", () => {
         args: ["task", "list"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
         env: { FUSION_SKIP_ONBOARDING: "1" },
       }),
@@ -54,6 +57,7 @@ describe("onboard bypass reasons", () => {
       env: { FUSION_SKIP_ONBOARDING: "1" },
       isTTY: true,
       pathExists: () => false,
+      cliOnboardingCompleted: false,
       runOnboard,
     });
     expect(runOnboard).not.toHaveBeenCalled();
@@ -76,6 +80,7 @@ describe("onboard bypass reasons", () => {
         args: ["task", "list"],
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: true, reason: "central-db-missing" });
@@ -122,6 +127,7 @@ describe("extractGlobalProjectFlag", () => {
       skipOnboarding: parsed.skipOnboarding,
       isTTY: true,
       pathExists: () => false,
+      cliOnboardingCompleted: false,
       runOnboard,
     });
 
@@ -132,6 +138,7 @@ describe("extractGlobalProjectFlag", () => {
         skipOnboarding: parsed.skipOnboarding,
         centralDbExists: false,
         projectInitialized: false,
+        cliOnboardingCompleted: false,
         isTTY: true,
       }),
     ).toEqual({ launch: false, reason: "skip-flag" });

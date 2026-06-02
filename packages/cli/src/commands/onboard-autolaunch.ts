@@ -1,14 +1,16 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { getDefaultCentralDbPath } from "@fusion/core";
+import { getDefaultCentralDbPath, GlobalSettingsStore } from "@fusion/core";
 
 import { isTTYAvailable } from "./dashboard-tui/index.js";
+import { isCliOnboardingComplete } from "./onboard.js";
 
 export interface AutoLaunchInput {
   command: string;
   args: string[];
   centralDbExists: boolean;
   projectInitialized: boolean;
+  cliOnboardingCompleted: boolean;
   isTTY: boolean;
   env?: NodeJS.ProcessEnv;
   skipOnboarding?: boolean;
@@ -51,6 +53,10 @@ export function shouldAutoLaunchOnboarding(input: AutoLaunchInput): AutoLaunchDe
     return { launch: false, reason: "skip-env" };
   }
 
+  if (input.cliOnboardingCompleted) {
+    return { launch: false, reason: "onboarding-complete-marker" };
+  }
+
   if (input.centralDbExists && input.projectInitialized) {
     return { launch: false, reason: "central-db-and-project-exist" };
   }
@@ -88,6 +94,30 @@ export interface MaybeAutoLaunchDeps {
   env?: NodeJS.ProcessEnv;
   runOnboard?: RunOnboard;
   pathExists?: (path: string) => boolean;
+  cliOnboardingCompleted?: boolean;
+  loadOnboardingComplete?: () => Promise<boolean> | boolean;
+}
+
+async function loadCliOnboardingComplete(): Promise<boolean> {
+  const globalSettingsStore = new GlobalSettingsStore();
+  await globalSettingsStore.init();
+  const settings = await globalSettingsStore.getSettings();
+  return isCliOnboardingComplete(settings);
+}
+
+async function resolveCliOnboardingCompleted(deps: MaybeAutoLaunchDeps): Promise<boolean> {
+  if (deps.cliOnboardingCompleted !== undefined) {
+    return deps.cliOnboardingCompleted;
+  }
+
+  const loadOnboardingComplete = deps.loadOnboardingComplete ?? loadCliOnboardingComplete;
+  try {
+    return await loadOnboardingComplete();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[onboard-autolaunch] onboarding marker probe failed; treating as incomplete: ${message}`);
+    return false;
+  }
 }
 
 export async function maybeAutoLaunchOnboarding(deps: MaybeAutoLaunchDeps): Promise<void> {
@@ -109,14 +139,26 @@ export async function maybeAutoLaunchOnboarding(deps: MaybeAutoLaunchDeps): Prom
     return;
   }
 
-  const decision = shouldAutoLaunchOnboarding({
+  const baseDecisionInput = {
     command: deps.command,
     args: deps.args,
     centralDbExists,
     projectInitialized,
+    cliOnboardingCompleted: false,
     isTTY,
     env,
     skipOnboarding: deps.skipOnboarding,
+  };
+
+  const baseDecision = shouldAutoLaunchOnboarding(baseDecisionInput);
+  if (!baseDecision.launch) {
+    return;
+  }
+
+  const cliOnboardingCompleted = await resolveCliOnboardingCompleted(deps);
+  const decision = shouldAutoLaunchOnboarding({
+    ...baseDecisionInput,
+    cliOnboardingCompleted,
   });
 
   if (!decision.launch) {
