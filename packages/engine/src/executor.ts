@@ -2598,6 +2598,44 @@ export class TaskExecutor {
     return true;
   }
 
+  private async handleNonContinuableSessionRetry(task: Task, errorMessage: string): Promise<boolean> {
+    if (!isNonContinuableSessionError(errorMessage)) {
+      return false;
+    }
+
+    const liveTask = await this.store.getTask(task.id);
+    if (!liveTask) {
+      return false;
+    }
+
+    const decision = computeRecoveryDecision({
+      recoveryRetryCount: liveTask.recoveryRetryCount,
+      nextRecoveryAt: liveTask.nextRecoveryAt,
+    });
+
+    if (decision.shouldRetry) {
+      const attempt = decision.nextState.recoveryRetryCount;
+      const delay = formatDelay(decision.delayMs);
+      executorLog.warn(`⚡ ${task.id} non-continuable session — fresh-session retry ${attempt}/${MAX_RECOVERY_RETRIES} in ${delay}`);
+      await this.store.logEntry(task.id, `Non-continuable session — fresh-session retry (${attempt}/${MAX_RECOVERY_RETRIES} in ${delay}): ${errorMessage}`, undefined, this.getRunContextFor(task.id));
+      await this.store.updateTask(task.id, {
+        recoveryRetryCount: decision.nextState.recoveryRetryCount,
+        nextRecoveryAt: decision.nextState.nextRecoveryAt,
+        sessionFile: null,
+      });
+      await this.store.moveTask(task.id, "todo", { preserveResumeState: true });
+      return true;
+    }
+
+    executorLog.error(`✗ ${task.id} non-continuable session fresh-session retries exhausted (${MAX_RECOVERY_RETRIES} attempts): ${errorMessage}`);
+    await this.store.logEntry(task.id, `Non-continuable session fresh-session retries exhausted after ${MAX_RECOVERY_RETRIES} attempts: ${errorMessage}`, undefined, this.getRunContextFor(task.id));
+    await this.store.updateTask(task.id, {
+      recoveryRetryCount: null,
+      nextRecoveryAt: null,
+    });
+    return false;
+  }
+
   private async getTaskCompletionBlocker(task: Task): Promise<string | undefined> {
     return getTaskCompletionBlockerForStore(this.store, task);
   }
@@ -5445,6 +5483,8 @@ export class TaskExecutor {
           }
           return;
         } else if (await this.handleNonContinuableSessionError(task, taskDone, errorMessage)) {
+          return;
+        } else if (await this.handleNonContinuableSessionRetry(task, errorMessage)) {
           return;
         } else if (this.options.usageLimitPauser && isUsageLimitError(errorMessage)) {
           await this.options.usageLimitPauser.onUsageLimitHit("executor", task.id, errorMessage);

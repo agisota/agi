@@ -4,6 +4,7 @@ import type { Task, TaskStore } from "@fusion/core";
 import "../executor-test-helpers.js";
 import { TaskExecutor } from "../../executor.js";
 import { SelfHealingManager } from "../../self-healing.js";
+import { MAX_RECOVERY_RETRIES } from "../../recovery-policy.js";
 import { mockedCreateFnAgent, resetExecutorMocks } from "../executor-test-helpers.js";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
@@ -142,8 +143,46 @@ describe("FN-5866 reliability interactions: post-done continuation no wedge", ()
     manager.stop();
   });
 
-  it("still marks incomplete work failed when the same session error happens before completion", async () => {
-    const task = makeTask({ id: "FN-5866-INCOMPLETE" });
+  it("requeues incomplete work with a fresh session when the session is not continuable", async () => {
+    const task = makeTask({
+      id: "FN-5866-INCOMPLETE",
+      sessionFile: "/tmp/test/.fusion/sessions/FN-5866-INCOMPLETE.json",
+    });
+    const store = createStore(task);
+    const onError = vi.fn();
+
+    mockedCreateFnAgent.mockResolvedValue({
+      session: {
+        prompt: vi.fn().mockRejectedValue(new Error("Cannot continue from message role: assistant")),
+        dispose: vi.fn(),
+        getSessionStats: vi.fn().mockResolvedValue({
+          tokens: { input: 5, output: 0, cacheRead: 0, cacheWrite: 0, total: 5 },
+        }),
+      },
+    } as any);
+
+    const executor = new TaskExecutor(store, "/tmp/test", { onError });
+    await executor.execute(task);
+
+    expect(task.column).toBe("todo");
+    expect(task.status).toBeUndefined();
+    expect(task.error).toBeUndefined();
+    expect(task.sessionFile).toBeNull();
+    expect(task.recoveryRetryCount).toBe(1);
+    expect(task.nextRecoveryAt).toEqual(expect.any(String));
+    expect(store.moveTask).toHaveBeenCalledWith(task.id, "todo", { preserveResumeState: true });
+    expect(store.handoffToReview).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect((task.log ?? []).some((entry: any) => entry.action.includes("Non-continuable session — fresh-session retry"))).toBe(true);
+  });
+
+  it("falls through to terminal failure after the non-continuable fresh-session retry budget is exhausted", async () => {
+    const task = makeTask({
+      id: "FN-5866-INCOMPLETE-EXHAUSTED",
+      recoveryRetryCount: MAX_RECOVERY_RETRIES,
+      nextRecoveryAt: "2026-06-02T00:05:00.000Z",
+      sessionFile: "/tmp/test/.fusion/sessions/FN-5866-INCOMPLETE-EXHAUSTED.json",
+    });
     const store = createStore(task);
     const onError = vi.fn();
 
@@ -163,7 +202,12 @@ describe("FN-5866 reliability interactions: post-done continuation no wedge", ()
     expect(task.column).toBe("in-review");
     expect(task.status).toBe("failed");
     expect(task.error).toContain("Cannot continue from message role: assistant");
+    expect(task.recoveryRetryCount).toBeNull();
+    expect(task.nextRecoveryAt).toBeNull();
+    expect(task.sessionFile).toBeNull();
+    expect(store.moveTask).not.toHaveBeenCalledWith(task.id, "todo", { preserveResumeState: true });
     expect(store.handoffToReview).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledTimes(1);
+    expect((task.log ?? []).some((entry: any) => entry.action.includes("fresh-session retries exhausted"))).toBe(true);
   });
 });
