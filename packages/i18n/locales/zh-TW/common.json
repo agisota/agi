@@ -1,0 +1,15 @@
+{
+  "columns": {
+    "triage": "",
+    "todo": "",
+    "in-progress": "",
+    "in-review": "",
+    "done": "",
+    "archived": ""
+  },
+  "actions": {
+    "save": "",
+    "cancel": "",
+    "close": ""
+  }
+}

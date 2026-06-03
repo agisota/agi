@@ -1,0 +1,9 @@
+{
+  "settings": {
+    "appearance": {
+      "title": "Appearance",
+      "language": "Language",
+      "languageHint": "Choose the language for the {{brand}} interface."
+    }
+  }
+}
