@@ -1,7 +1,12 @@
 import type { Settings, TaskDetail, WorkflowIr, WorkflowIrEdge, WorkflowIrNode } from "@fusion/core";
 import { BUILTIN_CODING_WORKFLOW_IR, WorkflowIrError, isExperimentalFeatureEnabled } from "@fusion/core";
 
-import { createDefaultNodeHandlers, createNoopLegacySeams, type WorkflowLegacySeams } from "./workflow-node-handlers.js";
+import {
+  createDefaultNodeHandlers,
+  createNoopLegacySeams,
+  type WorkflowCustomNodeRunner,
+  type WorkflowLegacySeams,
+} from "./workflow-node-handlers.js";
 
 export type WorkflowNodeOutcome = "success" | "failure";
 
@@ -22,6 +27,8 @@ export type WorkflowNodeHandler = (node: WorkflowIrNode, context: WorkflowNodeEx
 export interface WorkflowGraphExecutorDeps {
   handlers?: Partial<Record<WorkflowIrNode["kind"], WorkflowNodeHandler>>;
   seams?: WorkflowLegacySeams;
+  /** Executes custom (non-seam) prompt/script/gate nodes. */
+  runCustomNode?: WorkflowCustomNodeRunner;
   maxRetriesPerNode?: number;
 }
 
@@ -47,7 +54,7 @@ export class WorkflowGraphExecutor {
   public constructor(private readonly deps: WorkflowGraphExecutorDeps) {
     this.maxRetriesPerNode = Math.max(1, Math.floor(deps.maxRetriesPerNode ?? 2));
     this.handlers = {
-      ...createDefaultNodeHandlers(deps.seams ?? createNoopLegacySeams()),
+      ...createDefaultNodeHandlers(deps.seams ?? createNoopLegacySeams(), deps.runCustomNode),
       ...(deps.handlers ?? {}),
     };
   }
