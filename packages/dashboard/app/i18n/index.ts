@@ -41,7 +41,12 @@ export const i18nReady = i18next.init({
   detection: {
     order: ["localStorage", "navigator", "htmlTag"],
     lookupLocalStorage: LANGUAGE_STORAGE_KEY,
-    caches: ["localStorage"],
+    // Don't auto-persist the *detected* locale: the detector would write the
+    // storage key during init, and useLanguage distinguishes a real user choice
+    // from mere detection by this key's presence (its server-settings hydration
+    // tier only fires when no local choice exists). setLanguage() writes the
+    // key explicitly on actual user choices.
+    caches: [],
     // Normalize multi-subtag detections (e.g. navigator "zh-Hans-CN" /
     // "zh-Hant-TW") to a supported locale before fallback, matching the CLI's
     // env detection.

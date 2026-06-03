@@ -71,6 +71,23 @@ describe("react-i18next under the Ink reconciler", () => {
     expect(lastFrame()).toContain("Loading…");
   });
 
+  it("renders from a real catalog, not the defaultValue fallback", async () => {
+    // t("tui.loading", "Loading…") can't distinguish a loaded catalog from the
+    // inline defaultValue. A non-en lookup with no defaultValue proves the
+    // bundled catalog itself resolved.
+    const i18n = initCliI18n("en");
+    await i18n.changeLanguage("fr");
+    function FrLoading() {
+      const { t } = useTranslation("cli");
+      return createElement(Text, null, t("tui.loading"));
+    }
+    const { lastFrame } = render(
+      createElement(I18nextProvider, { i18n }, createElement(FrLoading)),
+    );
+    expect(lastFrame()).toContain("Chargement…");
+    await i18n.changeLanguage("en");
+  });
+
   it("re-renders on changeLanguage", async () => {
     const i18n = initCliI18n("en");
     cliI18n.addResourceBundle("zh-CN", "cli", { tui: { loading: "加载中…" } }, true, true);

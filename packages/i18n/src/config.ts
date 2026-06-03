@@ -58,6 +58,9 @@ export function normalizeToSupportedLocale(tag: string): Locale | undefined {
 
   const lower = norm.toLowerCase();
   if (lower.startsWith("zh")) {
+    // An explicit Simplified script subtag wins over region: zh-Hans-HK /
+    // zh-Hans-MO are valid BCP-47 for Simplified Chinese used in HK/Macau.
+    if (lower.includes("hans")) return "zh-CN";
     if (
       lower.includes("hant") ||
       lower.includes("-tw") ||

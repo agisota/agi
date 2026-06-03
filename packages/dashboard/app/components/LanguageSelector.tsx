@@ -21,7 +21,9 @@ export function LanguageSelector() {
   return (
     <div className="language-selector">
       <div className="language-selector-title">{label}</div>
-      <div className="language-options" role="radiogroup" aria-label={label}>
+      {/* role="group" + aria-pressed: toggle-button semantics (radiogroup would
+          conflict with aria-pressed and confuse screen readers). */}
+      <div className="language-options" role="group" aria-label={label}>
         {supportedLocales.map((locale) => (
           <button
             key={locale}

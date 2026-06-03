@@ -68,6 +68,7 @@ export function normalizeToSupportedLocale(tag: string): Locale | undefined {
   if (isLocale(norm)) return norm;
   const lower = norm.toLowerCase();
   if (lower.startsWith("zh")) {
+    if (lower.includes("hans")) return "zh-CN"; // explicit script wins over region (zh-Hans-HK)
     if (lower.includes("hant") || lower.includes("-tw") ||
         lower.includes("-hk") || lower.includes("-mo")) return "zh-TW";
     return "zh-CN";

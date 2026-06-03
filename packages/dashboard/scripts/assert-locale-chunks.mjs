@@ -15,10 +15,13 @@ const i18nRoot = join(here, "..", "..", "i18n");
 const namespaces = JSON.parse(readFileSync(join(i18nRoot, "namespaces.json"), "utf8")).dashboard;
 
 // Derive the expected per-namespace chunk floor from the authored locale set
-// rather than hardcoding a count, so adding a locale needs no edit here.
+// rather than hardcoding a count, so adding a locale needs no edit here. Only
+// directories that actually contain the default-namespace catalog count as
+// locales, so a stray dir (editor artifact, partial sync) can't inflate the
+// floor and produce a spurious failure.
 const localesDir = join(i18nRoot, "locales");
 const expectedLocaleCount = readdirSync(localesDir, { withFileTypes: true }).filter(
-  (d) => d.isDirectory(),
+  (d) => d.isDirectory() && existsSync(join(localesDir, d.name, "common.json")),
 ).length;
 
 if (!existsSync(assetsDir)) {

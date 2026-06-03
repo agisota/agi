@@ -79,6 +79,15 @@ describe("normalizeToSupportedLocale", () => {
     expect(normalizeToSupportedLocale("zh-SG")).toBe("zh-CN");
   });
 
+  it("lets an explicit Simplified script win over a Traditional-leaning region", () => {
+    // zh-Hans-HK / zh-Hans-MO are valid BCP-47: Simplified script in HK/Macau.
+    expect(normalizeToSupportedLocale("zh-Hans-HK")).toBe("zh-CN");
+    expect(normalizeToSupportedLocale("zh-Hans-MO")).toBe("zh-CN");
+    expect(normalizeToSupportedLocale("zh_Hans_HK")).toBe("zh-CN");
+    // And the reverse stays Traditional regardless of region.
+    expect(normalizeToSupportedLocale("zh-Hant-CN")).toBe("zh-TW");
+  });
+
   it("strips region subtags on other languages and rejects unsupported", () => {
     expect(normalizeToSupportedLocale("fr-FR")).toBe("fr");
     expect(normalizeToSupportedLocale("es-419")).toBe("es");

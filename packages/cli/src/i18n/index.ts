@@ -65,6 +65,10 @@ export function initCliI18n(locale: Locale): I18nInstance {
     });
     initialized = true;
   } else if (i18next.language !== locale) {
+    // changeLanguage is async; the instance carries the previous locale until
+    // the microtask queue drains. Benign in production (called once per
+    // process) — callers that need the settled locale before rendering should
+    // await i18next.changeLanguage(locale) directly.
     void i18next.changeLanguage(locale);
   }
   return i18next;
