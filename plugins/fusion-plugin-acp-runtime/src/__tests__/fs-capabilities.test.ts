@@ -134,7 +134,9 @@ describe("writeTextFile", () => {
   }
 
   it("writes within cwd when policy allows; content persists and reads back", async () => {
-    const res = await writer(allowGate)({
+    // Acknowledge the unrestricted risk so an `allow` disposition isn't escalated
+    // to approval (S1) — this test exercises the allow→write path itself.
+    const res = await writer(allowGate, { allowUnrestricted: true })({
       sessionId: "s",
       path: "out.txt",
       content: "written-by-agent",
@@ -142,6 +144,14 @@ describe("writeTextFile", () => {
     expect(res).toEqual({});
     const onDisk = await readFile(path.join(cwd, "out.txt"), "utf8");
     expect(onDisk).toBe("written-by-agent");
+  });
+
+  it("escalates an allow write to approval/deny without the unrestricted acknowledgement (S1)", async () => {
+    // allowGate sets file_write_delete: "allow", but with no acknowledgement and
+    // no approver the write must be denied, not silently written.
+    await expect(
+      writer(allowGate)({ sessionId: "s", path: "out2.txt", content: "x" } as never),
+    ).rejects.toThrow();
   });
 
   it("rejects an oversized write before touching the fs", async () => {

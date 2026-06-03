@@ -69,6 +69,11 @@ export class AcpRuntimeAdapter implements AgentRuntime {
         allowRead: this.settings.fsRead,
         allowWrite: this.settings.fsWrite,
       },
+      // Risk S1: unless the user acknowledged the untrusted-agent risk, a blanket
+      // `allow` on a sensitive category is escalated to approval rather than
+      // auto-approved — so the default `unrestricted` policy can't silently
+      // green-light this untrusted subprocess.
+      { allowUnrestricted: this.settings.allowUnrestricted },
     );
 
     // Spawn + initialize (U2). fs capabilities are advertised only where the

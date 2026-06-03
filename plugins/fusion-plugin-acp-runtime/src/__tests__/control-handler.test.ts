@@ -110,11 +110,35 @@ describe("resolvePermission — the security floor", () => {
   });
 
   // [Risk S2] allow → allow_once, allow_always NEVER selected.
+  // (acknowledged: with allowUnrestricted the S1 escalation is off, so the allow
+  // disposition reaches option selection — the point of this test.)
   it("selects allow_once for an allow category and never allow_always even when offered", async () => {
     const gate = gateWithRules({ ...UNRESTRICTED, command_execution: "allow" });
-    const res = await resolvePermission(toolCall("execute"), ALL_OPTIONS, gate);
+    const res = await resolvePermission(toolCall("execute"), ALL_OPTIONS, gate, {
+      allowUnrestricted: true,
+    });
     expect(selectedId(res)).toBe("allow_once_id");
     expect(selectedId(res)).not.toBe("allow_always_id");
+  });
+
+  // [Risk S1] WITHOUT acknowledgement, a blanket allow on a sensitive category
+  // is escalated to approval — and default-denies when no approver exists.
+  it("escalates a sensitive allow to deny under the unrestricted default (no acknowledgement, no approver)", async () => {
+    const gate = gateWithRules(UNRESTRICTED); // command_execution: "allow"
+    const res = await resolvePermission(toolCall("execute"), ALL_OPTIONS, gate);
+    expect(selectedId(res)).toBe("reject_once_id");
+  });
+  it("auto-allows a sensitive call only when the unrestricted risk is acknowledged", async () => {
+    const gate = gateWithRules(UNRESTRICTED);
+    const res = await resolvePermission(toolCall("execute"), ALL_OPTIONS, gate, {
+      allowUnrestricted: true,
+    });
+    expect(selectedId(res)).toBe("allow_once_id");
+  });
+  it("never escalates an exempt (read-only) kind regardless of acknowledgement", async () => {
+    const gate = gateWithRules(UNRESTRICTED);
+    const res = await resolvePermission(toolCall("read"), ALL_OPTIONS, gate);
+    expect(selectedId(res)).toBe("allow_once_id");
   });
 
   it("exempt kinds (read) always allow via allow_once", async () => {
@@ -159,7 +183,9 @@ describe("resolvePermission — the security floor", () => {
       { optionId: "allow_always_id", name: "Allow always", kind: "allow_always" },
       { optionId: "reject_always_id", name: "Reject always", kind: "reject_always" },
     ];
-    const res = await resolvePermission(toolCall("execute"), noAllowOnce, gate);
+    const res = await resolvePermission(toolCall("execute"), noAllowOnce, gate, {
+      allowUnrestricted: true,
+    });
     // No reject_once either → cancelled, and definitely not allow_always.
     expect(res.outcome.outcome).toBe("cancelled");
     expect(selectedId(res)).toBeUndefined();

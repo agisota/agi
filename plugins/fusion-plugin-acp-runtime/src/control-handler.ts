@@ -232,10 +232,40 @@ export async function runApprovalForCategory(
  * `require-approval` without a resolvable approver, or a missing `allow_once`
  * option.
  */
+export interface ResolvePermissionOptions {
+  /**
+   * Risk S1 acknowledgement. When false (the safe default), a blanket `allow`
+   * disposition on a *sensitive* category is escalated to `require-approval`
+   * rather than auto-approved — so the shipped `unrestricted` default policy
+   * does not silently green-light an untrusted agent's command/file/network
+   * calls. The user opts out of the escalation by acknowledging the risk.
+   */
+  allowUnrestricted?: boolean;
+}
+
+/**
+ * Per-category disposition with the Risk S1 acknowledgement escalation applied:
+ * a *sensitive* category the policy would `allow` is upgraded to
+ * `require-approval` unless `allowUnrestricted` is set. `exempt` (read-only)
+ * never escalates. Exported so the fs write path applies the identical rule.
+ */
+export function effectiveDisposition(
+  category: FusionCategory | "exempt",
+  gate: PermissionGate,
+  opts?: ResolvePermissionOptions,
+): GateDisposition {
+  const disposition = dispositionFor(category, gate);
+  if (disposition === "allow" && category !== "exempt" && opts?.allowUnrestricted !== true) {
+    return "require-approval";
+  }
+  return disposition;
+}
+
 export async function resolvePermission(
   toolCall: ToolCallUpdate,
   options: PermissionOption[],
   gate: PermissionGate | undefined,
+  opts?: ResolvePermissionOptions,
 ): Promise<RequestPermissionResponse> {
   // No gate / no policy → default-deny.
   if (!gate || !gate.permissionPolicy) {
@@ -248,7 +278,8 @@ export async function resolvePermission(
     return buildResponse(selectOption("deny", options));
   }
 
-  const disposition = dispositionFor(category, gate);
+  // Per-category disposition + S1 acknowledgement escalation.
+  const disposition = effectiveDisposition(category, gate, opts);
 
   if (disposition === "allow") {
     return buildResponse(selectOption("allow", options));

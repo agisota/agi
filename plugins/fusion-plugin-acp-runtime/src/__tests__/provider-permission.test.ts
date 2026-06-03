@@ -46,10 +46,24 @@ function selectedId(res: RequestPermissionResponse): string | undefined {
 }
 
 describe("createBridgingClientHandler — requestPermission delegates to the gate", () => {
-  it("answers allow_once for an allow category", async () => {
-    const { handler } = createBridgingClientHandler({}, gate({ ...UNRESTRICTED, command_execution: "allow" }));
+  it("answers allow_once for an allow category (risk acknowledged)", async () => {
+    const { handler } = createBridgingClientHandler(
+      {},
+      gate({ ...UNRESTRICTED, command_execution: "allow" }),
+      undefined,
+      { allowUnrestricted: true },
+    );
     const res = await handler.requestPermission(req("execute"));
     expect(selectedId(res)).toBe("allow_once_id");
+  });
+
+  it("escalates a sensitive allow to deny without the unrestricted acknowledgement (S1)", async () => {
+    const { handler } = createBridgingClientHandler(
+      {},
+      gate({ ...UNRESTRICTED, command_execution: "allow" }),
+    );
+    const res = await handler.requestPermission(req("execute"));
+    expect(selectedId(res)).toBe("reject_once_id");
   });
 
   it("default-denies (reject_once) when no gate is supplied", async () => {

@@ -59,6 +59,13 @@ describe("resolveCliSettings", () => {
     expect(s.fsWrite).toBe(false);
     // env allow-list empty by default (KTD6b) — no inherited process.env.
     expect(s.envAllowList).toEqual([]);
+    // Risk S1 acknowledgement is off by default (safe).
+    expect(s.allowUnrestricted).toBe(false);
+  });
+
+  it("honors the acpAllowUnrestricted acknowledgement", () => {
+    expect(resolveCliSettings({ acpAllowUnrestricted: true }).allowUnrestricted).toBe(true);
+    expect(resolveCliSettings({ acpAllowUnrestricted: "yes" }).allowUnrestricted).toBe(false);
   });
 
   it("honors explicit binary, args, and capability toggles", () => {

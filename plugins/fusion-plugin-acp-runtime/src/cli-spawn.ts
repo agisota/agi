@@ -23,6 +23,16 @@ export interface AcpCliSettings {
    * default — callers opt specific vars in by name.
    */
   envAllowList: string[];
+  /**
+   * Risk S1 acknowledgement. The shipped default permission policy is
+   * `unrestricted` (every category → allow). Because the ACP agent is an
+   * untrusted subprocess, the permission floor refuses to auto-approve a
+   * *sensitive* category on a blanket `allow` disposition unless the user has
+   * explicitly acknowledged that risk by setting this true — otherwise such
+   * calls are escalated to approval (or denied when no approver exists).
+   * Default: false (safe).
+   */
+  allowUnrestricted: boolean;
 }
 
 function asTrimmedString(value: unknown): string | undefined {
@@ -46,5 +56,6 @@ export function resolveCliSettings(settings?: Record<string, unknown>): AcpCliSe
   const fsRead = asBool(settings?.acpFsRead);
   const fsWrite = asBool(settings?.acpFsWrite);
   const envAllowList = asStringArray(settings?.acpEnvAllowList) ?? [];
-  return { binaryPath, args, model, fsRead, fsWrite, envAllowList };
+  const allowUnrestricted = asBool(settings?.acpAllowUnrestricted);
+  return { binaryPath, args, model, fsRead, fsWrite, envAllowList, allowUnrestricted };
 }

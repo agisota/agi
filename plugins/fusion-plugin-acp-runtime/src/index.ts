@@ -32,6 +32,15 @@ const plugin: FusionPlugin = definePlugin({
         `ACP Runtime Plugin loaded — binary=${settings.binaryPath} args=[${settings.args.join(" ")}] ` +
           `fsRead=${settings.fsRead} fsWrite=${settings.fsWrite}`,
       );
+      // Risk S1: the ACP agent is an untrusted subprocess. Acknowledging the
+      // unrestricted policy disables the per-call approval escalation — warn so
+      // it is a deliberate, visible choice.
+      if (settings.allowUnrestricted) {
+        ctx.logger.warn(
+          "ACP Runtime: acpAllowUnrestricted is set — sensitive tool calls from the untrusted agent " +
+            "will be auto-approved under an allow-all policy. Prefer an approval-required policy.",
+        );
+      }
     },
   },
   runtime: {

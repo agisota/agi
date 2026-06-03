@@ -25,7 +25,7 @@ import {
 } from "@agentclientprotocol/sdk";
 import { spawnAgent, captureStderr, forceKill, unregisterProcess } from "./process-manager.js";
 import { createEventBridge } from "./event-bridge.js";
-import { resolvePermission } from "./control-handler.js";
+import { resolvePermission, type ResolvePermissionOptions } from "./control-handler.js";
 import { createFsHandlers } from "./fs-capabilities.js";
 import { boundIdentifier } from "./sanitize.js";
 import type { AcpCallbacks, PermissionGate } from "./types.js";
@@ -113,6 +113,7 @@ export function createBridgingClientHandler(
   callbacks: AcpCallbacks,
   gate?: PermissionGate,
   fsOpts?: FsHandlerBuildOptions,
+  permissionOpts?: ResolvePermissionOptions,
 ): BridgingClientHandler {
   const bridge = createEventBridge(callbacks);
 
@@ -125,6 +126,7 @@ export function createBridgingClientHandler(
         gate,
         allowRead: fsOpts.allowRead,
         allowWrite: fsOpts.allowWrite,
+        allowUnrestricted: permissionOpts?.allowUnrestricted,
       })
     : {};
 
@@ -165,7 +167,7 @@ export function createBridgingClientHandler(
         const drain = (response: RequestPermissionResponse) => finish(response);
         pending.add(drain);
 
-        resolvePermission(params.toolCall, params.options, gate).then(
+        resolvePermission(params.toolCall, params.options, gate, permissionOpts).then(
           (response) => finish(response),
           // resolvePermission never rejects, but stay safe: deny-by-cancel.
           () => finish(cancelledResponse),

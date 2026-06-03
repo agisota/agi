@@ -25,7 +25,7 @@ import {
   openWithinCwd,
   PathJailError,
 } from "./path-jail.js";
-import { dispositionFor, runApprovalForCategory } from "./control-handler.js";
+import { effectiveDisposition, runApprovalForCategory } from "./control-handler.js";
 import type { PermissionGate } from "./types.js";
 
 /** Hard ceiling on bytes returned from a read when `limit` is absent/huge (S5). */
@@ -61,6 +61,12 @@ export interface FsHandlerOptions {
   allowRead: boolean;
   /** Advertise/register `writeTextFile` (default OFF — KTD6). */
   allowWrite: boolean;
+  /**
+   * Risk S1 acknowledgement. When false (default), a blanket `allow` on the
+   * `file_write_delete` category is escalated to `require-approval` for the
+   * untrusted agent rather than auto-approved.
+   */
+  allowUnrestricted?: boolean;
   /** Override the read byte ceiling (tests). */
   readMaxBytes?: number;
   /** Override the write byte ceiling (tests). */
@@ -181,7 +187,9 @@ export function createFsHandlers(opts: FsHandlerOptions): FsHandlers {
       // security floor stays single-sourced.
       const gate = opts.gate;
       const disposition = gate?.permissionPolicy
-        ? dispositionFor("file_write_delete", gate)
+        ? effectiveDisposition("file_write_delete", gate, {
+            allowUnrestricted: opts.allowUnrestricted,
+          })
         : "require-approval";
 
       if (disposition === "block") {
