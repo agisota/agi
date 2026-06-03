@@ -407,7 +407,12 @@ function cleanupInMemorySession(sessionId: string): boolean {
 
   if (session.agent) {
     try {
-      session.agent.session.dispose?.();
+      const disposeResult = session.agent.session.dispose?.();
+      if (disposeResult) {
+        disposeResult.catch((err: unknown) => {
+          diagnostics.errorFromException("Error disposing agent for session", err, { sessionId, operation: "dispose-session" });
+        });
+      }
     } catch (err) {
       diagnostics.errorFromException("Error disposing agent for session", err, { sessionId, operation: "dispose-session" });
     }

@@ -26,6 +26,7 @@ const sessions = new Map<string, PlanningSession>();
 vi.mock("../planning.js", () => ({
   getSession: (id: string) => sessions.get(id),
   getSummary: (id: string) => sessions.get(id)?.summary,
+  releaseSession: vi.fn(),
   cleanupSession: vi.fn(),
   formatInterviewQA: vi.fn(() => ""),
   mergePlanningSubtaskDrafts: vi.fn((_sessionId: string, subtasks: unknown[]) => subtasks),
