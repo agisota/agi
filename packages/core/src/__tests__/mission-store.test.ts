@@ -3338,14 +3338,33 @@ describe("MissionStore", () => {
       expect(linked[0].sourceFeatureId).toBe(feature.id);
     });
 
+    it("lazily re-links exactly one managed assertion for legacy acceptance-criteria features", () => {
+      const mission = store.createMission({ title: "M" });
+      const milestone = store.addMilestone(mission.id, { title: "MS" });
+      const slice = store.addSlice(milestone.id, { title: "SL" });
+      const feature = store.addFeature(slice.id, { title: "Feature", acceptanceCriteria: "AC text" });
+      const [managed] = store.listAssertionsForFeature(feature.id);
+      store.unlinkFeatureFromAssertion(feature.id, managed.id);
+      store.deleteContractAssertion(managed.id);
+
+      const first = store.ensureFeatureAssertionLinked(feature.id);
+      const second = store.ensureFeatureAssertionLinked(feature.id);
+
+      expect(first).toHaveLength(1);
+      expect(first[0].assertion).toBe("AC text");
+      expect(second).toHaveLength(1);
+      expect(second[0].id).toBe(first[0].id);
+      expect(store.listAssertionsForFeature(feature.id)).toHaveLength(1);
+    });
+
     it("derives managed assertion text from description or fallback", () => {
       const mission = store.createMission({ title: "M" });
       const milestone = store.addMilestone(mission.id, { title: "MS" });
       const slice = store.addSlice(milestone.id, { title: "SL" });
       const fromDescription = store.addFeature(slice.id, { title: "Desc Feature", description: "Desc text" });
       const fallback = store.addFeature(slice.id, { title: "Fallback Feature" });
-      expect(store.listAssertionsForFeature(fromDescription.id)[0].assertion).toBe("Desc text");
-      expect(store.listAssertionsForFeature(fallback.id)[0].assertion).toBe("Verify implementation of: Fallback Feature");
+      expect(store.ensureFeatureAssertionLinked(fromDescription.id)[0].assertion).toBe("Desc text");
+      expect(store.ensureFeatureAssertionLinked(fallback.id)[0].assertion).toBe("Verify implementation of: Fallback Feature");
     });
 
     it("syncs managed assertion in place on acceptanceCriteria update", () => {

@@ -512,7 +512,7 @@ A feature transitions to `blocked` when:
 
 On engine restart, `recoverActiveMissions()` re-enqueues features in `validating` or `needs_fix` states, ensuring no validation work is lost. It also re-triggers `implementing` features whose linked task is already `done`/`archived` and whose assertion validation has not passed yet. When the stale-run reaper has already converted an abandoned validator run into `needs_fix`, `processTaskOutcome()` promotes the feature back through `implementing` and re-validates instead of skipping it. The same recovery path is replayed during periodic self-heal maintenance, so historically stranded `implementing` features can self-heal without requiring an engine restart.
 
-For features with zero linked assertions, the completion path is explicit: the loop marks the feature `done`, advances `loopState` to `passed`, emits `validation:passed` with summary `"No assertions linked"`, and records mission event code `validation_auto_passed_no_assertions`. Contract details (including canonical no-assertions behavior and FN-5696 assertion-authoring separation) are defined in [Mission Completion Gate Contract](./missions-completion-contract.md).
+For features with missing linked assertions, the completion path is now validator-first: the loop lazily restores the store-managed per-feature assertion just before validation, then runs the AI validator instead of auto-passing. Milestone `acceptanceCriteria` is threaded into the validator prompt for every feature in that milestone, so all mission criteria are AI-evaluated. Contract details are defined in [Mission Completion Gate Contract](./missions-completion-contract.md).
 
 ### Autopilot / Scheduler Interplay
 
@@ -543,8 +543,7 @@ These are independent tracking mechanisms — autopilot monitors mission progres
 **MissionEvent audit types:**
 - `slice_activated`, `feature_planned`, `feature_completed`
 - `validation:started`, `validation:passed`, `validation:failed`, `validation:blocked`
-- `validation_auto_passed_no_assertions` (reason: `"No assertions linked"`)
-- `milestone_missing_structured_assertions` (warning when prose criteria exist with zero structured assertions)
+- `milestone_missing_structured_assertions` (legacy-data warning surface; enforcement still lazy-restores managed assertions at runtime)
 - `fix_feature:created`, `feature:blocked`
 
 **Validator run telemetry:**

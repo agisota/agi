@@ -900,7 +900,6 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
   const [missionHealthById, setMissionHealthById] = useState<Map<string, MissionHealth>>(new Map());
 
   const [activeTab, setActiveTab] = useState<"structure" | "activity">("structure");
-  const milestoneAssertionGapSignatureRef = useRef<Map<string, string>>(new Map());
   const [missionEvents, setMissionEvents] = useState<MissionEvent[]>([]);
   const missionEventsRef = useRef<MissionEvent[]>([]);
   const missionsRef = useRef<MissionWithSummary[]>([]);
@@ -917,30 +916,6 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
 
   const activityEventsContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!selectedMission) return;
-
-    const nextSignatures = new Map<string, string>();
-    for (const milestone of selectedMission.milestones) {
-      const featuresWithAcceptanceCriteria = milestone.slices
-        .flatMap((slice) => slice.features)
-        .filter((feature) => (feature.acceptanceCriteria ?? "").trim().length > 0);
-      const assertionCount = assertionsByMilestone.get(milestone.id)?.length ?? 0;
-      const hasZeroAssertionGuard = featuresWithAcceptanceCriteria.length > 0 && assertionCount === 0;
-      const signature = `${hasZeroAssertionGuard}:${featuresWithAcceptanceCriteria.length}:${assertionCount}`;
-      const previousSignature = milestoneAssertionGapSignatureRef.current.get(milestone.id);
-      if (hasZeroAssertionGuard && previousSignature !== signature) {
-        console.warn("[MissionManager] milestone_zero_assertion_guard", {
-          milestoneId: milestone.id,
-          featureAcceptanceCriteriaCount: featuresWithAcceptanceCriteria.length,
-          assertionCount,
-        });
-      }
-      nextSignatures.set(milestone.id, signature);
-    }
-
-    milestoneAssertionGapSignatureRef.current = nextSignatures;
-  }, [assertionsByMilestone, selectedMission]);
   const activityEventsEndRef = useRef<HTMLDivElement>(null);
 
   // Keep latest state available to long-lived SSE handlers without reconnect churn.
@@ -2802,7 +2777,6 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
                   const milestoneAssertions = Array.isArray(assertionsByMilestone.get(milestone.id))
                     ? assertionsByMilestone.get(milestone.id)!
                     : [] as MissionContractAssertion[];
-                  const hasZeroAssertionGuard = featuresWithAcceptanceCriteria.length > 0 && milestoneAssertions.length === 0;
 
                   return (
                   <div key={milestone.id} className="mission-milestone">
@@ -3613,17 +3587,11 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
                           {/* Assertions Panel */}
                           <div className="mission-assertions">
                             <div className="mission-assertions__header">
-                              <span className="mission-assertions__title">Contract assertions (validator-enforced when linked)</span>
+                              <span className="mission-assertions__title">Contract assertions (AI-validated)</span>
                               <span className="mission-assertions__mode-tag" data-testid="milestone-assertions-enforced-indicator">
                                 <span className="status-dot status-dot--running" />
-                                Enforced by autopilot
+                                AI-validated mission gate
                               </span>
-                              {hasZeroAssertionGuard && (
-                                <span className="mission-assertions__mode-tag mission-assertions__mode-tag--warning" data-testid="milestone-zero-assertion-guard">
-                                  <span className="status-dot status-dot--pending" />
-                                  Feature criteria present but no enforced contract assertions linked
-                                </span>
-                              )}
                               {milestoneRollup && (
                                 <span
                                   className="mission-status-badge mission-status-badge--sm"
@@ -3757,23 +3725,11 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
                                         {(() => {
                                           const linked = linkedFeaturesByAssertion.get(assertion.id);
                                           const count = linked?.length ?? 0;
-                                          const isEnforced = count > 0;
-                                          return (
-                                            <>
-                                              <span
-                                                className={`mission-assertion__enforcement ${isEnforced ? "mission-assertion__enforcement--enforced" : "mission-assertion__enforcement--informational"}`}
-                                                data-testid={`mission-assertion-enforcement-${assertion.id}`}
-                                              >
-                                                <span className={`status-dot ${isEnforced ? "status-dot--running" : "status-dot--pending"}`} />
-                                                {isEnforced ? "Enforced gate" : "Informational"}
-                                              </span>
-                                              {count > 0 ? (
-                                                <span className="mission-assertion__linked-count" title={`${count} linked feature${count !== 1 ? "s" : ""}`}>
-                                                  ({count} linked)
-                                                </span>
-                                              ) : null}
-                                            </>
-                                          );
+                                          return count > 0 ? (
+                                            <span className="mission-assertion__linked-count" title={`${count} linked feature${count !== 1 ? "s" : ""}`}>
+                                              ({count} linked)
+                                            </span>
+                                          ) : null;
                                         })()}
                                         <button
                                           className="mission-icon-btn"
@@ -3882,22 +3838,19 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
                               {(milestoneAssertions.length === 0)
                                 && !isCreatingAssertion
                                 && (
+                                  // Render from feature prose presence directly. Legacy
+                                  // hasProseButNoAssertions telemetry is no longer the gate.
                                   featuresWithAcceptanceCriteria.length > 0 ? (
-                                    // Product contract source of truth: docs/missions-completion-contract.md (FN-5718).
-                                    // MissionFeature.acceptanceCriteria is informational authored intent; linked
-                                    // MissionContractAssertion rows are the validator-enforced completion gate.
-                                    // When criteria prose exists but assertions are absent, keep criteria visible
-                                    // and warn that the surface is informational until assertions are linked.
                                     <>
                                       <div className="mission-manager__empty mission-assertions__empty">
-                                        <span>No contract assertions are linked yet. Feature acceptance criteria are present below and remain informational until assertions are linked.</span>
+                                        <span>No linked contract assertions are loaded yet. Feature criteria below will still be AI-validated when mission validation runs.</span>
                                       </div>
                                       <div className="mission-assertions__list" data-testid="milestone-feature-acceptance-rollup">
                                         <div className="mission-assertions__rollup-header">
-                                          <span className="mission-assertions__title">Feature acceptance criteria (informational source)</span>
-                                          <span className="mission-assertions__mode-tag mission-assertions__mode-tag--informational" data-testid="milestone-feature-acceptance-informational-indicator">
-                                            <span className="status-dot status-dot--pending" />
-                                            Not enforced by autopilot
+                                          <span className="mission-assertions__title">Feature criteria awaiting assertion sync</span>
+                                          <span className="mission-assertions__mode-tag" data-testid="milestone-feature-acceptance-ai-validated-indicator">
+                                            <span className="status-dot status-dot--running" />
+                                            AI-validated at runtime
                                           </span>
                                         </div>
                                         {featuresWithAcceptanceCriteria.map((feature) => (
@@ -3905,11 +3858,14 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
                                             <div className="mission-assertion__header">
                                               <span className="mission-assertion__title">{feature.title}</span>
                                               <span
-                                                className="mission-assertion__enforcement mission-assertion__enforcement--informational"
-                                                data-testid={`mission-feature-acceptance-enforcement-${feature.id}`}
+                                                className="mission-status-badge mission-status-badge--sm"
+                                                data-testid={`mission-feature-acceptance-status-${feature.id}`}
+                                                style={{
+                                                  backgroundColor: featureStatusColors[feature.status].bg,
+                                                  color: featureStatusColors[feature.status].text,
+                                                }}
                                               >
-                                                <span className="status-dot status-dot--pending" />
-                                                Informational
+                                                {feature.status}
                                               </span>
                                             </div>
                                             <div className="mission-assertion__text">

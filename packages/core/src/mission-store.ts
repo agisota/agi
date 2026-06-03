@@ -2197,6 +2197,16 @@ export class MissionStore extends EventEmitter<MissionStoreEvents> {
     }
   }
 
+  ensureFeatureAssertionLinked(featureId: string): MissionContractAssertion[] {
+    const feature = this.getFeature(featureId);
+    if (!feature) {
+      throw new Error(`Feature ${featureId} not found`);
+    }
+
+    this.ensureFeatureAssertion(feature);
+    return this.listAssertionsForFeature(featureId);
+  }
+
   /**
    * Idempotently seed authored contract assertions for specific features.
    *
