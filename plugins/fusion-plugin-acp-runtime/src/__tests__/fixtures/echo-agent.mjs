@@ -135,6 +135,15 @@ class EchoAgent {
     // Cancel-mid-prompt test: keep the turn open until cancel() arrives, then
     // resolve with the "cancelled" stop reason (mirrors a real agent).
     if (process.env.ACP_FIXTURE_HANG_PROMPT === "1") {
+      // Race-proof: cancel() can be dispatched while this handler is suspended
+      // on the sessionUpdate write above (JSON-RPC notifications are handled
+      // concurrently). If the cancel already landed, resolve immediately
+      // instead of registering a hang nobody will release — this exact race
+      // made the cancel-mid-prompt test time out on loaded CI shards.
+      if (this._cancelRequested) {
+        this._cancelRequested = false;
+        return { stopReason: "cancelled" };
+      }
       return await new Promise((resolve) => {
         this._cancelTurn = () => resolve({ stopReason: "cancelled" });
       });
@@ -143,11 +152,15 @@ class EchoAgent {
   }
 
   async cancel(_params) {
-    // Release any in-flight hung turn with a "cancelled" stop reason.
+    // Release any in-flight hung turn with a "cancelled" stop reason. If the
+    // prompt handler hasn't reached its hang point yet, record the cancel so
+    // it resolves immediately when it does (see prompt()).
     if (this._cancelTurn) {
       const release = this._cancelTurn;
       this._cancelTurn = undefined;
       release();
+    } else {
+      this._cancelRequested = true;
     }
   }
 }
