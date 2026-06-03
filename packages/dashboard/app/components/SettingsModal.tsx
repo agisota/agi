@@ -19,6 +19,7 @@ import type { AuthProvider, ManualOAuthCodeInfo, ModelInfo, BackupListResponse, 
 import { useMemoryBackendStatus } from "../hooks/useMemoryBackendStatus";
 import { useOverlayDismiss } from "../hooks/useOverlayDismiss";
 import type { ToastType } from "../hooks/useToast";
+import { useTranslation } from "react-i18next";
 import { ThemeSelector } from "./ThemeSelector";
 import { LanguageSelector } from "./LanguageSelector";
 import { useSessionBannersHidden, setSessionBannersHidden } from "../hooks/useSessionBannerPref";
@@ -431,6 +432,7 @@ export function SettingsModal({
   onReopenOnboarding,
   onOpenApprovals,
 }: SettingsModalProps) {
+  const { t } = useTranslation("app");
   const { confirm } = useConfirm();
   const worktrunkInstall = useWorktrunkInstallStatus(projectId);
   const worktrunkInstallVerified = worktrunkInstall.status === "installed";
@@ -3693,7 +3695,7 @@ export function SettingsModal({
         return (
           <>
             {renderScopeBanner()}
-            <h4 className="settings-section-heading">Appearance</h4>
+            <h4 className="settings-section-heading">{t("settings.appearance.title", "Appearance")}</h4>
             <ThemeSelector
               themeMode={themeMode}
               colorTheme={colorTheme}
