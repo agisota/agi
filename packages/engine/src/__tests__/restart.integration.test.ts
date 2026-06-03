@@ -1298,7 +1298,8 @@ describe("Crash scenario edge cases", () => {
 
   it("concurrent resumeOrphaned() calls don't double-execute the same task", async () => {
     const store = createMockStore();
-    const worktreePath = "/tmp/test/.worktrees/swift-falcon";
+    const rootDir = "/private/tmp/test";
+    const worktreePath = `${rootDir}/.worktrees/swift-falcon`;
     const task = makeTask("FN-092", "in-progress", {
       worktree: worktreePath,
       branch: "fusion/fn-092",
@@ -1314,7 +1315,7 @@ describe("Crash scenario edge cases", () => {
       }
       if (String(cmd) === "git worktree list --porcelain") {
         return [
-          "worktree /tmp/test",
+          `worktree ${rootDir}`,
           "HEAD abc123",
           "branch refs/heads/main",
           "",
@@ -1335,7 +1336,7 @@ describe("Crash scenario edge cases", () => {
       },
     } as any);
 
-    const executor = new TaskExecutor(store, "/tmp/test");
+    const executor = new TaskExecutor(store, rootDir);
 
     // First call starts execution
     const first = executor.resumeOrphaned();

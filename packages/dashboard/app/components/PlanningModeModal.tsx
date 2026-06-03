@@ -2141,7 +2141,8 @@ export function PlanningModeModal({ isOpen, onClose, onTaskCreated, onTasksCreat
               onRefine={() => {
                 void handleRefineFurther();
               }}
-              isLoading={isCreatingTask || isStartingBreakdown}
+              isCreatingTask={isCreatingTask}
+              isStartingBreakdown={isStartingBreakdown}
             />
           )}
 
@@ -2435,7 +2436,8 @@ interface SummaryViewProps {
   onCreateTask: () => void;
   onBreakIntoTasks: () => void;
   onRefine: () => void;
-  isLoading: boolean;
+  isCreatingTask: boolean;
+  isStartingBreakdown: boolean;
 }
 
 function SummaryView({
@@ -2452,7 +2454,8 @@ function SummaryView({
   onCreateTask,
   onBreakIntoTasks,
   onRefine,
-  isLoading,
+  isCreatingTask,
+  isStartingBreakdown,
 }: SummaryViewProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [renderMarkdown, setRenderMarkdown] = useState(false);
@@ -2468,6 +2471,7 @@ function SummaryView({
   const selectedPriority = normalizeTaskPriority(summary.priority);
   const isBranchNameRequired = branchMode === "existing" || branchMode === "custom-new";
   const hasInvalidBranchSelection = isBranchNameRequired && !branchName.trim();
+  const isLoading = isCreatingTask || isStartingBreakdown;
 
   const handleDependencyToggle = (taskId: string) => {
     const newDeps = selectedDependencies.includes(taskId)
@@ -2657,7 +2661,7 @@ function SummaryView({
         </button>
         <div className="planning-summary-actions-right">
           <button className="btn" onClick={onCreateTask} disabled={isLoading || hasInvalidBranchSelection}>
-            {isLoading ? (
+            {isCreatingTask ? (
               <>
                 <Loader2 size={16} className="spin icon-mr-8" />
                 Creating...
@@ -2675,7 +2679,7 @@ function SummaryView({
             disabled={isLoading}
             title="Break the plan into multiple tasks with dependencies"
           >
-            {isLoading ? (
+            {isStartingBreakdown ? (
               <>
                 <Loader2 size={16} className="spin icon-mr-8" />
                 Breaking down...

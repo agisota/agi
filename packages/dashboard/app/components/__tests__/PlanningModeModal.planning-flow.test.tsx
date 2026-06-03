@@ -660,6 +660,75 @@ describe("PlanningModeModal", () => {
       });
     });
 
+    it("FN-5912 keeps Break into Tasks labeled while Create Single Task is pending", async () => {
+      const resumedSummary: PlanningSummary = {
+        title: "Resume-spinner-isolation-single-task",
+        description: "Recovered summary for spinner isolation on single-task creation",
+        suggestedSize: "M",
+        suggestedDependencies: [],
+        keyDeliverables: ["Implement", "Verify"],
+      };
+      const createTaskDeferred = createDeferred<Task>();
+
+      mockFetchAiSession.mockResolvedValueOnce({
+        id: "session-spinner-isolation-single-task",
+        type: "planning",
+        status: "complete",
+        title: "Resume-spinner-isolation-single-task",
+        inputPayload: JSON.stringify({ initialPlan: "Recover and create a single task" }),
+        conversationHistory: "[]",
+        currentQuestion: null,
+        result: JSON.stringify(resumedSummary),
+        thinkingOutput: "",
+        error: null,
+        projectId: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      mockCreateTaskFromPlanning.mockReturnValueOnce(createTaskDeferred.promise);
+
+      render(
+        <PlanningModeModal
+          isOpen={true}
+          onClose={mockOnClose}
+          onTaskCreated={mockOnTaskCreated}
+          onTasksCreated={vi.fn()}
+          tasks={mockTasks}
+          resumeSessionId="session-spinner-isolation-single-task"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Create Single Task" })).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Create Single Task" }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Creating..." })).toBeDisabled();
+      });
+
+      expect(screen.getByRole("button", { name: "Break into Tasks" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Breaking down..." })).toBeNull();
+
+      createTaskDeferred.resolve({
+        id: "FN-5912",
+        title: "Created from spinner isolation test",
+        description: "",
+        column: "triage",
+        dependencies: [],
+        steps: [],
+        currentStep: 0,
+        log: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      } as Task);
+
+      await waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalled();
+      });
+    });
+
     it("FN-4769 shows inline Breaking down spinner for Break into Tasks while breakdown start is pending", async () => {
       const resumedSummary: PlanningSummary = {
         title: "Resume-spinner-breakdown-start",
@@ -710,6 +779,75 @@ describe("PlanningModeModal", () => {
 
       breakdownDeferred.resolve({
         sessionId: "session-spinner-breakdown-start",
+        subtasks: [
+          {
+            id: "subtask-1",
+            title: "First subtask",
+            description: "First description",
+            suggestedSize: "M",
+            dependsOn: [],
+          },
+        ],
+      });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Create Tasks" })).toBeDefined();
+      });
+    });
+
+    it("FN-5912 keeps Create Single Task labeled while Break into Tasks is pending", async () => {
+      const resumedSummary: PlanningSummary = {
+        title: "Resume-spinner-isolation-breakdown",
+        description: "Recovered summary for spinner isolation on breakdown start",
+        suggestedSize: "M",
+        suggestedDependencies: [],
+        keyDeliverables: ["Implement", "Verify"],
+      };
+      const breakdownDeferred = createDeferred<{ sessionId: string; subtasks: any[] }>();
+
+      mockFetchAiSession.mockResolvedValueOnce({
+        id: "session-spinner-isolation-breakdown",
+        type: "planning",
+        status: "complete",
+        title: "Resume-spinner-isolation-breakdown",
+        inputPayload: JSON.stringify({ initialPlan: "Recover and break down into tasks" }),
+        conversationHistory: "[]",
+        currentQuestion: null,
+        result: JSON.stringify(resumedSummary),
+        thinkingOutput: "",
+        error: null,
+        projectId: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      mockStartPlanningBreakdown.mockReturnValueOnce(breakdownDeferred.promise);
+
+      render(
+        <PlanningModeModal
+          isOpen={true}
+          onClose={mockOnClose}
+          onTaskCreated={mockOnTaskCreated}
+          onTasksCreated={vi.fn()}
+          tasks={mockTasks}
+          resumeSessionId="session-spinner-isolation-breakdown"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Break into Tasks" })).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Break into Tasks" }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Breaking down..." })).toBeDisabled();
+      });
+
+      expect(screen.getByRole("button", { name: "Create Single Task" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Creating..." })).toBeNull();
+
+      breakdownDeferred.resolve({
+        sessionId: "session-spinner-isolation-breakdown",
         subtasks: [
           {
             id: "subtask-1",
