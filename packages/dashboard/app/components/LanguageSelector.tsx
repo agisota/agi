@@ -10,6 +10,7 @@ const ENDONYMS: Record<Locale, string> = {
   "zh-TW": "繁體中文",
   fr: "Français",
   es: "Español",
+  ko: "한국어",
 };
 
 /** Settings control for choosing the UI language. Applies in place (no reload). */

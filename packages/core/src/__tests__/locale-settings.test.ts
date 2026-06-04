@@ -12,13 +12,13 @@ import {
 } from "../index.js";
 
 describe("locale primitives", () => {
-  it("exposes exactly the five supported locale codes", () => {
-    expect([...SUPPORTED_LOCALES]).toEqual(["en", "zh-CN", "zh-TW", "fr", "es"]);
+  it("exposes exactly the six supported locale codes", () => {
+    expect([...SUPPORTED_LOCALES]).toEqual(["en", "zh-CN", "zh-TW", "fr", "es", "ko"]);
   });
 
   it("uses en as the default/source locale", () => {
     expect(DEFAULT_LOCALE).toBe("en");
-    expectTypeOf<Locale>().toEqualTypeOf<"en" | "zh-CN" | "zh-TW" | "fr" | "es">();
+    expectTypeOf<Locale>().toEqualTypeOf<"en" | "zh-CN" | "zh-TW" | "fr" | "es" | "ko">();
   });
 
   it("narrows supported codes and rejects everything else via isLocale", () => {

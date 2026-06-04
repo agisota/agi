@@ -18,7 +18,7 @@ import {
  * source, not by file path. `common` is the default namespace.
  */
 export default defineConfig({
-  locales: ["en", "zh-CN", "zh-TW", "fr", "es"],
+  locales: ["en", "zh-CN", "zh-TW", "fr", "es", "ko"],
   extract: {
     input: [
       "packages/dashboard/app/**/*.{ts,tsx}",

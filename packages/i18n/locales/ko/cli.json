@@ -1,0 +1,9 @@
+{
+  "tui": {
+    "loading": "불러오는 중…",
+    "loadingTasks": "작업을 불러오는 중…",
+    "noTasks": "이 프로젝트에 작업이 없습니다.",
+    "switchProjectsHint": "[{{key}}] 키를 눌러 프로젝트를 전환합니다.",
+    "quit": "종료"
+  }
+}

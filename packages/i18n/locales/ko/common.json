@@ -1,0 +1,15 @@
+{
+  "columns": {
+    "triage": "계획",
+    "todo": "할 일",
+    "in-progress": "진행 중",
+    "in-review": "검토 중",
+    "done": "완료",
+    "archived": "보관됨"
+  },
+  "actions": {
+    "save": "저장",
+    "cancel": "취소",
+    "close": "닫기"
+  }
+}

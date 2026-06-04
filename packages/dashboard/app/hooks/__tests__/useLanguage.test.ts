@@ -83,7 +83,7 @@ describe("useLanguage", () => {
 
   it("exposes the supported locale list", () => {
     const { result } = renderHook(() => useLanguage());
-    expect([...result.current.supportedLocales]).toEqual(["en", "zh-CN", "zh-TW", "fr", "es"]);
+    expect([...result.current.supportedLocales]).toEqual(["en", "zh-CN", "zh-TW", "fr", "es", "ko"]);
   });
 
   it("hydrates from server settings when no local choice exists", async () => {
