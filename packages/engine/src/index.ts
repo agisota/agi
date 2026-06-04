@@ -61,10 +61,17 @@ export {
   evaluateBranchGroupPromotion,
   evaluateBranchGroupCompletion,
   promoteBranchGroup,
+  reconcileBranchGroupPr,
   type BranchGroupMergeRouting,
   type BranchGroupPromotionDecision,
   type BranchGroupCompletionStatus,
   type BranchGroupPromotionResult,
+  type PromoteBranchGroupInput,
+  type ReconcileBranchGroupPrResult,
+  type CreateGroupPrFn,
+  type SyncGroupPrFn,
+  type CloseGroupPrFn,
+  type GroupPrReconcileResult,
 } from "./group-merge-coordinator.js";
 export {
   resolveMergeIntegrationRoot,
@@ -119,6 +126,7 @@ export {
   type InteractiveAgentResult,
   type InteractiveAgentFactory,
 } from "./interactive-ai-session.js";
+export { selectPermanentAgentForTask, listEligibleExecutorAgents } from "./agent-assignment.js";
 
 // Register createFnAgent into core's loader so consumers in @fusion/core
 // (e.g. ai-summarize, memory-compaction) can resolve it without a circular
