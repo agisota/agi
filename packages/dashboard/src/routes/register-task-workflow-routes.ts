@@ -776,6 +776,28 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
         const listOptions = { limit, offset, slim: true, includeArchived, ...(column ? { column } : {}) };
         tasks = await scopedStore.listTasks(listOptions);
       }
+
+      // Residual B (U9/U13): additively populate `branchProgress` when the
+      // workflowColumns flag is ON and the fan-out branch table has rows for
+      // any of these tasks. One batched query (cheap; short-circuits when the
+      // table is empty). The payload is otherwise byte-identical.
+      try {
+        const settings = await scopedStore.getSettingsFast();
+        if (isWorkflowColumnsEnabled(settings) && tasks.length > 0) {
+          const byTask = scopedStore.getBranchProgressByTask(tasks.map((t) => t.id));
+          if (byTask.size > 0) {
+            tasks = tasks.map((task) => {
+              const branchProgress = byTask.get(task.id);
+              return branchProgress && branchProgress.length > 0
+                ? { ...task, branchProgress }
+                : task;
+            });
+          }
+        }
+      } catch {
+        // Branch-progress enrichment is best-effort and must never fail the
+        // board load — fall through with the un-enriched task list.
+      }
       res.json(tasks);
     } catch (err: unknown) {
       if (err instanceof ApiError) {

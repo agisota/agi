@@ -86,6 +86,8 @@ export {
   listTraits,
   resolveColumnFlags,
   validateColumnTraits,
+  assertColumnTraitsValid,
+  ColumnTraitValidationError,
   registerTraitHookImpl,
   __resetTraitRegistryForTests,
 } from "./trait-registry.js";
@@ -1266,6 +1268,10 @@ export {
   deriveStageTransitions,
   buildWorkflowObservationFromTask,
   buildWorkflowObservation,
+  checkTransitionParity,
+  countDualAcceptDisagreements,
+  computeWorkflowColumnsGraduationReport,
+  DUAL_ACCEPT_PARITY_MUTATIONS,
 } from "./workflow-parity.js";
 export type {
   WorkflowAuditObservation,
@@ -1280,6 +1286,11 @@ export type {
   WorkflowObservationBuildOptions,
   WorkflowObservationParts,
   WorkflowParitySummary,
+  TransitionParityDiff,
+  TransitionParityReport,
+  DualAcceptDisagreementReport,
+  WorkflowColumnsGraduationReport,
+  GraduationReportInputs,
 } from "./workflow-parity.js";
 export { isResearchExperimentalEnabled, resolveResearchSettings } from "./research-settings.js";
 export type { ResolvedResearchSettings } from "./research-settings.js";

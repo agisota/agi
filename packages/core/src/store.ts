@@ -15,7 +15,7 @@ import {
   findWorkflowColumn,
   resolveColumnPluginGates,
 } from "./plugin-gate-verdict.js";
-import { getTraitRegistry } from "./trait-registry.js";
+import { getTraitRegistry, assertColumnTraitsValid } from "./trait-registry.js";
 import { resolveColumnCapacity } from "./workflow-capacity.js";
 import {
   OccupiedColumnsError,
@@ -38,7 +38,7 @@ import {
 } from "./transition-types.js";
 import { writeTransitionPending, clearTransitionPending } from "./transition-pending.js";
 import { BUILTIN_CODING_WORKFLOW_IR } from "./builtin-coding-workflow-ir.js";
-import type { WorkflowIr } from "./workflow-ir-types.js";
+import type { WorkflowIr, WorkflowIrColumn } from "./workflow-ir-types.js";
 // Side-effect import: registers the 14 built-in trait DEFINITIONS into the
 // shared trait registry on load (the flag-ON path resolves traits by id).
 import "./builtin-traits.js";
@@ -53,8 +53,11 @@ import { BUILTIN_WORKFLOWS, getBuiltinWorkflow, isBuiltinWorkflowId } from "./bu
 import {
   WORKFLOW_PARITY_OBSERVED_MUTATION,
   WORKFLOW_PARITY_DRIFT_MUTATION,
+  DUAL_ACCEPT_PARITY_MUTATIONS,
+  computeWorkflowColumnsGraduationReport,
   type WorkflowParityDiff,
   type WorkflowParitySummary,
+  type WorkflowColumnsGraduationReport,
 } from "./workflow-parity.js";
 
 /** Tags WorkflowStep rows materialized by compiling a workflow so they can be
@@ -1587,6 +1590,22 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
       storeLog.warn("Project-memory bootstrap failed during init", {
         phase: "init:memory-bootstrap",
         rootDir: this.rootDir,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // U12: workflow-columns integrity pass. When the flag is ON, audit + re-home
+    // any task whose stored column is no longer valid in its resolved workflow
+    // (KTD-1 guarantees zero rewrites for healthy legacy rows, so this is a
+    // no-op for the common case). Idempotent; non-fatal — never blocks startup.
+    try {
+      const settings = await this.getSettingsFast();
+      if (isWorkflowColumnsEnabled(settings)) {
+        await this.runWorkflowColumnsIntegrityPass();
+      }
+    } catch (err) {
+      storeLog.warn("workflowColumns integrity pass failed during init", {
+        phase: "init:workflow-columns-integrity",
         error: err instanceof Error ? err.message : String(err),
       });
     }
@@ -4982,6 +5001,82 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
     return sorted.slice(offset, offset + Math.max(0, limit));
   }
 
+  /**
+   * Residual B (U13/U9): per-branch progress snapshots for the given tasks,
+   * read from the `workflow_run_branches` table. Used to populate the optional
+   * additive `branchProgress` field on the board task payload so U9's parallel-
+   * window badge can render. Cheap and additive:
+   *   - returns an empty map immediately when the table is empty (the common
+   *     case — no fan-out runs in flight);
+   *   - one query for the whole task batch (no per-card N+1);
+   *   - returns only the LATEST run's branches per task (a card is in exactly
+   *     one parallel window at a time — KTD-11 one-card-one-position).
+   * Never throws on a missing/legacy table (additive guard).
+   */
+  getBranchProgressByTask(
+    taskIds: readonly string[],
+  ): Map<string, Array<{ branchId: string; nodeId: string; status: string }>> {
+    const result = new Map<string, Array<{ branchId: string; nodeId: string; status: string }>>();
+    if (taskIds.length === 0) return result;
+    try {
+      // Skip entirely when the table has no rows (cheap existence probe).
+      const any = this.db
+        .prepare("SELECT 1 FROM workflow_run_branches LIMIT 1")
+        .get();
+      if (!any) return result;
+
+      const placeholders = taskIds.map(() => "?").join(", ");
+      const rows = this.db
+        .prepare(
+          `SELECT b.taskId AS taskId, b.runId AS runId, b.branchId AS branchId,
+                  b.currentNodeId AS nodeId, b.status AS status, b.updatedAt AS updatedAt
+             FROM workflow_run_branches b
+             JOIN (
+               SELECT taskId, MAX(updatedAt) AS latest
+                 FROM workflow_run_branches
+                WHERE taskId IN (${placeholders})
+                GROUP BY taskId
+             ) latest_run ON latest_run.taskId = b.taskId
+            WHERE b.taskId IN (${placeholders})`,
+        )
+        .all(...taskIds, ...taskIds) as Array<{
+          taskId: string;
+          runId: string;
+          branchId: string;
+          nodeId: string;
+          status: string;
+          updatedAt: string;
+        }>;
+
+      // Group by task; for each task keep only the branches of its most-recent
+      // run (the runId of the row with the latest updatedAt).
+      const latestRunByTask = new Map<string, string>();
+      for (const row of rows) {
+        const known = latestRunByTask.get(row.taskId);
+        if (!known) latestRunByTask.set(row.taskId, row.runId);
+      }
+      // Re-derive the latest runId precisely from the max-updatedAt row.
+      const maxByTask = new Map<string, { runId: string; updatedAt: string }>();
+      for (const row of rows) {
+        const cur = maxByTask.get(row.taskId);
+        if (!cur || row.updatedAt > cur.updatedAt) {
+          maxByTask.set(row.taskId, { runId: row.runId, updatedAt: row.updatedAt });
+        }
+      }
+      for (const row of rows) {
+        const latest = maxByTask.get(row.taskId);
+        if (!latest || row.runId !== latest.runId) continue;
+        const list = result.get(row.taskId) ?? [];
+        list.push({ branchId: row.branchId, nodeId: row.nodeId, status: row.status });
+        result.set(row.taskId, list);
+      }
+    } catch {
+      // Legacy/missing table or query failure — degrade to no branch progress.
+      return new Map();
+    }
+    return result;
+  }
+
   async listTasksForGithubTrackingReconcile(options?: { offset?: number; limit?: number }): Promise<{ tasks: Task[]; hasMore: boolean }> {
     const reconcileScanLimit = 200;
     const offset = Math.max(0, options?.offset ?? 0);
@@ -6184,11 +6279,29 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
     // the fire-and-forget hook runner per KTD-2. It is idempotent and clears the
     // transitionPending marker once done. A crash before this point leaves the
     // marker for the recovery sweep to re-run (re-running is a no-op for the
-    // default workflow's already-committed field effects). We clear it
-    // synchronously here because the default workflow has no async post-commit
-    // hook bodies in U4 (merge enqueue is in-txn via the handoff path);
-    // plugin/async post-commit hooks land in U7/U8 and will defer the clear.
+    // default workflow's already-committed field effects).
+    //
+    // Residual C (U8): AFTER the built-in effects, invoke registered PLUGIN
+    // onExit (from column) / onEnter (to column) trait hook impls, recording
+    // per-hook completion in the marker's hooksRemaining. A throwing plugin hook
+    // DEGRADES (audit) and never wedges the lock or strands the marker — the
+    // marker is always cleared at the end regardless of hook failures.
     if (useWorkflow) {
+      // Plugin hooks are skipped on engine/recovery-sourced moves (KTD-9 — those
+      // bypass trait effects) and on same-column no-ops.
+      if (!bypassGuards && fromColumn !== toColumn && workflowIr) {
+        try {
+          await this.runPluginColumnTransitionHooks(id, workflowIr, fromColumn, toColumn);
+        } catch (err) {
+          // The runner itself swallows per-hook failures; this is a final guard
+          // so a runner-level fault never strands the marker.
+          storeLog.warn("Plugin column transition hook runner faulted (degraded)", {
+            phase: "moveTaskInternal:plugin-hooks",
+            taskId: id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
       try {
         clearTransitionPending(this.db, id);
       } catch {
@@ -6200,6 +6313,111 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
       this.emit("task:moved", { task, from: fromColumn, to: toColumn, source: moveSource });
     }
     return task;
+  }
+
+  /**
+   * Residual C (U8): run registered PLUGIN onExit (from column) / onEnter (to
+   * column) trait hook impls AFTER the built-in default-workflow effects, on the
+   * post-commit path. Plugin hooks are async-only (KTD-7) and route through the
+   * registry's resolved impl (the engine wires `runCustomNode` in via the trait
+   * adapter; an unregistered/degraded hook resolves to a no-op + audit warning).
+   *
+   * Per-hook completion is recorded in the `transitionPending` marker's
+   * `hooksRemaining` so a crash mid-hook is recoverable. A hook that THROWS is
+   * audited (`plugin:trait-hook-degraded`) and treated as completed (removed
+   * from `hooksRemaining`) — a misbehaving plugin never wedges the task lock or
+   * strands the card (KTD-2 degraded-not-stranded posture). The caller clears
+   * the marker after this returns.
+   */
+  private async runPluginColumnTransitionHooks(
+    taskId: string,
+    workflowIr: WorkflowIr,
+    fromColumn: string,
+    toColumn: string,
+  ): Promise<void> {
+    const registry = getTraitRegistry();
+    // Collect (traitId, hookKind) pairs: onExit for from-column plugin traits,
+    // onEnter for to-column plugin traits. Only plugin-namespaced traits (KTD-7).
+    const pending: Array<{ traitId: string; hookKind: "onEnter" | "onExit" }> = [];
+    const fromCol = findWorkflowColumn(workflowIr, fromColumn);
+    for (const ct of fromCol?.traits ?? []) {
+      if (!ct.trait.startsWith("plugin:")) continue;
+      const def = registry.getTrait(ct.trait);
+      if (def?.hooks?.onExit) pending.push({ traitId: ct.trait, hookKind: "onExit" });
+    }
+    const toCol = findWorkflowColumn(workflowIr, toColumn);
+    for (const ct of toCol?.traits ?? []) {
+      if (!ct.trait.startsWith("plugin:")) continue;
+      const def = registry.getTrait(ct.trait);
+      if (def?.hooks?.onEnter) pending.push({ traitId: ct.trait, hookKind: "onEnter" });
+    }
+    if (pending.length === 0) return;
+
+    // Record the plugin hooks in the marker's hooksRemaining (alongside the
+    // default-workflow:postCommit marker already written in-txn) so a crash
+    // mid-hook is recoverable.
+    const hookIds = pending.map((p) => `${p.traitId}:${p.hookKind}`);
+    const startedAt = Date.now();
+    try {
+      writeTransitionPending(
+        this.db,
+        taskId,
+        makeTransitionPending(toColumn, ["default-workflow:postCommit", ...hookIds], startedAt),
+      );
+    } catch {
+      // Marker bookkeeping is best-effort; proceed to run the hooks regardless.
+    }
+
+    // Read the task once for hook context. MUST be a non-locking read — this
+    // runs inside `withTaskLock`, so `getTask` (which re-acquires the lock)
+    // would deadlock. `readTaskFromDb` is the in-lock-safe read.
+    const taskRow = this.readTaskFromDb(taskId, { includeDeleted: false });
+    const taskDetail = taskRow as unknown as TaskDetail | undefined;
+
+    const remaining = ["default-workflow:postCommit", ...hookIds];
+    for (const { traitId, hookKind } of pending) {
+      const resolved = registry.resolveTraitHook(traitId, hookKind);
+      if (resolved.warning) {
+        // Degraded (no impl / force-disabled) → passive no-op, audit the warning.
+        this.recordRunAuditEvent({
+          taskId,
+          agentId: "system",
+          runId: `plugin-trait-hook-${traitId}-${taskId}-${Date.now()}`,
+          domain: "database",
+          mutationType: "plugin:trait-hook-degraded",
+          target: taskId,
+          metadata: { traitId, hookKind, reason: "no-impl", message: resolved.warning.message },
+        });
+      } else if (resolved.impl) {
+        try {
+          await resolved.impl({ task: taskDetail, context: { fromColumn, toColumn, hookKind } });
+        } catch (err) {
+          // A throwing plugin hook DEGRADES — audited, never wedges the lock.
+          this.recordRunAuditEvent({
+            taskId,
+            agentId: "system",
+            runId: `plugin-trait-hook-${traitId}-${taskId}-${Date.now()}`,
+            domain: "database",
+            mutationType: "plugin:trait-hook-degraded",
+            target: taskId,
+            metadata: {
+              traitId,
+              hookKind,
+              reason: "threw",
+              error: err instanceof Error ? err.message : String(err),
+            },
+          });
+        }
+      }
+      // Mark this hook complete in the marker (whether it ran, degraded, or threw).
+      const idx = remaining.indexOf(`${traitId}:${hookKind}`);
+      if (idx >= 0) remaining.splice(idx, 1);
+      try {
+        writeTransitionPending(this.db, taskId, makeTransitionPending(toColumn, remaining, startedAt));
+      } catch {
+        // Best-effort progress bookkeeping; the final clear is the backstop.
+      }
+    }
   }
 
   private resetAllStepsToPending(task: Task): void {
@@ -7727,6 +7945,37 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
       driftFieldCounts,
       recentDrift,
     };
+  }
+
+  /**
+   * Aggregate the `workflowColumns` flag default-flip criteria (U12, KTD-8) into
+   * a single graduation report: five-invariant dual-observe parity, the default
+   * workflow's transition parity vs VALID_TRANSITIONS, and the dual-accept
+   * marker/column disagreement count (U6, FN-5719). The flip is a FIELD decision
+   * — this report is the GATE. Does NOT flip the flag; callers inspect `ready`
+   * and `blockers`.
+   */
+  computeWorkflowColumnsGraduationReport(
+    options: { since?: string; limit?: number } = {},
+  ): WorkflowColumnsGraduationReport {
+    const limit = options.limit ?? 1000;
+    const parity = this.getWorkflowParitySummary(options);
+    const dualAcceptEvents: RunAuditEvent[] = [];
+    for (const mutationType of DUAL_ACCEPT_PARITY_MUTATIONS) {
+      dualAcceptEvents.push(
+        ...this.getRunAuditEvents({
+          domain: "database",
+          mutationType: mutationType as unknown as RunAuditEvent["mutationType"],
+          startTime: options.since,
+          limit,
+        }),
+      );
+    }
+    return computeWorkflowColumnsGraduationReport({
+      parity,
+      defaultWorkflowIr: BUILTIN_CODING_WORKFLOW_IR,
+      dualAcceptEvents,
+    });
   }
 
   enqueueMergeQueue(taskId: string, opts: MergeQueueEnqueueOptions = {}): MergeQueueEntry {
@@ -11556,6 +11805,17 @@ ${stepsSection}`;
     return {};
   }
 
+  /** Server-side trait-composition validation (residual A). Throws a typed
+   *  ColumnTraitValidationError when the IR's columns have save-blocking trait
+   *  conflicts, so conflicts reject server-side and not only in the editor. A
+   *  v1 IR (no columns) is a no-op. */
+  private assertWorkflowIrTraitsValid(ir: WorkflowIr): void {
+    const columns = (ir as { columns?: WorkflowIrColumn[] }).columns;
+    if (Array.isArray(columns) && columns.length > 0) {
+      assertColumnTraitsValid(columns);
+    }
+  }
+
   /** Create a named workflow definition. The IR is validated via parseWorkflowIr. */
   async createWorkflowDefinition(
     input: WorkflowDefinitionInput,
@@ -11565,6 +11825,9 @@ ${stepsSection}`;
       if (!name) throw new Error("Workflow name is required");
       // Validate the IR shape up front so we never persist a malformed graph.
       const ir = parseWorkflowIr(input.ir);
+      // Residual A: also reject save-blocking trait composition conflicts here,
+      // not only in the editor's client-side validation.
+      this.assertWorkflowIrTraitsValid(ir);
       const layout = input.layout ?? {};
       const now = new Date().toISOString();
       const id = this.nextWorkflowDefinitionId();
@@ -11681,6 +11944,9 @@ ${stepsSection}`;
       const name = updates.name !== undefined ? updates.name.trim() : existing.name;
       if (!name) throw new Error("Workflow name is required");
       const ir = updates.ir !== undefined ? parseWorkflowIr(updates.ir) : existing.ir;
+      // Residual A: reject save-blocking trait composition conflicts server-side
+      // when the IR is being changed.
+      if (updates.ir !== undefined) this.assertWorkflowIrTraitsValid(ir);
       const next: WorkflowDefinition = {
         ...existing,
         name,
@@ -11901,6 +12167,87 @@ ${stepsSection}`;
       target: taskId,
       metadata: { ...metadata, reason, fromColumn, toColumn: targetColumn, abortRan, moved, error },
     });
+  }
+
+  // ── U12: workflow-columns integrity pass ──────────────────────────────────
+  //
+  // Migration rewrites ZERO task rows (KTD-1): a null selection resolves to the
+  // built-in default workflow at read time, and the default workflow's column
+  // IDs are byte-identical to the legacy enum values, so every legacy row is
+  // already valid. The only residual risk is a task whose stored column is not a
+  // valid column in its RESOLVED workflow — e.g. a custom workflow was edited to
+  // drop a column out-of-band, or a legacy row references a column the selected
+  // custom workflow never defined. The integrity pass audits those and re-homes
+  // them via the U5 reconciliation path (`recoveryRehome`, guard-bypassing,
+  // capacity-honoring), one audit event per card.
+  //
+  // Idempotent: a second run finds nothing out-of-place (the re-home lands the
+  // card in a valid column) and is a pure no-op. Tasks in complete- or
+  // archived-flagged columns are left UNTOUCHED (done/archived cards are terminal
+  // — re-homing them would corrupt the board) even if (defensively) their column
+  // were somehow not in the resolved IR; we never disturb terminal cards.
+  //
+  // Runs only when the `workflowColumns` flag is ON (flag-OFF keeps the legacy
+  // enum path, where every column is valid by construction).
+  async runWorkflowColumnsIntegrityPass(): Promise<{ scanned: number; rehomed: number; skippedTerminal: number }> {
+    let scanned = 0;
+    let rehomed = 0;
+    let skippedTerminal = 0;
+
+    const rows = this.db
+      .prepare(`SELECT id FROM tasks WHERE "deletedAt" IS NULL`)
+      .all() as Array<{ id: string }>;
+
+    const registry = getTraitRegistry();
+
+    for (const { id } of rows) {
+      scanned += 1;
+      const task = this.readTaskFromDb(id, { includeDeleted: false });
+      if (!task) continue;
+      const ir = this.resolveTaskWorkflowIrSync(id);
+      const currentColumn = task.column;
+
+      // Already valid in its resolved workflow — nothing to do (the common case;
+      // this is why the pass is idempotent and a no-op for healthy DBs).
+      if (workflowHasColumn(ir, currentColumn)) continue;
+
+      // The stored column is not in the resolved workflow. Before re-homing,
+      // never disturb a terminal card: if the column the card sits in carries a
+      // complete/archived flag in its workflow it is terminal — but since the
+      // column is NOT in the IR we cannot read its flags there. Fall back to the
+      // legacy terminal semantics (done/archived) so terminal cards are never
+      // re-homed, matching the plan's "done/archived untouched" rule.
+      const column = findWorkflowColumn(ir, currentColumn);
+      const flags = column ? registry.resolveColumnFlags(column) : undefined;
+      const isTerminal =
+        flags?.complete === true ||
+        flags?.archived === true ||
+        currentColumn === "done" ||
+        currentColumn === "archived";
+      if (isTerminal) {
+        skippedTerminal += 1;
+        continue;
+      }
+
+      const targetColumn = resolveEntryColumnId(ir);
+      if (!targetColumn) continue; // non-reconcilable IR — leave the card put.
+
+      await this.rehomeOccupant(id, targetColumn, "workflow-edit-rehome", {
+        integrityPass: true,
+        invalidColumn: currentColumn,
+      });
+      rehomed += 1;
+    }
+
+    if (rehomed > 0 || skippedTerminal > 0) {
+      storeLog.log("workflowColumns integrity pass completed", {
+        phase: "init:workflow-columns-integrity",
+        scanned,
+        rehomed,
+        skippedTerminal,
+      });
+    }
+    return { scanned, rehomed, skippedTerminal };
   }
 
   // ── Workflow selection (resolves a workflow to enabledWorkflowSteps) ────

@@ -1,5 +1,5 @@
 import type { WorkflowIr } from "@fusion/core";
-import { OccupiedColumnsError, WorkflowCompileError, WorkflowIrError, compileWorkflowToSteps, listTraits } from "@fusion/core";
+import { ColumnTraitValidationError, OccupiedColumnsError, WorkflowCompileError, WorkflowIrError, compileWorkflowToSteps, listTraits } from "@fusion/core";
 import { ApiError, badRequest, conflict, notFound } from "../api-error.js";
 import type { ApiRoutesContext } from "./types.js";
 
@@ -70,6 +70,11 @@ export function registerWorkflowRoutes(ctx: ApiRoutesContext): void {
     } catch (err: unknown) {
       if (err instanceof ApiError) throw err;
       if (err instanceof WorkflowIrError) throw badRequest(err.message);
+      // Residual A: server-side trait composition conflict → 400 with the
+      // structured violations (consistent with the IR-error 4xx mapping).
+      if (err instanceof ColumnTraitValidationError) {
+        throw badRequest(err.message, { violations: err.violations });
+      }
       rethrowAsApiError(err);
     }
   });
@@ -118,6 +123,9 @@ export function registerWorkflowRoutes(ctx: ApiRoutesContext): void {
         throw conflict(err.message, { workflowId: err.workflowId, occupancies: err.occupancies });
       }
       if (err instanceof WorkflowIrError) throw badRequest(err.message);
+      if (err instanceof ColumnTraitValidationError) {
+        throw badRequest(err.message, { violations: err.violations });
+      }
       if (err instanceof Error && /not found/i.test(err.message)) throw notFound(err.message);
       rethrowAsApiError(err);
     }

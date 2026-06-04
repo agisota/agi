@@ -419,6 +419,96 @@ describe("U8 onEnter hook degradation (card stays, marker cleared, no wedge)", (
   });
 });
 
+describe("Residual C: plugin onEnter/onExit are INVOKED on the post-commit path", () => {
+  let rootDir = "";
+  let store: TaskStore;
+  const enterTrait = pluginTraitRegistryId("notify-plugin", "enter");
+  const exitTrait = pluginTraitRegistryId("notify-plugin", "exit");
+  let enterCalls = 0;
+  let exitCalls = 0;
+
+  beforeEach(async () => {
+    freshRegistry();
+    enterCalls = 0;
+    exitCalls = 0;
+    const registry = getTraitRegistry();
+    registry.register({ id: enterTrait, name: "Enter", flags: { notify: true }, hooks: { onEnter: true }, builtin: false });
+    registry.register({ id: exitTrait, name: "Exit", flags: { notify: true }, hooks: { onExit: true }, builtin: false });
+    registry.registerTraitHookImpl(enterTrait, "onEnter", () => { enterCalls += 1; });
+    registry.registerTraitHookImpl(exitTrait, "onExit", () => { exitCalls += 1; });
+
+    rootDir = mkdtempSync(join(tmpdir(), "u8-cohooks-"));
+    git(rootDir, "init -b main");
+    git(rootDir, "config user.name 'Fusion'");
+    git(rootDir, "config user.email 'hi@runfusion.ai'");
+    writeFileSync(join(rootDir, "README.md"), "root\n");
+    git(rootDir, "add README.md");
+    git(rootDir, "commit -m init");
+    store = new TaskStore(rootDir, undefined, { inMemoryDb: false });
+    await store.init();
+    await store.updateGlobalSettings({ experimentalFeatures: { workflowColumns: true } });
+  });
+
+  afterEach(() => {
+    try { store?.close(); } catch { /* ignore */ }
+    if (rootDir) rmSync(rootDir, { recursive: true, force: true });
+    __resetTraitRegistryForTests();
+  });
+
+  it("onEnter fires for the to-column's plugin trait; onExit fires for the from-column's", async () => {
+    // Workflow: intake-col(exit trait) → gate-col(enter trait) → done-col.
+    const ir = {
+      version: "v2",
+      name: "CoHooks",
+      columns: [
+        { id: "intake-col", name: "Intake", traits: [{ trait: "intake" }, { trait: exitTrait }] },
+        { id: "gate-col", name: "Gate", traits: [{ trait: enterTrait }] },
+        { id: "done-col", name: "Done", traits: [{ trait: "complete" }] },
+      ],
+      nodes: [
+        { id: "start", kind: "start", column: "intake-col" },
+        { id: "end", kind: "end", column: "done-col" },
+      ],
+      edges: [{ from: "start", to: "end" }],
+    } as WorkflowIr;
+    const def = await store.createWorkflowDefinition({ name: "CoHooks", ir });
+    const task = await store.createTask({ description: "card" });
+    setSelection(store, task.id, def.id);
+    setColumn(store, task.id, "intake-col");
+
+    const moved = await store.moveTask(task.id, "gate-col", { moveSource: "user" });
+    expect(moved.column).toBe("gate-col");
+    expect(enterCalls).toBe(1); // gate-col onEnter
+    expect(exitCalls).toBe(1); // intake-col onExit
+    // Marker cleared (no strand).
+    expect(readTransitionPending(store, task.id)).toBeNull();
+  });
+
+  it("engine-sourced (bypassGuards) moves skip plugin hooks (KTD-9)", async () => {
+    const ir = {
+      version: "v2",
+      name: "CoHooks2",
+      columns: [
+        { id: "intake-col", name: "Intake", traits: [{ trait: "intake" }] },
+        { id: "gate-col", name: "Gate", traits: [{ trait: enterTrait }] },
+        { id: "done-col", name: "Done", traits: [{ trait: "complete" }] },
+      ],
+      nodes: [
+        { id: "start", kind: "start", column: "intake-col" },
+        { id: "end", kind: "end", column: "done-col" },
+      ],
+      edges: [{ from: "start", to: "end" }],
+    } as WorkflowIr;
+    const def = await store.createWorkflowDefinition({ name: "CoHooks2", ir });
+    const task = await store.createTask({ description: "card" });
+    setSelection(store, task.id, def.id);
+    setColumn(store, task.id, "intake-col");
+
+    await store.moveTask(task.id, "gate-col", { moveSource: "engine", bypassGuards: true });
+    expect(enterCalls).toBe(0); // engine move bypasses trait effects
+  });
+});
+
 describe("U8 plugin loader aggregation + disable/force-disable (KTD-7)", () => {
   let rootDir = "";
   let pluginStore: PluginStore;

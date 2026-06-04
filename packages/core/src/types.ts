@@ -15,7 +15,22 @@ export type { CapacityRiskSignal } from "./capacity.js";
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high"] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
+/**
+ * The legacy default-workflow column set. Under
+ * `experimentalFeatures.workflowColumns` a task's valid columns are resolved
+ * from its workflow definition (the default workflow's column IDs are
+ * byte-identical to these — KTD-1). New flag-aware code should prefer the
+ * workflow-resolved path (`resolveAllowedColumns` / `workflowHasColumn` in
+ * `workflow-transitions.ts`) and trait-flag predicates over string equality;
+ * this enum remains the canonical id set for the built-in default workflow.
+ */
 export const COLUMNS = ["triage", "todo", "in-progress", "in-review", "done", "archived"] as const;
+/**
+ * The closed legacy column union — still the correct type for default-workflow
+ * column ids and the flag-OFF path. Movement entry points accept the wider
+ * {@link ColumnId}; flag-ON code validates ids against the task's resolved
+ * workflow at runtime.
+ */
 export type Column = (typeof COLUMNS)[number];
 
 /**
@@ -29,10 +44,22 @@ export type ColumnId = Column | (string & {});
 
 export const DEFAULT_COLUMN: Column = "triage";
 
+/**
+ * Tests membership against the closed legacy column enum. Note: under the
+ * workflowColumns flag, column validity is workflow-scoped — flag-aware code
+ * should use `workflowHasColumn(ir, columnId)` (`workflow-transitions.ts`);
+ * this remains correct for the flag-OFF path and default-workflow ids.
+ */
 export function isColumn(value: unknown): value is Column {
   return typeof value === "string" && (COLUMNS as readonly string[]).includes(value);
 }
 
+/**
+ * @deprecated (workflowColumns, U12) Coerces an arbitrary value to a legacy
+ * column, DISCARDING workflow-defined custom column ids — lossy under the
+ * flag. Resolve and validate against the task's workflow instead. Retained
+ * for the legacy flag-OFF path while the flag exists.
+ */
 export function normalizeColumn(value: unknown, fallback: Column = DEFAULT_COLUMN): Column {
   return isColumn(value) ? value : fallback;
 }
@@ -3959,6 +3986,15 @@ export const COLUMN_DESCRIPTIONS: Record<Column, string> = {
   archived: "Completed and archived",
 };
 
+/**
+ * @deprecated (workflowColumns, U12) The hardcoded legacy transition graph.
+ * Under `experimentalFeatures.workflowColumns`, transition validity is resolved
+ * from the task's workflow column graph (`resolveAllowedColumns` in
+ * `workflow-transitions.ts`) plus trait guards in `moveTaskInternal` — this
+ * constant is now only the flag-OFF authority and the parity oracle the default
+ * workflow is machine-checked against (transition-parity suite). Retained while
+ * the flag exists; do NOT remove until graduation + legacy-path deletion.
+ */
 export const VALID_TRANSITIONS: Record<Column, Column[]> = {
   // FN-4892: intake-side heuristics may cold-archive tasks before execution starts.
   triage: ["todo", "archived"],

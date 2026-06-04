@@ -96,6 +96,68 @@ describe("workflow routes (U4)", () => {
     expect(bad.status).toBe(400);
   });
 
+  it("Residual A: POST /workflows rejects a server-side trait composition conflict with 400 + violations", async () => {
+    // A v2 column carrying BOTH `complete` and `wip` (countsTowardWip) — a
+    // terminal column cannot also hold a capacity slot. parseWorkflowIr accepts
+    // the shape; the save-mode composition validator must reject it.
+    const conflictIr: WorkflowIr = {
+      version: "v2",
+      name: "conflict",
+      columns: [
+        { id: "intake-col", name: "Intake", traits: [{ trait: "intake" }] },
+        { id: "bad-col", name: "Bad", traits: [{ trait: "complete" }, { trait: "wip", config: { limit: 1 } }] },
+      ],
+      nodes: [
+        { id: "start", kind: "start", column: "intake-col" },
+        { id: "end", kind: "end", column: "bad-col" },
+      ],
+      edges: [{ from: "start", to: "end" }],
+    } as WorkflowIr;
+    const res = await post("/api/workflows", { name: "Conflict", ir: conflictIr });
+    expect(res.status).toBe(400);
+    const details = (res.body as { details?: { violations?: unknown[] } }).details;
+    expect(Array.isArray(details?.violations)).toBe(true);
+    expect((details?.violations?.length ?? 0)).toBeGreaterThan(0);
+  });
+
+  it("Residual A: PATCH /workflows/:id rejects a trait composition conflict server-side", async () => {
+    const created = await post("/api/workflows", {
+      name: "Editable",
+      ir: {
+        version: "v2",
+        name: "editable",
+        columns: [
+          { id: "intake-col", name: "Intake", traits: [{ trait: "intake" }] },
+          { id: "work-col", name: "Work", traits: [] },
+        ],
+        nodes: [
+          { id: "start", kind: "start", column: "intake-col" },
+          { id: "end", kind: "end", column: "work-col" },
+        ],
+        edges: [{ from: "start", to: "end" }],
+      },
+    });
+    expect(created.status).toBe(201);
+    const id = (created.body as { id: string }).id;
+    const conflictIr: WorkflowIr = {
+      version: "v2",
+      name: "editable",
+      columns: [
+        { id: "intake-col", name: "Intake", traits: [{ trait: "intake" }] },
+        { id: "work-col", name: "Work", traits: [{ trait: "complete" }, { trait: "wip", config: { limit: 2 } }] },
+      ],
+      nodes: [
+        { id: "start", kind: "start", column: "intake-col" },
+        { id: "end", kind: "end", column: "work-col" },
+      ],
+      edges: [{ from: "start", to: "end" }],
+    } as WorkflowIr;
+    const res = await request(app, "PATCH", `/api/workflows/${id}`, JSON.stringify({ ir: conflictIr }), {
+      "content-type": "application/json",
+    });
+    expect(res.status).toBe(400);
+  });
+
   it("GET /workflows lists created workflows (ahead of read-only built-ins)", async () => {
     await post("/api/workflows", { name: "A", ir: linearIr() });
     const res = await get("/api/workflows");

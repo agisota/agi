@@ -71,6 +71,23 @@ export interface TraitViolation {
   message: string;
 }
 
+/**
+ * Thrown by the store's create/update workflow paths (residual A) when a
+ * workflow's trait composition has `error`-severity violations under `save`
+ * mode — so trait conflicts reject server-side, not only in the editor. Carries
+ * the structured violations so the surface can render them per-column. The
+ * dashboard routes map this to a 400 (consistent with `WorkflowIrError`).
+ */
+export class ColumnTraitValidationError extends Error {
+  readonly violations: TraitViolation[];
+  constructor(violations: TraitViolation[]) {
+    const summary = violations.map((v) => v.message).join("; ");
+    super(`Workflow trait composition invalid: ${summary}`);
+    this.name = "ColumnTraitValidationError";
+    this.violations = violations;
+  }
+}
+
 /** A simple audit-warning record returned by hook resolution / load-time
  *  re-validation. Modeled as a returned value (not a thrown error and not an
  *  engine logger) so core stays engine-free; callers may forward it to audit. */
@@ -388,6 +405,19 @@ export function validateColumnTraits(
   mode: "save" | "load" = "save",
 ): TraitViolation[] {
   return getTraitRegistry().validateColumnTraits(columns, mode);
+}
+
+/**
+ * Save-mode composition validation that THROWS (residual A). Runs the registry's
+ * `validateColumnTraits` in `save` mode and throws a {@link ColumnTraitValidationError}
+ * if any `error`-severity violations are present. `degraded` advisories are
+ * ignored (they never block a save). A no-op for `[]`/no-error columns.
+ */
+export function assertColumnTraitsValid(columns: WorkflowIrColumn[]): void {
+  const violations = getTraitRegistry()
+    .validateColumnTraits(columns, "save")
+    .filter((v) => v.severity === "error");
+  if (violations.length > 0) throw new ColumnTraitValidationError(violations);
 }
 
 export function registerTraitHookImpl(
