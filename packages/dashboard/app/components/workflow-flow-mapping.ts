@@ -21,6 +21,20 @@ interface WorkflowForeachConfig {
   template: { nodes: WorkflowIrNode[]; edges: WorkflowIrEdge[] };
 }
 
+/** Local mirror of @fusion/core's WorkflowFieldDefinition (KTD-13). The core
+ *  barrel does not re-export it and the dashboard build aliases @fusion/core to
+ *  a types-only entry; the editor only needs to carry the array through the
+ *  IR<->flow round-trip without inspecting it, so this minimal shape suffices. */
+export interface WorkflowFieldDefinitionShape {
+  id: string;
+  name: string;
+  type: string;
+  required?: boolean;
+  default?: unknown;
+  options?: { value: string; label: string; color?: string }[];
+  render?: { placement?: string; widget?: string; badge?: boolean };
+}
+
 // ── foreach template region (KTD-3, U8) ──────────────────────────────────────
 //
 // A `foreach` node is authored inline as a React Flow group node whose template
@@ -272,6 +286,7 @@ export function flowToIr(
   nodes: FlowNode<WorkflowFlowNodeData>[],
   edges: FlowEdge[],
   columns?: WorkflowIrColumn[],
+  fields?: WorkflowFieldDefinitionShape[],
 ): { ir: WorkflowIr; layout: Record<string, { x: number; y: number }> } {
   const realNodes = nodes.filter((n) => !isColumnBandNode(n.id));
   // Partition by parentId: foreach group children reassemble into that group's
@@ -287,7 +302,10 @@ export function flowToIr(
     }
   }
   const groupIds = new Set(topNodes.filter((n) => n.data.kind === "foreach").map((n) => n.id));
-  const v2 = Array.isArray(columns) && columns.length > 0;
+  const hasFields = Array.isArray(fields) && fields.length > 0;
+  // Fields are a v2-only declaration: a workflow with fields but no custom
+  // columns still serializes as v2 (with the synthesized default columns).
+  const v2 = (Array.isArray(columns) && columns.length > 0) || hasFields;
   const layout: Record<string, { x: number; y: number }> = {};
 
   /** Project one flow node (top-level or template child) into an IR node. */
@@ -323,8 +341,9 @@ export function flowToIr(
     };
   }
 
+  const hasColumns = Array.isArray(columns) && columns.length > 0;
   const irNodes: WorkflowIr["nodes"] = topNodes.map((node) => {
-    const column = v2 ? node.data.column ?? columnForY(node.position.y, columns!) : undefined;
+    const column = hasColumns ? node.data.column ?? columnForY(node.position.y, columns!) : undefined;
     const base = toIrNode(node, node.id);
     layout[node.id] = { x: Math.round(node.position.x), y: Math.round(node.position.y) };
     return column ? { ...base, column } : base;
@@ -349,10 +368,16 @@ export function flowToIr(
     const ir: WorkflowIrV2 = {
       version: "v2",
       name,
-      columns: columns!.map((c) => ({ id: c.id, name: c.name, traits: c.traits })),
+      columns: hasColumns ? columns!.map((c) => ({ id: c.id, name: c.name, traits: c.traits })) : [],
       nodes: irNodes,
       edges: irEdges,
     };
+    if (hasFields) {
+      // The IR's `fields` is typed against @fusion/core's concrete
+      // WorkflowFieldDefinition; the editor carries the array through opaquely
+      // and the server validator is the source of truth, so assign via unknown.
+      (ir as { fields?: unknown }).fields = fields!.map((f) => ({ ...f }));
+    }
     return { ir, layout };
   }
 
@@ -511,6 +536,18 @@ export function unplacedNodeIds(
  *  columns; v1 → empty, meaning "no custom columns authored yet"). */
 export function columnsOf(def: WorkflowDefinition): WorkflowIrColumn[] {
   return isV2(def.ir) ? def.ir.columns.map((c) => ({ ...c, traits: [...c.traits] })) : [];
+}
+
+/** Extract the editor's working custom-field list from a definition (KTD-13).
+ *  v2 with `fields` → a deep-ish copy; v1 or no fields → empty. */
+export function fieldsOf(def: WorkflowDefinition): WorkflowFieldDefinitionShape[] {
+  const ir = def.ir as { fields?: WorkflowFieldDefinitionShape[] };
+  if (!isV2(def.ir) || !Array.isArray(ir.fields)) return [];
+  return ir.fields.map((f) => ({
+    ...f,
+    options: f.options ? f.options.map((o) => ({ ...o })) : undefined,
+    render: f.render ? { ...f.render } : undefined,
+  }));
 }
 
 /** Seed graph for a brand-new workflow: start → end with room to insert steps. */

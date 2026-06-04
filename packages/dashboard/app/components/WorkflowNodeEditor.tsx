@@ -41,6 +41,7 @@ import {
   emptyWorkflowIr,
   emptyWorkflowLayout,
   columnsOf,
+  fieldsOf,
   columnsToBandNodes,
   strictColumnForY,
   validateColumnsClient,
@@ -55,6 +56,8 @@ import {
 } from "./workflow-flow-mapping";
 import { fetchTraits, type TraitCatalogEntry } from "../api";
 import { WorkflowColumnPanel } from "./WorkflowColumnPanel";
+import { WorkflowFieldsPanel } from "./WorkflowFieldsPanel";
+import type { WorkflowFieldDefinition } from "../api";
 import { CustomModelDropdown } from "./CustomModelDropdown";
 
 type ExecutorKind = "model" | "agent" | "skill" | "cli";
@@ -132,6 +135,8 @@ function InnerEditor({
   const { t } = useTranslation("app");
   // v2 columns the editor is authoring for the active workflow.
   const [columns, setColumns] = useState<WorkflowIrColumn[]>([]);
+  // v2 custom field definitions the editor is authoring (KTD-13/14, U13).
+  const [fields, setFields] = useState<WorkflowFieldDefinition[]>([]);
   const [traitCatalog, setTraitCatalog] = useState<TraitCatalogEntry[]>([]);
 
   const activeWorkflow = useMemo(() => workflows.find((w) => w.id === activeId), [workflows, activeId]);
@@ -185,12 +190,14 @@ function InnerEditor({
       setNodes([]);
       setEdges([]);
       setColumns([]);
+      setFields([]);
       return;
     }
     const flow = irToFlow(activeWorkflow);
     setNodes(flow.nodes);
     setEdges(flow.edges);
     setColumns(columnsOf(activeWorkflow));
+    setFields(fieldsOf(activeWorkflow) as WorkflowFieldDefinition[]);
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
     setValidationError(null);
@@ -430,7 +437,13 @@ function InnerEditor({
     setValidationError(null);
     setServerNodeError(null);
     try {
-      const { ir, layout } = flowToIr(activeWorkflow.name, nodes, edges, columns.length ? columns : undefined);
+      const { ir, layout } = flowToIr(
+        activeWorkflow.name,
+        nodes,
+        edges,
+        columns.length ? columns : undefined,
+        fields.length ? fields : undefined,
+      );
       const updated = await updateWorkflow(activeWorkflow.id, { ir, layout }, projectId);
       setWorkflows((ws) => ws.map((w) => (w.id === updated.id ? updated : w)));
       // Validate by compiling — surfaces non-linear graphs as a banner.
@@ -456,7 +469,7 @@ function InnerEditor({
     } finally {
       setSaving(false);
     }
-  }, [activeWorkflow, nodes, edges, columns, unplaced, blockingViolationCount, projectId, addToast, t]);
+  }, [activeWorkflow, nodes, edges, columns, fields, unplaced, blockingViolationCount, projectId, addToast, t]);
 
   // Stamp the shared error-state badge onto offending nodes: unplaced step
   // nodes and any node the server flagged (seam-in-branch). One component
@@ -686,6 +699,15 @@ function InnerEditor({
               violations={columnViolations}
               readOnly={isBuiltin}
               projectId={projectId}
+              addToast={addToast}
+            />
+          )}
+
+          {activeWorkflow && (
+            <WorkflowFieldsPanel
+              fields={fields}
+              onChange={setFields}
+              readOnly={isBuiltin}
               addToast={addToast}
             />
           )}
