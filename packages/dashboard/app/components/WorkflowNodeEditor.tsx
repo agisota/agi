@@ -14,7 +14,7 @@ import {
   type Edge as FlowEdge,
 } from "@xyflow/react";
 import { useTranslation } from "react-i18next";
-import { X, Plus, Trash2, Save, MessageSquare, Terminal, Shield, GitMerge, Loader2, HelpCircle, PauseCircle, Split, Merge, Repeat, ClipboardCheck, ListChecks, Code2, LayoutGrid } from "lucide-react";
+import { X, Plus, Trash2, Save, MessageSquare, Terminal, Shield, GitMerge, Loader2, HelpCircle, PauseCircle, Split, Merge, Repeat, ClipboardCheck, ListChecks, Code2, LayoutGrid, Workflow } from "lucide-react";
 import type { WorkflowDefinition, WorkflowIrColumn, TraitViolation } from "@fusion/core";
 import { getErrorMessage } from "@fusion/core";
 import {
@@ -148,6 +148,23 @@ const PALETTE: Array<{ kind: WorkflowEditorNodeKind; label: string; icon: typeof
   { kind: "parse-steps", label: "Parse steps", icon: ListChecks, presetConfig: { artifact: "PROMPT.md", parser: "step-headings" } },
   { kind: "code", label: "Code", icon: Code2, presetConfig: { source: "" } },
 ];
+
+// Node kinds a user authors from the palette. Structural/derived nodes
+// (start/end and column bands — which map to data.kind "start") are excluded, so
+// a fresh start→end graph counts as trivial. Used by the palette-hint (R9).
+const USER_NODE_KINDS: ReadonlySet<WorkflowEditorNodeKind> = new Set<WorkflowEditorNodeKind>([
+  "prompt",
+  "script",
+  "gate",
+  "code",
+  "hold",
+  "split",
+  "join",
+  "foreach",
+  "step-review",
+  "parse-steps",
+  "merge",
+]);
 
 /** Local create-workflow dialog (KTD-7). Built on the shared `.modal` primitives
  *  (precedent: NewTaskModal). Owns its own name/description/error state; the
@@ -323,6 +340,15 @@ function InnerEditor({
 
   const activeWorkflow = useMemo(() => workflows.find((w) => w.id === activeId), [workflows, activeId]);
   const isBuiltin = !!activeWorkflow && isBuiltinWorkflowId(activeWorkflow.id);
+
+  // Trivial-graph palette hint (R9): a user-owned workflow whose graph carries no
+  // user-authored node yet (everything is start/end/column-band — column bands map
+  // to data.kind "start"). Disappears as soon as any user node exists; never shows
+  // for built-ins.
+  const isTrivialUserGraph = useMemo(() => {
+    if (!activeWorkflow || isBuiltin) return false;
+    return !nodes.some((n) => USER_NODE_KINDS.has(n.data.kind));
+  }, [activeWorkflow, isBuiltin, nodes]);
 
   // Trait catalog (for client-side composition validation; the panel fetches its
   // own copy for the picker, but the editor needs the flags to validate).
@@ -1227,6 +1253,14 @@ function InnerEditor({
                 )}
 
                 <div className="wf-editor-canvas" ref={canvasRef} tabIndex={-1}>
+                  {isTrivialUserGraph && (
+                    <div className="wf-trivial-hint" role="status" data-testid="wf-trivial-hint">
+                      {t(
+                        "workflowNodes.trivialGraphHint",
+                        "This workflow only runs start → end. Add steps from the palette above to build it out.",
+                      )}
+                    </div>
+                  )}
                   <WorkflowEditorCatalogContext.Provider value={catalogs}>
                   <ReactFlow
                     nodes={nodesForRender}
@@ -1263,8 +1297,24 @@ function InnerEditor({
                 </div>
               </>
             ) : (
-              <div className="wf-editor-empty wf-editor-canvas-empty">
-                {t("workflows.selectOrCreate", "Select or create a workflow to start editing.")}
+              <div className="wf-editor-empty wf-editor-canvas-empty wf-editor-onboard">
+                <Workflow className="wf-editor-onboard-icon" size={40} aria-hidden />
+                <h3 className="wf-editor-onboard-title">
+                  {t("workflows.emptyTitle", "No workflow selected")}
+                </h3>
+                <p className="wf-editor-onboard-text">
+                  {t(
+                    "workflows.emptyDescription",
+                    "Workflows orchestrate the steps and gates that run around task execution. Create one to start arranging that flow.",
+                  )}
+                </p>
+                <button
+                  className="wf-editor-save wf-editor-onboard-cta"
+                  data-testid="wf-empty-create"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus size={14} /> {t("workflows.newWorkflow", "New workflow")}
+                </button>
               </div>
             )}
           </section>

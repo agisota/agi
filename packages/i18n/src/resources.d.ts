@@ -6809,7 +6809,8 @@ export default interface Resources {
       "reviewPlan": "Plan review",
       "reviewType": "Review type",
       "splitNote": "Branches run concurrently from this node. Execute and merge seams are not allowed inside a branch.",
-      "stepExecuteLabel": "Step execute"
+      "stepExecuteLabel": "Step execute",
+      "trivialGraphHint": "This workflow only runs start → end. Add steps from the palette above to build it out."
     },
     "workflowSelector": {
       "switchActiveMessage": "This task has an active session. Switching workflows aborts it and re-homes the card into the new workflow's entry column. Continue?",
@@ -6837,13 +6838,14 @@ export default interface Resources {
       "discardMessage": "You have unsaved changes to this workflow. Discard them?",
       "discardTitle": "Discard unsaved changes?",
       "duplicateToCustomize": "Duplicate to customize",
+      "emptyDescription": "Workflows orchestrate the steps and gates that run around task execution. Create one to start arranging that flow.",
+      "emptyTitle": "No workflow selected",
       "nameLabel": "Workflow name",
       "newWorkflow": "New workflow",
       "readOnlyBuiltin": "Read-only built-in workflow",
       "saveFailed": "Failed to save workflow",
       "saved": "Workflow saved",
-      "savedNotCompilable": "Workflow saved but cannot be compiled",
-      "selectOrCreate": "Select or create a workflow to start editing."
+      "savedNotCompilable": "Workflow saved but cannot be compiled"
     },
     "workspace": {
       "projectRoot": "Project Root",

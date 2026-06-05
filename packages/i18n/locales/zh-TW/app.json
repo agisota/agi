@@ -6807,7 +6807,8 @@
     "reviewPlan": "Plan review",
     "reviewType": "Review type",
     "splitNote": "分支從此節點並行執行。分支內不允許執行與合併接縫。",
-    "stepExecuteLabel": "Step execute"
+    "stepExecuteLabel": "Step execute",
+    "trivialGraphHint": ""
   },
   "workflows": {
     "clickToEditDescription": "",
@@ -6829,13 +6830,14 @@
     "discardMessage": "",
     "discardTitle": "",
     "duplicateToCustomize": "",
+    "emptyDescription": "",
+    "emptyTitle": "",
     "nameLabel": "",
     "newWorkflow": "",
     "readOnlyBuiltin": "",
     "saved": "",
     "savedNotCompilable": "",
-    "saveFailed": "",
-    "selectOrCreate": ""
+    "saveFailed": ""
   },
   "workflowSelector": {
     "switchActiveMessage": "",

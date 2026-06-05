@@ -121,6 +121,52 @@
   justify-content: center;
 }
 
+/* No-workflow onboarding panel (R9): icon + heading + explanation + create CTA. */
+.wf-editor-onboard {
+  flex-direction: column;
+  text-align: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+}
+
+.wf-editor-onboard-icon {
+  color: var(--text-muted);
+}
+
+.wf-editor-onboard-title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.wf-editor-onboard-text {
+  margin: 0;
+  max-width: 36ch;
+  color: var(--text-muted);
+}
+
+.wf-editor-onboard-cta {
+  margin-top: var(--space-xs);
+}
+
+/* Trivial-graph palette hint (R9): non-blocking banner over the canvas. */
+.wf-trivial-hint {
+  position: absolute;
+  top: var(--space-sm);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  pointer-events: none;
+  max-width: min(90%, 42ch);
+  padding: var(--space-xs) var(--space-sm);
+  background: color-mix(in srgb, var(--ws-info) 8%, var(--bg-secondary));
+  border: 1px solid var(--ws-info);
+  border-radius: var(--radius-sm);
+  color: var(--ws-info);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 .wf-editor-toolbar {
   display: flex;
   align-items: center;

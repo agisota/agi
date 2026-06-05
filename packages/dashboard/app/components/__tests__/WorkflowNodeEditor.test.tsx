@@ -136,7 +136,8 @@ describe("WorkflowNodeEditor", () => {
     render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} />);
     expect(await screen.findByText("Workflows")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/No workflows yet/i)).toBeInTheDocument());
-    expect(screen.getByText(/Select or create a workflow/i)).toBeInTheDocument();
+    expect(screen.getByText(/No workflow selected/i)).toBeInTheDocument();
+    expect(screen.getByTestId("wf-empty-create")).toBeInTheDocument();
   });
 
   it("renders nothing when closed", () => {
@@ -1005,5 +1006,74 @@ describe("WorkflowNodeEditor — U4 create dialog / delete / inline rename / dir
     fireEvent.click(within(dialog).getByRole("button", { name: /Cancel/i }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: /Discard unsaved changes/i })).not.toBeInTheDocument());
     expect(screen.getByTestId("wf-workflow-name")).toHaveTextContent("Edited");
+  });
+});
+
+// ── U6: empty / onboarding states ───────────────────────────────────────────
+
+// A user-owned workflow whose graph is only start→end (no user-authored nodes).
+function trivialUserDef(): WorkflowDefinition {
+  return {
+    id: "WF-TRIVIAL",
+    name: "Trivial",
+    description: "",
+    ir: {
+      version: "v1",
+      name: "Trivial",
+      nodes: [
+        { id: "start", kind: "start" },
+        { id: "end", kind: "end" },
+      ],
+      edges: [{ from: "start", to: "end", condition: "success" }],
+    },
+    layout: { start: { x: 0, y: 0 }, end: { x: 240, y: 0 } },
+    createdAt: "2026-06-03T00:00:00.000Z",
+    updatedAt: "2026-06-03T00:00:00.000Z",
+  };
+}
+
+describe("WorkflowNodeEditor — U6 empty/onboarding states", () => {
+  beforeEach(() => {
+    vi.mocked(fetchTraits).mockResolvedValue(TRAIT_CATALOG);
+    vi.mocked(fetchStepParsers).mockResolvedValue(["step-headings", "json-steps"]);
+  });
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("no-workflow empty state CTA opens the create dialog", async () => {
+    vi.mocked(fetchWorkflows).mockResolvedValue([]);
+    render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} />);
+    const cta = await screen.findByTestId("wf-empty-create");
+    expect(screen.queryByTestId("wf-create-dialog")).not.toBeInTheDocument();
+    fireEvent.click(cta);
+    expect(await screen.findByTestId("wf-create-dialog")).toBeInTheDocument();
+  });
+
+  it("renders the trivial-graph palette hint for a user-owned start→end workflow", async () => {
+    vi.mocked(fetchWorkflows).mockResolvedValue([trivialUserDef()]);
+    render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} />);
+    // Wait for hydration (the palette appears for editable workflows).
+    await screen.findByText("Save");
+    expect(await screen.findByTestId("wf-trivial-hint")).toBeInTheDocument();
+  });
+
+  it("hides the trivial-graph hint once a user node exists", async () => {
+    // v2Def() carries a "prompt" step → a user-authored node.
+    vi.mocked(fetchWorkflows).mockResolvedValue([v2Def()]);
+    render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} />);
+    await screen.findByText("Save");
+    await screen.findByTestId("wf-column-panel");
+    expect(screen.queryByTestId("wf-trivial-hint")).not.toBeInTheDocument();
+  });
+
+  it("never renders the trivial-graph hint for a built-in workflow", async () => {
+    // Built-in that is itself trivial (start→end only) — must still not show the hint.
+    const builtinTrivial: WorkflowDefinition = { ...trivialUserDef(), id: "builtin:trivial", name: "Built-in" };
+    vi.mocked(fetchWorkflows).mockResolvedValue([builtinTrivial]);
+    render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} />);
+    expect(await screen.findByTestId("wf-readonly-banner")).toBeInTheDocument();
+    expect(screen.queryByTestId("wf-trivial-hint")).not.toBeInTheDocument();
   });
 });

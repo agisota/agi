@@ -6807,7 +6807,8 @@
     "reviewPlan": "Plan review",
     "reviewType": "Review type",
     "splitNote": "Branches run concurrently from this node. Execute and merge seams are not allowed inside a branch.",
-    "stepExecuteLabel": "Step execute"
+    "stepExecuteLabel": "Step execute",
+    "trivialGraphHint": "This workflow only runs start → end. Add steps from the palette above to build it out."
   },
   "workflows": {
     "clickToEditDescription": "Click to edit description",
@@ -6829,13 +6830,14 @@
     "discardMessage": "You have unsaved changes to this workflow. Discard them?",
     "discardTitle": "Discard unsaved changes?",
     "duplicateToCustomize": "Duplicate to customize",
+    "emptyDescription": "Workflows orchestrate the steps and gates that run around task execution. Create one to start arranging that flow.",
+    "emptyTitle": "No workflow selected",
     "nameLabel": "Workflow name",
     "newWorkflow": "New workflow",
     "readOnlyBuiltin": "Read-only built-in workflow",
     "saved": "Workflow saved",
     "savedNotCompilable": "Workflow saved but cannot be compiled",
-    "saveFailed": "Failed to save workflow",
-    "selectOrCreate": "Select or create a workflow to start editing."
+    "saveFailed": "Failed to save workflow"
   },
   "workflowSelector": {
     "switchActiveMessage": "This task has an active session. Switching workflows aborts it and re-homes the card into the new workflow's entry column. Continue?",
