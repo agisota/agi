@@ -191,6 +191,21 @@ A workflow graph node that reads a declared Artifact and runs a registry parser 
 ### Custom task field
 A workflow-declared, typed task field (`string | text | number | boolean | enum | multi-enum | date | url`, with enum options and render hints) whose values live in `tasks.customFields`, keyed by field id. The task model is thereby recast as core fields (title, description) + standard metadata + these workflow-defined fields. Writes pass through a single store authority (`updateTaskCustomFields`) that validates each value against the resolving workflow's schema and returns typed rejections (offending `fieldId` + `code`); agents write them via `fn_task_update`'s `custom_fields` patch. Editing a workflow's fields or switching a task's workflow orphans (never destroys) values for removed or type-incompatible ids — orphans are retained and surfaced under a detail disclosure, excluded from cards. Same id means the same field within a project; there is no cross-workflow shared field namespace.
 
+## Testing
+
+### Merge Gate
+The minimal set of merge-blocking PR checks: lint, typecheck, build, a Boot Smoke, and a small curated engine test suite. The gate is the only test signal that can block a PR; all other tests run non-blocking after merge.
+
+Gate membership is an explicit allow-list, never a glob: a test earns its slot with evidence of value and never graduates in by default. A flake inside the gate is *evicted* — its allow-list entry is removed — which deliberately requires no green run from the flaky test itself, so the gate can always be repaired while red.
+
+### Boot Smoke
+The gate's "app starts and serves" proof: the CLI answers its help command and a real server boots on a throwaway port, answers its health endpoint, and shuts down cleanly on signal. A pass requires both that the shutdown signal was actually delivered and that the exit was clean — a crash after serving is a failed boot path, not a pass.
+
+### Deletion Ratchet
+The standing policy for flaky tests: a test observed failing without a corresponding real bug is quarantined on sight — a dated ledger entry plus exclusion from all runs, not retried, not patched — then deleted 2 weeks later unless rescued with evidence it catches real regressions plus a root-cause fix. Appeasement (widened timeouts, added retries, loosened assertions) is prohibited, for agents especially.
+
+A second quarantine in the same subsystem is a product-race smell: the flake may be a real bug, so the product code gets a look before the deletion clock runs out. Gate flakes exit by Merge Gate eviction rather than quarantine, unless they should also leave the non-blocking tier.
+
 ## Flagged ambiguities
 
 - "Merging" a shared-branch-group Task had been used for both member integration and group promotion — these are distinct steps with independent gating and must not be conflated.
