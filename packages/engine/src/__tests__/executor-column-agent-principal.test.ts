@@ -277,9 +277,58 @@ describe("column-agent principal alignment (plan U5)", () => {
         "agent-X": makeColumnAgent(),
       });
       const executeSpy = vi.spyOn(executor, "execute").mockResolvedValue(undefined as any);
+      // #12 distinguishability: spy on the pass-2 matcher to prove pass-2 was
+      // actually REACHED (not silently skipped) and returned false because the
+      // task's own complete model pair suppresses the defer column agent — rather
+      // than a false-pass where pass-2 never ran.
+      const matchSpy = vi.spyOn(executor as any, "taskEffectiveAgentMatches");
 
       await executor.resumeTaskForAgent("agent-X");
+      expect(matchSpy).toHaveBeenCalledTimes(1);
+      expect(matchSpy.mock.calls[0][1]).toBe("agent-X");
+      await expect(matchSpy.mock.results[0].value).resolves.toBe(false);
       expect(executeSpy).not.toHaveBeenCalled();
+    });
+
+    it("step-execute template node binding governs → pass 2 matches a foreach-template-bound column agent (walks template subgraphs)", async () => {
+      // R6: step-execute seam nodes live ONLY inside a foreach template, never in
+      // ir.nodes. Pass 2 must walk foreach template subgraphs to find them; before
+      // the template-walk fix this returned false and the task was never re-dispatched.
+      const task = singleSessionTask({ id: "FN-STEP", assignedAgentId: "agent-Y" });
+      const ir = {
+        version: "v2",
+        name: "test-wf",
+        columns: [
+          { id: "step-col", name: "Step Col", traits: [], agent: OVERRIDE_COL },
+          { id: "todo", name: "Todo", traits: [] },
+        ],
+        nodes: [
+          {
+            id: "foreach-1",
+            kind: "foreach",
+            column: "todo",
+            config: {
+              template: {
+                nodes: [
+                  { id: "step-exec", kind: "prompt", column: "step-col", config: { seam: "step-execute" } },
+                ],
+              },
+            },
+          },
+        ],
+        edges: [],
+      } as unknown as WorkflowIr;
+      const store = resumeStore(task, ir);
+      const { executor } = makeExecutor(store, {
+        "agent-Y": makeAssignedAgent(),
+        "agent-X": makeColumnAgent(),
+      });
+      const executeSpy = vi.spyOn(executor, "execute").mockResolvedValue(undefined as any);
+
+      await executor.resumeTaskForAgent("agent-X");
+
+      expect(executeSpy).toHaveBeenCalledTimes(1);
+      expect(executeSpy.mock.calls[0][0]).toMatchObject({ id: "FN-STEP" });
     });
   });
 
@@ -385,6 +434,69 @@ describe("column-agent principal alignment (plan U5)", () => {
       expect(find).not.toHaveBeenCalled();
       // Tracked id cleared so we stop probing every tick.
       expect((executor as any).activeSessions.get(task.id).lastEffectiveColumnAgentId).toBeNull();
+    });
+
+    it("no-op tick: same effective column agent + already-resolved model → setModel NOT called", async () => {
+      // The active session is already running as X on X's advertised model. A
+      // task:updated tick that changes nothing about the effective agent/model must
+      // not re-issue a setModel (no churn / no spurious hot-swap).
+      const store = createMockStore();
+      const find = vi.fn().mockReturnValue({ provider: "anthropic", modelId: "claude-x" });
+      const task = singleSessionTask({ assignedAgentId: "agent-Y" });
+      // Column agent X advertises EXACTLY the model the session already resolved.
+      const { executor } = makeExecutor(store, {
+        "agent-X": makeColumnAgent({ runtimeConfig: { model: "anthropic/claude-x", allowParallelExecution: false } }),
+      });
+      (executor as any)._modelRegistry = { find };
+
+      // activeGraphSession seeds lastResolvedModelProvider/Id = anthropic/claude-x
+      // and lastEffectiveColumnAgentId = agent-X — matching the agent's model.
+      const { setModel } = activeGraphSession(executor, task.id, "exec-node", OVERRIDE_COL);
+
+      store._trigger("task:updated", task);
+      await new Promise((r) => setTimeout(r, 0));
+
+      // No agent change, no model change → no hot-swap.
+      expect(setModel).not.toHaveBeenCalled();
+      expect(loggedLines(store).some((l) => l.includes("Column agent changed"))).toBe(false);
+      // The legacy task-model block must also not fire a model swap for the override session.
+      expect(loggedLines(store).some((l) => l.startsWith("Model changed"))).toBe(false);
+    });
+
+    it("override session + mid-flight task model/assigned-agent edit → column agent's model is preserved (legacy hot-swap does NOT clobber it)", async () => {
+      // R3: under an OVERRIDE column, the column agent owns the model. A user editing
+      // the task's modelProvider/modelId or assignedAgentId mid-flight must NOT cause
+      // the legacy task-model hot-swap to resolve the assigned/own model and clobber
+      // the column agent's model.
+      const store = createMockStore();
+      const find = vi.fn().mockReturnValue({ provider: "openai", modelId: "gpt-edited" });
+      // Edited task: now carries a complete own model pair AND a different assigned agent.
+      const task = singleSessionTask({
+        assignedAgentId: "agent-Z",
+        modelProvider: "openai",
+        modelId: "gpt-edited",
+      });
+      // Column agent X advertises its own (unchanged) model.
+      const { executor } = makeExecutor(store, {
+        "agent-X": makeColumnAgent({ runtimeConfig: { model: "anthropic/claude-x", allowParallelExecution: false } }),
+        "agent-Z": makeAssignedAgent({ id: "agent-Z", runtimeConfig: { model: "openai/gpt-edited" } }),
+      });
+      (executor as any)._modelRegistry = { find };
+
+      const { setModel } = activeGraphSession(executor, task.id, "exec-node", OVERRIDE_COL);
+
+      store._trigger("task:updated", task);
+      await new Promise((r) => setTimeout(r, 0));
+
+      // The legacy block is short-circuited under override: the assigned/own model
+      // (openai/gpt-edited) is NEVER applied via setModel.
+      expect(find).not.toHaveBeenCalledWith("openai", "gpt-edited");
+      const setModelArgs = setModel.mock.calls.map((c: any[]) => c[0]);
+      expect(setModelArgs).not.toContainEqual({ provider: "openai", modelId: "gpt-edited" });
+      // No legacy "Model changed to openai/gpt-edited" audit line either.
+      expect(loggedLines(store).some((l) => l.includes("openai/gpt-edited"))).toBe(false);
+      // The tracked effective principal stays the column agent.
+      expect((executor as any).activeSessions.get(task.id).lastEffectiveColumnAgentId).toBe("agent-X");
     });
 
     it("legacy entry (no effective column agent) → the column-invalidation block is skipped", async () => {

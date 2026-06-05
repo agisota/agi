@@ -739,6 +739,30 @@ describe("WorkflowNodeEditor — U6 column agents", () => {
     expect(triage?.agent).toEqual({ agentId: "agent-001", mode: "defer" });
   });
 
+  it("toggling the mode to override saves the binding with mode: override", async () => {
+    // Start from a deferred binding so the mode toggle is already visible.
+    vi.mocked(fetchWorkflows).mockResolvedValue([boundDef("defer")]);
+    vi.mocked(updateWorkflow).mockImplementation(async (_id, updates) => ({ ...boundDef("defer"), ...(updates as object) }));
+    render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} />);
+    const picker = (await screen.findByTestId("wf-column-agent-select-triage")) as HTMLSelectElement;
+    await waitFor(() => expect(picker.value).toBe("agent-001"));
+
+    // Defer is the initial mode; flip to Override.
+    const deferRadio = (await screen.findByText("Defer")).closest("label")!.querySelector("input")! as HTMLInputElement;
+    expect(deferRadio.checked).toBe(true);
+    const overrideRadio = screen.getByText("Override").closest("label")!.querySelector("input")! as HTMLInputElement;
+    fireEvent.click(overrideRadio);
+    await waitFor(() => expect(overrideRadio.checked).toBe(true));
+
+    // Save round-trips the updated mode into the IR.
+    fireEvent.click(screen.getByText("Save").closest("button")!);
+    await waitFor(() => expect(updateWorkflow).toHaveBeenCalled());
+    const [, updates] = vi.mocked(updateWorkflow).mock.calls[0];
+    const cols = (updates as { ir: { columns: { id: string; agent?: { agentId: string; mode: string } }[] } }).ir.columns;
+    const triage = cols.find((c) => c.id === "triage");
+    expect(triage?.agent).toEqual({ agentId: "agent-001", mode: "override" });
+  });
+
   it("clearing to (none) removes the agent key entirely (no agent: null)", async () => {
     vi.mocked(fetchWorkflows).mockResolvedValue([boundDef("defer")]);
     vi.mocked(updateWorkflow).mockImplementation(async (_id, updates) => ({ ...boundDef("defer"), ...(updates as object) }));

@@ -183,6 +183,34 @@ describe("runGraphCustomNode column-agent resolution (plan U3)", () => {
     ).toBe(true);
   });
 
+  it("column agent lookup THROWS (store/agentStore error) → node still succeeds, 'lookup failed' logged (R8)", async () => {
+    // adoptColumnAgentForNode is best-effort: an agentStore.getAgent rejection must
+    // be swallowed and the node must fall back to node/default resolution rather
+    // than the graph node failing.
+    const store = createMockStore();
+    store.getTask.mockResolvedValue({ id: "FN-001", worktree: "/tmp/wt", log: [] } as any);
+    const agentStore = {
+      getAgent: vi.fn().mockRejectedValue(new Error("agent store unavailable")),
+    };
+    const executor = new TaskExecutor(store as any, "/tmp/test", { agentStore } as any);
+    const captured = spyStep(executor);
+
+    const node = { id: "review", kind: "prompt", column: "review", config: { prompt: "Plain." } };
+    const result = await (executor as any).runGraphCustomNode(node, { id: "FN-001" }, {}, OVERRIDE);
+
+    // Node did NOT fail despite the lookup throwing.
+    expect(result.outcome).toBe("success");
+    // No column-agent model adopted (lookup failed) → node falls back.
+    expect(captured.step.modelProvider).toBeUndefined();
+    expect(captured.step.modelId).toBeUndefined();
+    // The catch-path fallback audit fired.
+    expect(
+      loggedLines(store).some(
+        (l) => l.includes("column agent 'agent-col' lookup failed") && l.includes("falling back"),
+      ),
+    ).toBe(true);
+  });
+
   it("node with no declared column → untouched resolution even when a binding is passed as undefined", async () => {
     const store = createMockStore();
     store.getTask.mockResolvedValue({ id: "FN-001", worktree: "/tmp/wt", log: [] } as any);

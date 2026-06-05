@@ -304,8 +304,13 @@ export {
   normalizeAgentPermissionPolicy,
   resolveEffectiveAgentPermissionPolicy,
   isAgentPermissionPolicyPresetId,
+  isPolicyBroaderThanDefault,
 } from "./agent-permission-policy.js";
 export type { BuiltInAgentPermissionPolicyPreset } from "./agent-permission-policy.js";
+export {
+  validateColumnAgentBindings,
+  ColumnAgentBindingError,
+} from "./column-agent-binding-validation.js";
 export { AgentStore, DEFAULT_AGENT_HEARTBEAT_INTERVAL_MS } from "./agent-store.js";
 export type { AgentStoreEvents } from "./agent-store.js";
 export {

@@ -564,6 +564,52 @@ describe("workflow routes — column agents (U6)", () => {
     expect(ok.status).toBe(201);
   });
 
+  it("saves without the flag when the agent policy equals the project default (no escalation)", async () => {
+    // Project default and the bound agent are both fully restrictive (locked-down):
+    // equal policies are NOT broader, so no confirmation is required.
+    await store.updateSettings({
+      defaultAgentPermissionPolicy: { rules: { file_write_delete: "block", command_execution: "block" } } as never,
+    });
+    const agentId = await makeAgent({
+      permissionPolicy: { presetId: "custom", rules: { file_write_delete: "block", command_execution: "block" } },
+    });
+    const res = await post("/api/workflows", { name: "Equal", ir: boundIr({ agentId, mode: "override" }) });
+    expect(res.status).toBe(201);
+  });
+
+  it("saves without the flag when the project default is unset (unrestricted) and the agent is unrestricted", async () => {
+    // No project default configured → effective default is `unrestricted` (allow-all).
+    // An unrestricted agent is equal, not broader, so no escalation.
+    const agentId = await makeAgent({ permissionPolicy: { presetId: "unrestricted" } });
+    const res = await post("/api/workflows", { name: "Unrestricted", ir: boundIr({ agentId, mode: "override" }) });
+    expect(res.status).toBe(201);
+  });
+
+  it("still detects escalation when the agent's custom rules map omits a category the default blocks", async () => {
+    // Default blocks two categories. The agent's custom rules map names only ONE
+    // of them (the other is absent → resolves to the unrestricted `allow` seed),
+    // so the agent is genuinely broader on the omitted category. A missing key
+    // must NOT silently suppress this escalation.
+    await store.updateSettings({
+      defaultAgentPermissionPolicy: { rules: { file_write_delete: "block", command_execution: "block" } } as never,
+    });
+    const agentId = await makeAgent({
+      // Only file_write_delete declared; command_execution omitted → allow (broader).
+      permissionPolicy: { presetId: "custom", rules: { file_write_delete: "block" } },
+    });
+    const denied = await post("/api/workflows", { name: "PartialEsc", ir: boundIr({ agentId, mode: "override" }) });
+    expect(denied.status).toBe(400);
+    expect(denied.body.error).toMatch(/broader/i);
+    expect((denied.body as { details?: { policyEscalation?: boolean } }).details?.policyEscalation).toBe(true);
+
+    const ok = await post("/api/workflows", {
+      name: "PartialEsc2",
+      ir: boundIr({ agentId, mode: "override" }),
+      confirmPolicyEscalation: true,
+    });
+    expect(ok.status).toBe(201);
+  });
+
   it("stores no agent key when the binding is absent (omission, R9)", async () => {
     const res = await post("/api/workflows", { name: "Plain", ir: boundIr() });
     expect(res.status).toBe(201);

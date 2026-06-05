@@ -313,6 +313,30 @@ describe("column-agent coding seams (plan U4)", () => {
       expect(loggedLines(store).some((l) => l.includes("running as column agent"))).toBe(false);
     });
 
+    it("defer column, task with own assignedAgentId only (NO model pair) → own-settings win, column agent NOT adopted", async () => {
+      // KTD-5 at the seam: an own agent IDENTITY alone counts as own-settings even
+      // without a complete model pair, so a defer column must NOT adopt the column
+      // agent. (Distinct from the bare-task case below where the column agent wins.)
+      const store = createMockStore();
+      const task = singleSessionTask({ assignedAgentId: "agent-Y" }); // no modelProvider/modelId
+      store.getTask.mockResolvedValue(task as any);
+      const { executor, agentStore } = makeExecutor(store, {
+        "agent-Y": makeAssignedAgent(),
+        "agent-col": makeColumnAgent(),
+      });
+      installTaskDoneAgent();
+
+      await runExecuteSeam(executor, task, "execute-node", DEFER_COL);
+
+      const opts = lastFnAgentOpts();
+      // Fell back to the assigned agent's model — column agent's model not adopted.
+      expect(opts.defaultProvider).toBe("openai");
+      expect(opts.defaultModelId).toBe("gpt-assigned");
+      // Column agent never fetched/adopted, no adoption audit.
+      expect(agentStore.getAgent).not.toHaveBeenCalledWith("agent-col");
+      expect(loggedLines(store).some((l) => l.includes("running as column agent"))).toBe(false);
+    });
+
     it("defer column, bare task (no own settings) → column agent adopted", async () => {
       const store = createMockStore();
       const task = singleSessionTask(); // no assignedAgentId, no model pair
