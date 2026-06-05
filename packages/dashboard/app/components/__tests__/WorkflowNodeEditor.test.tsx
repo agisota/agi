@@ -639,6 +639,7 @@ describe("WorkflowNodeEditor — U8 step-inversion authoring", () => {
 function builtinStepwiseDef(): WorkflowDefinition {
   return {
     id: "builtin:stepwise-coding",
+    kind: "workflow",
     name: "Stepwise coding (built-in)",
     description: "",
     ir: BUILTIN_STEPWISE_CODING_WORKFLOW_IR,

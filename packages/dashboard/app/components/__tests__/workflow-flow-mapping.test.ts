@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { WorkflowDefinition } from "@fusion/core";
+import { parseWorkflowIr } from "@fusion/core";
 import type { Node as FlowNode } from "@xyflow/react";
 import {
   irToFlow,
   flowToIr,
+  insertFragment,
+  fragmentSeamConflicts,
+  copyIrWithFreshIds,
   columnsOf,
   columnForY,
   bandTop,
@@ -750,5 +754,249 @@ describe("cascadeDelete (U3, R6)", () => {
     // No nodes removed, all other edges intact.
     expect(result.nodes).toHaveLength(nodes.length);
     expect(result.edges).toHaveLength(edges.length - 1);
+  });
+});
+
+// ── Fragment insertion + graph copy (U8, R7/R8) ──────────────────────────────
+
+/** start → a → b → c → end (top-level scope, reused by the U8 suites). */
+const u8ChainDef = (): WorkflowDefinition =>
+  makeDef({
+    version: "v1",
+    name: "chain",
+    nodes: [
+      { id: "start", kind: "start" },
+      { id: "a", kind: "prompt", config: { prompt: "a" } },
+      { id: "b", kind: "prompt", config: { prompt: "b" } },
+      { id: "c", kind: "prompt", config: { prompt: "c" } },
+      { id: "end", kind: "end" },
+    ],
+    edges: [
+      { from: "start", to: "a", condition: "success" },
+      { from: "a", to: "b", condition: "success" },
+      { from: "b", to: "c", condition: "success" },
+      { from: "c", to: "end", condition: "success" },
+    ],
+  });
+
+/** A small fragment IR: start → a → b → end, b carries a merge seam + name. */
+function fragmentIr(): WorkflowDefinition["ir"] {
+  return {
+    version: "v1",
+    name: "frag",
+    nodes: [
+      { id: "start", kind: "start" },
+      { id: "a", kind: "prompt", config: { prompt: "do a", name: "Step A" } },
+      { id: "b", kind: "prompt", config: { seam: "merge", name: "Merge" } },
+      { id: "end", kind: "end" },
+    ],
+    edges: [
+      { from: "start", to: "a", condition: "success" },
+      { from: "a", to: "b", condition: "failure" },
+      { from: "b", to: "end", condition: "success" },
+    ],
+  };
+}
+
+describe("insertFragment", () => {
+  it("strips start/end, remaps every node id, preserves internal edges/config/conditions", () => {
+    const existing = irToFlow(u8ChainDef());
+    const before = new Set(existing.nodes.map((n) => n.id));
+    const { nodes, edges, insertedNodeIds } = insertFragment(
+      existing.nodes,
+      existing.edges,
+      fragmentIr(),
+      { x: 500, y: 200 },
+    );
+
+    // Two body nodes inserted (start/end stripped).
+    expect(insertedNodeIds).toHaveLength(2);
+    expect(nodes).toHaveLength(existing.nodes.length + 2);
+
+    // Inserted ids are fresh (disjoint from existing) and not the fragment's.
+    for (const id of insertedNodeIds) {
+      expect(before.has(id)).toBe(false);
+      expect(["start", "a", "b", "end"]).not.toContain(id);
+    }
+
+    const inserted = nodes.filter((n) => insertedNodeIds.includes(n.id));
+    // No start/end among inserted nodes.
+    expect(inserted.some((n) => n.data.kind === "start" || n.data.kind === "end")).toBe(false);
+    // Config preserved: the merge node keeps its seam; the prompt keeps its prompt.
+    const merge = inserted.find((n) => n.data.kind === "merge")!;
+    expect(merge.data.config?.seam).toBe("merge");
+    const promptNode = inserted.find((n) => n.data.config?.prompt === "do a")!;
+    expect(promptNode).toBeTruthy();
+
+    // Only the single internal a→b edge survives (start→a, b→end stripped).
+    const newEdges = edges.slice(existing.edges.length);
+    expect(newEdges).toHaveLength(1);
+    const e = newEdges[0];
+    expect(insertedNodeIds).toContain(e.source);
+    expect(insertedNodeIds).toContain(e.target);
+    // Edge condition preserved.
+    expect(e.data?.condition).toBe("failure");
+
+    // Inputs not mutated.
+    expect(existing.nodes).toHaveLength(before.size);
+  });
+
+  it("positions inserted nodes near the requested position", () => {
+    const existing = irToFlow(u8ChainDef());
+    const { nodes, insertedNodeIds } = insertFragment(
+      existing.nodes,
+      existing.edges,
+      fragmentIr(),
+      { x: 500, y: 200 },
+    );
+    const inserted = nodes.filter((n) => insertedNodeIds.includes(n.id));
+    for (const n of inserted) {
+      expect(n.position.x).toBeGreaterThanOrEqual(500);
+      expect(n.position.y).toBeGreaterThanOrEqual(200);
+      expect(n.position.y).toBeLessThan(500);
+    }
+  });
+
+  it("double-insert of the same fragment yields two disjoint id sets", () => {
+    const existing = irToFlow(u8ChainDef());
+    const first = insertFragment(existing.nodes, existing.edges, fragmentIr(), { x: 500, y: 200 });
+    const second = insertFragment(first.nodes, first.edges, fragmentIr(), { x: 800, y: 200 });
+    const setA = new Set(first.insertedNodeIds);
+    for (const id of second.insertedNodeIds) expect(setA.has(id)).toBe(false);
+    // All ids across the graph are unique.
+    const allIds = second.nodes.map((n) => n.id);
+    expect(new Set(allIds).size).toBe(allIds.length);
+  });
+});
+
+describe("fragmentSeamConflicts", () => {
+  it("flags a merge seam present in both fragment and canvas", () => {
+    // Canvas containing a merge node.
+    const canvas = irToFlow(
+      makeDef({
+        version: "v1",
+        name: "wf",
+        nodes: [
+          { id: "start", kind: "start" },
+          { id: "m", kind: "prompt", config: { seam: "merge" } },
+          { id: "end", kind: "end" },
+        ],
+        edges: [
+          { from: "start", to: "m", condition: "success" },
+          { from: "m", to: "end", condition: "success" },
+        ],
+      }),
+    );
+    expect(fragmentSeamConflicts(fragmentIr(), canvas.nodes)).toEqual(["merge"]);
+  });
+
+  it("returns [] when the canvas has no overlapping seam", () => {
+    const canvas = irToFlow(u8ChainDef());
+    expect(fragmentSeamConflicts(fragmentIr(), canvas.nodes)).toEqual([]);
+  });
+
+  it("treats the editor 'merge' node kind as the merge seam on the canvas", () => {
+    // Canvas node has no config.seam but is rendered as a merge node.
+    const canvas: FlowNode<WorkflowFlowNodeData>[] = [
+      {
+        id: "x",
+        type: "merge",
+        position: { x: 0, y: 0 },
+        data: { kind: "merge", label: "Merge boundary" },
+      },
+    ];
+    expect(fragmentSeamConflicts(fragmentIr(), canvas)).toEqual(["merge"]);
+  });
+});
+
+describe("copyIrWithFreshIds", () => {
+  function v2WithForeach(): WorkflowDefinition["ir"] {
+    return {
+      version: "v2",
+      name: "wf",
+      columns: [{ id: "in-progress", name: "In Progress", traits: [] }],
+      nodes: [
+        { id: "start", kind: "start", column: "in-progress" },
+        {
+          id: "loop",
+          kind: "foreach",
+          column: "in-progress",
+          config: {
+            source: "task-steps",
+            template: {
+              nodes: [
+                { id: "t1", kind: "prompt", config: { prompt: "inner" } },
+                { id: "t2", kind: "prompt", config: { prompt: "inner2" } },
+              ],
+              edges: [{ from: "t1", to: "t2", condition: "success" }],
+            },
+          },
+        },
+        { id: "end", kind: "end", column: "in-progress" },
+      ],
+      edges: [
+        { from: "start", to: "loop", condition: "success" },
+        { from: "loop", to: "end", condition: "success" },
+      ],
+    };
+  }
+
+  it("preserves structure but remaps all node ids; layout keys remapped consistently", () => {
+    const ir = u8ChainDef().ir;
+    const layout = { start: { x: 0, y: 0 }, a: { x: 100, y: 0 }, b: { x: 200, y: 0 }, c: { x: 300, y: 0 }, end: { x: 400, y: 0 } };
+    const result = copyIrWithFreshIds(ir, layout);
+
+    // Same counts + kinds.
+    expect(result.ir.nodes).toHaveLength(ir.nodes.length);
+    expect(result.ir.edges).toHaveLength(ir.edges.length);
+    expect(result.ir.nodes.map((n) => n.kind)).toEqual(ir.nodes.map((n) => n.kind));
+
+    // All new ids, disjoint from originals.
+    const origIds = new Set(ir.nodes.map((n) => n.id));
+    for (const n of result.ir.nodes) expect(origIds.has(n.id)).toBe(false);
+
+    // Edges reference only new ids.
+    const newIds = new Set(result.ir.nodes.map((n) => n.id));
+    for (const e of result.ir.edges) {
+      expect(newIds.has(e.from)).toBe(true);
+      expect(newIds.has(e.to)).toBe(true);
+    }
+
+    // Layout keys remapped consistently: same value set, all keys are new ids.
+    expect(Object.keys(result.layout)).toHaveLength(Object.keys(layout).length);
+    for (const key of Object.keys(result.layout)) expect(newIds.has(key)).toBe(true);
+
+    // Original inputs untouched.
+    expect(ir.nodes[0].id).toBe("start");
+    expect(layout.start).toEqual({ x: 0, y: 0 });
+
+    // The copy is a valid IR (value import works under the test-runner alias).
+    const parsed = parseWorkflowIr(result.ir);
+    expect(parsed.nodes).toHaveLength(ir.nodes.length);
+  });
+
+  it("remaps foreach template node ids + edges, preserving columns", () => {
+    const ir = v2WithForeach();
+    const result = copyIrWithFreshIds(ir, {});
+    const loop = result.ir.nodes.find((n) => n.kind === "foreach")!;
+    const template = (loop.config as { template: { nodes: { id: string; kind: string }[]; edges: { from: string; to: string }[] } }).template;
+
+    // Template node ids are remapped (not the originals t1/t2).
+    expect(template.nodes.map((n) => n.id)).not.toEqual(["t1", "t2"]);
+    expect(template.nodes.map((n) => n.kind)).toEqual(["prompt", "prompt"]);
+
+    // Template edges reference the remapped template ids.
+    const tIds = new Set(template.nodes.map((n) => n.id));
+    expect(template.edges).toHaveLength(1);
+    expect(tIds.has(template.edges[0].from)).toBe(true);
+    expect(tIds.has(template.edges[0].to)).toBe(true);
+
+    // Columns preserved untouched.
+    expect(result.ir.version).toBe("v2");
+    if (result.ir.version === "v2") {
+      expect(result.ir.columns).toEqual(ir.columns);
+      // Node columns carried through.
+      expect(result.ir.nodes.every((n) => n.column === "in-progress")).toBe(true);
+    }
   });
 });

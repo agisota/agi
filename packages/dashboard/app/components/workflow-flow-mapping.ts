@@ -540,6 +540,15 @@ export function newEdgeId(): string {
   return `e-${Date.now().toString(36)}-${edgeSeq}`;
 }
 
+let nodeSeq = 0;
+/** Allocate a globally-unique node id (mirrors the editor's local newNodeId). The
+ *  fragment-insert / graph-copy helpers (U8) remap every node id through this so
+ *  inserted/copied subgraphs never collide with existing ids. */
+export function newNodeId(): string {
+  nodeSeq += 1;
+  return `n-${Date.now().toString(36)}-${nodeSeq}`;
+}
+
 /** Result of attempting to build an edge from a React Flow connection. */
 export type BuildConnectionResult =
   | { edge: FlowEdge }
@@ -771,4 +780,229 @@ export function emptyWorkflowIr(name: string): WorkflowIr {
 
 export function emptyWorkflowLayout(): Record<string, { x: number; y: number }> {
   return { start: { x: 80, y: 140 }, end: { x: 460, y: 140 } };
+}
+
+// ── Fragment insertion + graph copy (U8, R7/R8) ──────────────────────────────
+//
+// Pure primitives for the template library: inserting a fragment subgraph into
+// the live canvas (palette Templates section, U9) and copying a whole workflow
+// graph with fresh ids (create-from-template picker, U4/R7). All three return
+// new arrays/objects and never mutate their inputs.
+
+/** Seam markers that participate in the duplicate-seam pre-validation. A canvas
+ *  may host at most one node per seam, so inserting a fragment that carries a
+ *  seam already present on the canvas is rejected. The editor maps the "merge"
+ *  seam to its dedicated "merge" node kind, so a merge node counts as the merge
+ *  seam even without an explicit config.seam. */
+const SEAM_NAMES = new Set<string>(["execute", "review", "merge"]);
+
+/** Read the seam marker a flow node represents, if any: an explicit
+ *  config.seam, or the "merge" editor kind (which is the merge seam). */
+function flowNodeSeam(node: FlowNode<WorkflowFlowNodeData>): string | undefined {
+  if (node.data?.kind === "merge") return "merge";
+  const seam = node.data?.config?.seam;
+  return typeof seam === "string" ? seam : undefined;
+}
+
+/** Read the seam marker an IR node carries via its config.seam. */
+function irNodeSeam(node: WorkflowIrNode): string | undefined {
+  const seam = node.config?.seam;
+  return typeof seam === "string" ? seam : undefined;
+}
+
+/**
+ * Seam names (execute/review/merge) present in BOTH the fragment and the existing
+ * canvas — i.e. seams that would be duplicated by inserting the fragment. An
+ * empty result means the fragment is safe to insert. Other seam values
+ * (planning, step-execute, …) are not pre-validated here (only the tracked
+ * execute/review/merge seams are single-instance on the canvas).
+ */
+export function fragmentSeamConflicts(
+  fragmentIr: WorkflowIr,
+  nodes: FlowNode<WorkflowFlowNodeData>[],
+): string[] {
+  const canvasSeams = new Set<string>();
+  for (const n of nodes) {
+    const seam = flowNodeSeam(n);
+    if (seam && SEAM_NAMES.has(seam)) canvasSeams.add(seam);
+  }
+  const conflicts: string[] = [];
+  const seen = new Set<string>();
+  for (const node of fragmentIr.nodes) {
+    const seam = irNodeSeam(node);
+    if (seam && SEAM_NAMES.has(seam) && canvasSeams.has(seam) && !seen.has(seam)) {
+      seen.add(seam);
+      conflicts.push(seam);
+    }
+  }
+  return conflicts;
+}
+
+/** Build a React Flow node from a single IR node at an absolute position — the
+ *  same mapping irToFlow applies (kind→type via editorKind, data {kind,label,
+ *  config}, deletable). foreach template bodies are remapped by the caller; this
+ *  carries config (including any template) through verbatim. */
+function irNodeToFlowNode(
+  node: WorkflowIrNode,
+  id: string,
+  position: { x: number; y: number },
+): FlowNode<WorkflowFlowNodeData> {
+  const kind = editorKind(node);
+  return {
+    id,
+    type: kind,
+    position,
+    data: { kind, label: nodeLabel(node), config: { ...(node.config ?? {}) } },
+    deletable: node.kind !== "start" && node.kind !== "end",
+  };
+}
+
+/**
+ * Insert a fragment subgraph into a flow graph near `position`.
+ *
+ * The fragment's `start`/`end` nodes (and every edge incident to them) are
+ * stripped; each remaining fragment node id is remapped to a fresh newNodeId()
+ * and the fragment's internal edges are rewired to those ids with fresh edge
+ * ids, preserving condition/kind. Node config and kind are preserved. Inserted
+ * nodes are laid out relative to `position` using the fragment's persisted
+ * layout when present, else simple horizontal x-spacing.
+ *
+ * Returns NEW arrays plus the ids of the inserted (remapped) nodes; inputs are
+ * never mutated.
+ */
+export function insertFragment(
+  nodes: FlowNode<WorkflowFlowNodeData>[],
+  edges: FlowEdge[],
+  fragmentIr: WorkflowIr,
+  position: { x: number; y: number },
+  layout?: Record<string, { x: number; y: number }>,
+): {
+  nodes: FlowNode<WorkflowFlowNodeData>[];
+  edges: FlowEdge[];
+  insertedNodeIds: string[];
+} {
+  // Drop structural start/end; everything else is a real fragment node.
+  const bodyNodes = fragmentIr.nodes.filter((n) => n.kind !== "start" && n.kind !== "end");
+  const droppedIds = new Set(
+    fragmentIr.nodes.filter((n) => n.kind === "start" || n.kind === "end").map((n) => n.id),
+  );
+
+  // Remap every surviving fragment id to a fresh id.
+  const idMap = new Map<string, string>();
+  for (const n of bodyNodes) idMap.set(n.id, newNodeId());
+
+  // Anchor the fragment's layout origin so nodes land near `position`. When the
+  // fragment ships layout, preserve relative offsets; otherwise space the nodes
+  // horizontally.
+  const placed = bodyNodes.map((node) => layout?.[node.id]).filter((p): p is { x: number; y: number } => !!p);
+  const minX = placed.length ? Math.min(...placed.map((p) => p.x)) : 0;
+  const minY = placed.length ? Math.min(...placed.map((p) => p.y)) : 0;
+
+  const insertedNodeIds: string[] = [];
+  const newNodes = bodyNodes.map((node, index): FlowNode<WorkflowFlowNodeData> => {
+    const id = idMap.get(node.id)!;
+    insertedNodeIds.push(id);
+    const fromLayout = layout?.[node.id];
+    const pos = fromLayout
+      ? { x: position.x + (fromLayout.x - minX), y: position.y + (fromLayout.y - minY) }
+      : { x: position.x + index * 180, y: position.y };
+    return irNodeToFlowNode(node, id, pos);
+  });
+
+  // Rewire only the fragment's INTERNAL edges (both endpoints survived). Edges
+  // touching a stripped start/end node are dropped.
+  const newEdges: FlowEdge[] = fragmentIr.edges
+    .filter((e) => !droppedIds.has(e.from) && !droppedIds.has(e.to))
+    .filter((e) => idMap.has(e.from) && idMap.has(e.to))
+    .map((edge, index) => {
+      const flow = irEdgeToFlow(edge, index);
+      return {
+        ...flow,
+        id: newEdgeId(),
+        source: idMap.get(edge.from)!,
+        target: idMap.get(edge.to)!,
+      };
+    });
+
+  return {
+    nodes: [...nodes, ...newNodes],
+    edges: [...edges, ...newEdges],
+    insertedNodeIds,
+  };
+}
+
+/** Remap a foreach template's internal node ids + edges to fresh ids. Returns a
+ *  new template object; the original is untouched. Template-local ids are scoped
+ *  to the template, so a fresh local id space suffices (and keeps config compact
+ *  rather than reusing global ids). */
+function copyForeachTemplate(template: {
+  nodes: WorkflowIrNode[];
+  edges: WorkflowIrEdge[];
+}): { nodes: WorkflowIrNode[]; edges: WorkflowIrEdge[] } {
+  const innerMap = new Map<string, string>();
+  for (const n of template.nodes) innerMap.set(n.id, newNodeId());
+  const nodes = template.nodes.map((n) => copyIrNode(n, innerMap.get(n.id)!));
+  const edges = template.edges.map((e) => ({
+    ...e,
+    from: innerMap.get(e.from) ?? e.from,
+    to: innerMap.get(e.to) ?? e.to,
+  }));
+  return { nodes, edges };
+}
+
+/** Deep-ish copy of an IR node under a new id, recursing into a foreach
+ *  template's internal node references so they remain self-consistent. */
+function copyIrNode(node: WorkflowIrNode, newId: string): WorkflowIrNode {
+  const config = node.config ? { ...node.config } : undefined;
+  const foreach = foreachConfigOf(node);
+  if (foreach && config) {
+    config.template = copyForeachTemplate(foreach.template);
+  }
+  const copy: WorkflowIrNode = { id: newId, kind: node.kind };
+  if (node.column !== undefined) copy.column = node.column;
+  if (config) copy.config = config;
+  return copy;
+}
+
+/**
+ * Full-graph copy with fresh ids (R7): every top-level node id is remapped to a
+ * fresh id, edges are rewired, and the layout map's keys are remapped to match.
+ * v2 columns/fields/artifacts are preserved untouched (they hold no node id
+ * references). foreach template bodies have their internal node ids + edges
+ * remapped consistently too. Returns a NEW ir + layout; inputs are not mutated.
+ */
+export function copyIrWithFreshIds(
+  ir: WorkflowIr,
+  layout: Record<string, { x: number; y: number }>,
+): { ir: WorkflowIr; layout: Record<string, { x: number; y: number }> } {
+  const idMap = new Map<string, string>();
+  for (const n of ir.nodes) idMap.set(n.id, newNodeId());
+
+  const nodes = ir.nodes.map((n) => copyIrNode(n, idMap.get(n.id)!));
+  const edges = ir.edges.map((e) => ({
+    ...e,
+    from: idMap.get(e.from) ?? e.from,
+    to: idMap.get(e.to) ?? e.to,
+  }));
+
+  // Remap layout keys for top-level nodes; leave any unrelated keys as-is.
+  const newLayout: Record<string, { x: number; y: number }> = {};
+  for (const [key, pos] of Object.entries(layout)) {
+    const mapped = idMap.get(key);
+    newLayout[mapped ?? key] = { ...pos };
+  }
+
+  let copied: WorkflowIr;
+  if (isV2(ir)) {
+    const v2: WorkflowIrV2 = {
+      ...ir,
+      nodes,
+      edges,
+      columns: ir.columns.map((c) => ({ ...c, traits: c.traits.map((t) => ({ ...t })) })),
+    };
+    copied = v2;
+  } else {
+    copied = { ...ir, nodes, edges };
+  }
+  return { ir: copied, layout: newLayout };
 }
