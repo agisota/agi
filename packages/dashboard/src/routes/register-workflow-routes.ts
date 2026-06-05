@@ -1,9 +1,120 @@
 import type { WorkflowDefinition, WorkflowDefinitionKind, WorkflowIr, WorkflowIrNode } from "@fusion/core";
-import { ColumnTraitValidationError, OccupiedColumnsError, InvalidRehomeTargetError, WorkflowCompileError, WorkflowIrError, SCHEMA_VERSION, assertColumnTraitsValid, compileWorkflowToSteps, listTraits, listStepParsers, parseWorkflowIr } from "@fusion/core";
-import { validateCodeNodeSources } from "@fusion/engine";
-import { ApiError, badRequest, conflict, notFound } from "../api-error.js";
+import { ColumnTraitValidationError, OccupiedColumnsError, InvalidRehomeTargetError, WorkflowCompileError, WorkflowIrError, SCHEMA_VERSION, assertColumnTraitsValid, compileWorkflowToSteps, layoutForIr, listTraits, listStepParsers, parseWorkflowIr, resolvePlanningSettingsModel } from "@fusion/core";
+import { createFnAgent as engineCreateFnAgent, validateCodeNodeSources } from "@fusion/engine";
+import { ApiError, badRequest, conflict, notFound, rateLimited } from "../api-error.js";
 import { emitWorkflowSseEvent } from "../sse.js";
 import type { ApiRoutesContext } from "./types.js";
+
+// ── AI design route DI seam + rate limiter (U7/R11/KTD-6) ─────────────────────
+//
+// Test-injectable createFnAgent factory, co-located with the route per KTD-6's
+// "module-level __setCreateFnAgentForDesign DI seam co-located with the route".
+// Defaults to the statically imported engine binding; tests inject a fake that
+// captures the prompt and returns canned IR text (no model calls in tests).
+let createFnAgentForDesign: typeof engineCreateFnAgent = engineCreateFnAgent;
+
+/** @internal Inject a mock createFnAgent for the workflow-design route tests. */
+export function __setCreateFnAgentForDesign(mock: typeof engineCreateFnAgent): void {
+  createFnAgentForDesign = mock;
+}
+
+/** @internal Reset the design route's createFnAgent to the real engine binding. */
+export function __resetCreateFnAgentForDesign(): void {
+  createFnAgentForDesign = engineCreateFnAgent;
+}
+
+/** Minimal session shape used by the one-shot design turn (mirrors the refine
+ *  route's RefineAgentSession): subscribe to text deltas, prompt once, dispose. */
+interface DesignAgentSession {
+  on(event: "text", listener: (delta: string) => void): void;
+  prompt(text: string): Promise<void>;
+  dispose(): void;
+}
+
+/** Max design prompt length (chars). Over → 400 (mirrors the bounded prompts on
+ *  the other AI routes; generous enough for an edit-with-context instruction). */
+const MAX_DESIGN_PROMPT_LENGTH = 4000;
+
+/** Rate limit: max design requests per IP per hour (mirrors /ai/refine-text). */
+const MAX_DESIGN_REQUESTS_PER_HOUR = 10;
+const DESIGN_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+interface DesignRateLimitEntry {
+  count: number;
+  firstRequestAt: number;
+}
+
+// Dedicated window so design and refine-text don't share a counter. Module-level
+// (per-process) exactly like ai-refine's limiter.
+const designRateLimits = new Map<string, DesignRateLimitEntry>();
+
+/** Returns true when the IP may make a design request (and records it); false
+ *  when the 10/hour window is exhausted. Same shape as ai-refine.checkRateLimit. */
+function checkDesignRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = designRateLimits.get(ip);
+  if (!entry || now - entry.firstRequestAt > DESIGN_RATE_LIMIT_WINDOW_MS) {
+    designRateLimits.set(ip, { count: 1, firstRequestAt: now });
+    return true;
+  }
+  if (entry.count >= MAX_DESIGN_REQUESTS_PER_HOUR) return false;
+  entry.count++;
+  return true;
+}
+
+/** @internal Reset the design rate-limit window (tests). */
+export function __resetDesignRateLimit(): void {
+  designRateLimits.clear();
+}
+
+/** Extract a JSON object from possibly-fenced / prose-wrapped model output.
+ *  Mirrors the evaluator/agent-generation precedent (packages/engine
+ *  evaluator.ts extractJson): strip a leading ```json fence, else slice from the
+ *  first `{` to the last `}`. Kept local — engine helper is not exported and the
+ *  constraint forbids engine changes. */
+function extractJsonFromText(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("```")) {
+    return trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  }
+  const first = trimmed.indexOf("{");
+  const last = trimmed.lastIndexOf("}");
+  if (first >= 0 && last > first) return trimmed.slice(first, last + 1);
+  return trimmed;
+}
+
+/** System prompt for the design agent. Describes the WorkflowIr vocabulary
+ *  concisely (adapted from fn_workflow_create's tool description) and constrains
+ *  the model to emit ONLY a WorkflowIr JSON object. */
+const WORKFLOW_DESIGN_SYSTEM_PROMPT = `You are a Fusion workflow architect. Given a description (and optionally a base graph to modify), output a single WorkflowIr JSON object that defines a board workflow.
+
+OUTPUT CONTRACT
+- Respond with ONLY the WorkflowIr JSON object. No prose, no explanation, no markdown fences.
+
+WorkflowIr SHAPE
+{ "version": "v1", "name": string, "nodes": Node[], "edges": Edge[] }
+- Node: { "id": string (unique), "kind": NodeKind, "config"?: object }
+- Edge: { "from": nodeId, "to": nodeId, "condition"?: "success" | "failure" }
+
+NODE KINDS (v1)
+- "start" — exactly one; the entry node. REQUIRED.
+- "end" — exactly one; the terminal node. REQUIRED.
+- "prompt" — an agent task. config: { "name": string, "prompt": string }. Encode the
+  workflow seam via config.seam = "execute" | "review" | "merge":
+  "execute" is the coding/work seam, "review" verifies, "merge" integrates.
+- "script" — runs a configured project script. config: { "name": string, "scriptName": string }.
+- "gate" — a manual/automatic checkpoint.
+
+EDGES & SEAMS
+- Every edge from a prompt seam node should carry a condition: "success" continues
+  the happy path; "failure" routes to "end".
+- A standard linear coding workflow is: start → execute → review → merge → end, with
+  each seam's "success" advancing to the next and its "failure" going to "end".
+- Keep it LINEAR unless the description clearly requires branching. The legacy engine
+  only runs linear graphs; branches are valid but flagged interpreter-only.
+
+NEVER include "cliSkipApproval" or "autoApprove" in any node config — they are stripped
+at this boundary regardless.`;
 
 /**
  * Routes for named workflow definitions, IR compilation preview, per-task
@@ -505,6 +616,125 @@ export function registerWorkflowRoutes(ctx: ApiRoutesContext): void {
 
       emitWorkflowSseEvent("workflow:created", workflow, projectId);
       res.status(201).json({ workflow, strippedApprovalFlags, warnings });
+    } catch (err: unknown) {
+      if (err instanceof ApiError) throw err;
+      rethrowAsApiError(err);
+    }
+  });
+
+  // POST /api/workflows/design — prompt → server-validated WorkflowIr (U7/R11/
+  // KTD-6). One-shot, tool-less agent on the planning lane; output is JSON-
+  // extracted, parsed, compile-triaged, and approval-flag-stripped. Persists
+  // NOTHING — the route returns the IR and the client decides. For the edit flow
+  // the client passes `workflowId` (never IR); the persisted base graph is read
+  // server-side and folded into the prompt. Rate-limited 10/hour/IP.
+  //   prompt empty / > cap              → 400
+  //   rate limit exhausted              → 429
+  //   unknown workflowId                → 404
+  //   invalid JSON / parseWorkflowIr    → 422 (parser message)
+  //   compile deferred-suffix failure   → 200 { interpreterOnly: true }
+  //   other compile failure             → 422 (graph unsound for both engines)
+  router.post("/workflows/design", async (req, res) => {
+    try {
+      const { store } = await getProjectContext(req);
+      const body = (req.body ?? {}) as { prompt?: unknown; workflowId?: unknown };
+
+      // Validate prompt (bounded length; non-empty).
+      if (typeof body.prompt !== "string" || !body.prompt.trim()) {
+        throw badRequest("prompt is required and must be a non-empty string");
+      }
+      const prompt = body.prompt;
+      if (prompt.length > MAX_DESIGN_PROMPT_LENGTH) {
+        throw badRequest(`prompt must not exceed ${MAX_DESIGN_PROMPT_LENGTH} characters`);
+      }
+      if (body.workflowId !== undefined && typeof body.workflowId !== "string") {
+        throw badRequest("workflowId must be a string when provided");
+      }
+
+      // Rate limit (mirrors /ai/refine-text: 10/hour/IP).
+      const ip = req.ip || req.socket?.remoteAddress || "unknown";
+      if (!checkDesignRateLimit(ip)) {
+        throw rateLimited(
+          `Rate limit exceeded. Maximum ${MAX_DESIGN_REQUESTS_PER_HOUR} workflow design requests per hour.`,
+        );
+      }
+
+      // Edit flow: read the persisted base IR server-side (client never posts IR).
+      let baseIrJson: string | undefined;
+      if (typeof body.workflowId === "string") {
+        const baseDef = await store.getWorkflowDefinition(body.workflowId);
+        if (!baseDef) throw notFound(`Workflow '${body.workflowId}' not found`);
+        baseIrJson = JSON.stringify(baseDef.ir, null, 2);
+      }
+
+      // One-shot, tool-less design turn on the planning lane.
+      const settings = await store.getSettings();
+      const planningModel = resolvePlanningSettingsModel(settings);
+      const { session } = await createFnAgentForDesign({
+        cwd: store.getRootDir(),
+        systemPrompt: WORKFLOW_DESIGN_SYSTEM_PROMPT,
+        tools: "readonly",
+        defaultProvider: planningModel.provider,
+        defaultModelId: planningModel.modelId,
+        defaultThinkingLevel: settings.defaultThinkingLevel,
+      });
+
+      const designSession = session as unknown as DesignAgentSession;
+      let output = "";
+      designSession.on("text", (delta: string) => {
+        output += delta;
+      });
+
+      const userPrompt = baseIrJson
+        ? `Modify the following base workflow per the request below. Output the full updated WorkflowIr.\n\nBASE WORKFLOW IR:\n${baseIrJson}\n\nREQUEST:\n${prompt}`
+        : `Design a workflow for the following request:\n\n${prompt}`;
+      await designSession.prompt(userPrompt);
+      designSession.dispose();
+
+      // Extract JSON (handles fences/prose) → JSON.parse → parseWorkflowIr.
+      const candidate = extractJsonFromText(output);
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(candidate);
+      } catch {
+        throw new ApiError(422, "The AI response was not valid JSON.");
+      }
+
+      let ir: WorkflowIr;
+      try {
+        ir = parseWorkflowIr(parsedJson as WorkflowIr);
+      } catch (parseErr: unknown) {
+        if (parseErr instanceof WorkflowIrError) throw new ApiError(422, parseErr.message);
+        throw new ApiError(
+          422,
+          parseErr instanceof Error ? parseErr.message : "Invalid workflow IR",
+        );
+      }
+
+      // Compile triage: parseWorkflowIr is the validity gate. A compile failure
+      // whose message carries the deferred-interpreter suffix means the graph is
+      // structurally valid but only runnable on the (deferred) interpreter →
+      // interpreterOnly:true (NOT an error). Any OTHER compile failure means the
+      // graph is unsound for BOTH engines → 422.
+      let interpreterOnly = false;
+      try {
+        compileWorkflowToSteps(ir);
+      } catch (compileErr: unknown) {
+        const message = compileErr instanceof Error ? compileErr.message : String(compileErr);
+        if (message.includes("require the workflow interpreter (deferred)")) {
+          interpreterOnly = true;
+        } else {
+          throw new ApiError(422, message);
+        }
+      }
+
+      // Strip trust-escalating flags (shared helper; R11 trust boundary).
+      const strippedApprovalFlags = stripApprovalFlags(ir);
+
+      // Deterministic layout for the returned IR (server-side value import).
+      const layout = layoutForIr(ir);
+
+      res.json({ ir, layout, interpreterOnly, strippedApprovalFlags });
     } catch (err: unknown) {
       if (err instanceof ApiError) throw err;
       rethrowAsApiError(err);
