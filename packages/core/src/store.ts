@@ -60,12 +60,7 @@ import {
   CustomFieldRejectionError,
   type CustomFieldRejection,
 } from "./task-fields.js";
-import {
-  validateSettingValuePatch,
-  resolveEffectiveSettingValues,
-  WorkflowSettingRejectionError,
-  type WorkflowSettingRejection,
-} from "./workflow-settings.js";
+import { validateSettingValuePatch, WorkflowSettingRejectionError } from "./workflow-settings.js";
 // Side-effect import: registers the 14 built-in trait DEFINITIONS into the
 // shared trait registry on load (the flag-ON path resolves traits by id).
 import "./builtin-traits.js";

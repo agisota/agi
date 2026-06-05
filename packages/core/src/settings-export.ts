@@ -253,7 +253,7 @@ async function applyWorkflowSettingsSection(
 
   for (const [workflowId, rawValues] of Object.entries(section)) {
     if (!rawValues || typeof rawValues !== "object" || Array.isArray(rawValues)) continue;
-    let patch: Record<string, unknown> = { ...(rawValues as Record<string, unknown>) };
+    const patch: Record<string, unknown> = { ...(rawValues as Record<string, unknown>) };
 
     if (!merge) {
       // Replace mode: null out keys present in the current row but absent here so
@@ -279,7 +279,6 @@ async function applyWorkflowSettingsSection(
         const rejectedIds = extractRejectedSettingIds(err);
         if (rejectedIds.length === 0) {
           // Unknown error (not a value-rejection) — log and skip this workflow.
-          // eslint-disable-next-line no-console
           console.warn(
             `[settings-import] skipped workflow setting values for '${workflowId}': ${
               err instanceof Error ? err.message : String(err)
@@ -289,7 +288,6 @@ async function applyWorkflowSettingsSection(
         }
         for (const id of rejectedIds) {
           delete patch[id];
-          // eslint-disable-next-line no-console
           console.warn(
             `[settings-import] dropped invalid workflow setting value '${id}' for workflow '${workflowId}'`,
           );

@@ -1,7 +1,7 @@
 ---
 title: "feat: Workflow settings mechanism, settings hard-move, and Settings UI redesign"
 type: feat
-status: active
+status: completed
 date: 2026-06-04
 depth: deep
 origin: none (solo planning bootstrap; builds on docs/plans/2026-06-03-003-feat-workflow-custom-columns-traits-plan.md and docs/plans/2026-06-04-001-feat-step-inversion-workflow-modelable-steps-plan.md)
