@@ -705,6 +705,29 @@ describe("POST /api/plugins/:id/enable — legacy directory path heal", () => {
     expect(pluginLoader.loadPlugin).toHaveBeenCalledWith("my-plugin");
   });
 
+  it("heals directory paths in createPluginRouter's enable handler too", async () => {
+    const dirPath = "/home/user/plugins/my-plugin";
+    mockStat.mockResolvedValue({ isDirectory: () => true });
+    mockExistsSync.mockImplementation((p: string) => p === `${dirPath}/bundled.js`);
+    (pluginStore.enablePlugin as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...INSTALLED_PLUGIN,
+      path: dirPath,
+    });
+    (pluginStore.updatePlugin as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...INSTALLED_PLUGIN,
+      path: `${dirPath}/bundled.js`,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/plugins", createPluginRouter(pluginStore, pluginLoader));
+    const res = await REQUEST(app, "POST", "/api/plugins/my-plugin/enable", {});
+
+    expect(res.status).toBe(200);
+    expect(pluginStore.updatePlugin).toHaveBeenCalledWith("my-plugin", { path: `${dirPath}/bundled.js` });
+    expect(pluginLoader.loadPlugin).toHaveBeenCalledWith("my-plugin");
+  });
+
   it("leaves file paths untouched on enable", async () => {
     mockStatSync.mockReturnValue({ isDirectory: () => false });
     (pluginStore.enablePlugin as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -743,6 +766,26 @@ describe("POST /api/plugins mode:install — negative paths", () => {
     app.use("/api", createApiRoutes(store, { pluginStore, pluginLoader }));
     return app;
   }
+
+  it("returns 400 when the package has no loadable entry file", async () => {
+    const pkgRoot = "/home/user/plugins/my-plugin";
+    mockAccess.mockImplementation((p: string) => {
+      if (p === pkgRoot || p === `${pkgRoot}/manifest.json`) return Promise.resolve();
+      return Promise.reject(new Error("not found"));
+    });
+    mockReadFile.mockResolvedValue(JSON.stringify(VALID_MANIFEST));
+    // Manifest resolves, but no bundled.js / dist/index.js / src/index.ts exists.
+    mockExistsSync.mockReturnValue(false);
+
+    const res = await REQUEST(buildApp(), "POST", "/api/plugins", {
+      mode: "install",
+      path: pkgRoot,
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("no loadable entry file");
+    expect(pluginStore.registerPlugin).not.toHaveBeenCalled();
+  });
 
   it("returns 404 when path does not exist", async () => {
     mockAccess.mockRejectedValue(new Error("not found"));

@@ -307,6 +307,20 @@ export function createPluginRouter(
     // Enable in store
     let plugin = await pluginStore.enablePlugin(id);
 
+    // Heal legacy registrations that stored the package directory instead of
+    // a loadable entry file (Node ESM cannot import directories). Mirrors the
+    // heal in routes.ts's enable handler and the CLI's startup heal.
+    try {
+      if ((await stat(plugin.path)).isDirectory()) {
+        const entryPath = resolvePluginEntryPath(plugin.path);
+        if (entryPath) {
+          plugin = await pluginStore.updatePlugin(id, { path: entryPath });
+        }
+      }
+    } catch {
+      // Path missing or unreadable — let loadPlugin surface the real error.
+    }
+
     // Start the plugin
     try {
       await pluginLoader.loadPlugin(id);
