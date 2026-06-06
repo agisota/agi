@@ -296,7 +296,7 @@ export function DirectoryPicker({ value, onChange, placeholder, onInputKeyDown, 
                   type="button"
                   className="btn btn-sm btn-primary"
                   onClick={handleCreateFolder}
-                  disabled={!newFolderName.trim() || browser.loading}
+                  disabled={!newFolderName.trim() || browser.loading || !browser.currentPath}
                 >
                   {t("dirPicker.createFolderConfirm", "Create")}
                 </button>
