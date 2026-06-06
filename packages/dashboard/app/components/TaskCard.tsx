@@ -413,6 +413,25 @@ interface TaskCardProps {
   prNode?: { id: string; state: "creating" | "open" | "responding" | "merged" | "closed" | "failed"; prNumber?: number };
   /** Called when the PR node badge is clicked — opens the dedicated PR view (R12). */
   onOpenPullRequest?: (prEntityId: string) => void;
+  /**
+   * CLI agent session state for this task's session (CLI Agent Executor, U11).
+   * Drives the waiting-on-input / needs-attention card badges, which are
+   * DISTINCT from staleness/stall badges (which U8 suppresses in these states).
+   * Undefined when the task has no CLI session → no badge (card unchanged).
+   */
+  cliSessionState?: CliCardState;
+}
+
+/** Minimal CLI session shape the card needs for its badges (U11). */
+export interface CliCardState {
+  agentState:
+    | "starting"
+    | "ready"
+    | "busy"
+    | "waitingOnInput"
+    | "done"
+    | "dead"
+    | "needsAttention";
 }
 
 function getTaskPrimaryPrInfo(task: Pick<Task, "prInfo" | "prInfos">): PrInfo | undefined {
@@ -550,6 +569,7 @@ function areTaskCardPropsEqual(previous: TaskCardProps, next: TaskCardProps): bo
     previous.prNode?.id === next.prNode?.id &&
     previous.prNode?.state === next.prNode?.state &&
     previous.prNode?.prNumber === next.prNode?.prNumber &&
+    previous.cliSessionState?.agentState === next.cliSessionState?.agentState &&
     previous.cardFieldDefs === next.cardFieldDefs &&
     (previous.cardFieldDefs == null && next.cardFieldDefs == null
       ? true
@@ -670,6 +690,7 @@ function TaskCardComponent({
   cardFieldDefs,
   prNode,
   onOpenPullRequest,
+  cliSessionState,
 }: TaskCardProps) {
   const { t } = useTranslation("app");
   const columnLabel = useColumnLabel();
@@ -936,6 +957,9 @@ function TaskCardComponent({
   const stalledReview = getStalledReviewSignal(task);
   const showStalledReview = Boolean(stalledReview && task.column === "in-review" && !isPaused);
   const hasInReviewStall = shouldShowInReviewStallBadge(task);
+  // CLI agent session badges (U11) — distinct from staleness/stall badges.
+  const cliWaitingOnInput = cliSessionState?.agentState === "waitingOnInput";
+  const cliNeedsAttention = cliSessionState?.agentState === "needsAttention";
   const stallCopy = task.inReviewStall
     ? getInReviewStallCopy(task.inReviewStall, {
       mergeRetries: task.mergeRetries,
@@ -1821,6 +1845,24 @@ function TaskCardComponent({
             data-stall-code={stallCopy.code}
           >
             {stallCopy.badgeLabel}{stallCopy.counter ? ` ${stallCopy.counter}` : ""}
+          </span>
+        )}
+        {cliWaitingOnInput && (
+          <span
+            className="card-status-badge card-status-badge--cli-waiting"
+            data-cli-state="waitingOnInput"
+            title={t("tasks.cliWaitingOnInputTitle", "The CLI agent is waiting for your input")}
+          >
+            {t("tasks.cliWaitingOnInput", "Waiting on input")}
+          </span>
+        )}
+        {cliNeedsAttention && (
+          <span
+            className="card-status-badge card-status-badge--cli-attention failed"
+            data-cli-state="needsAttention"
+            title={t("tasks.cliNeedsAttentionTitle", "The CLI agent needs your attention")}
+          >
+            {t("tasks.cliNeedsAttention", "Needs attention")}
           </span>
         )}
         {hasStalePausedReview && stalePausedReviewCopy && (
