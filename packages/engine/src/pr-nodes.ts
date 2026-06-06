@@ -25,13 +25,21 @@ import {
 } from "@fusion/core";
 
 import type { WorkflowNodeHandler } from "./workflow-graph-executor.js";
+import {
+  runPrResponseRun,
+  type PrResponseRunDeps,
+  type PrResponseRunStore,
+  type PrReviewThread,
+  type PrPushResult,
+} from "./pr-response-run.js";
+import { makePrResponseAgentRunner, makePrResponseGitOps } from "./pr-response-run-ops.js";
 
 /**
  * The narrow slice of the store the PR node handlers need. Declared structurally
  * (not as the full `TaskStore`) so the engine stays decoupled from the concrete
  * store and the handlers stay trivially fakeable in tests.
  */
-export interface PrNodeStore {
+export interface PrNodeStore extends PrResponseRunStore {
   /** Create-or-reuse the single non-terminal entity for a source (AE6 idempotency). */
   ensurePrEntityForSource(input: PrEntityCreateInput): PrEntity;
   getPrEntity(id: string): PrEntity | null;
@@ -135,9 +143,97 @@ export interface PrNodeGithubOps {
   resolvePrSource: PrNodeDeps["resolvePrSource"];
   createPr: PrNodeDeps["createPr"];
   mergePr: PrNodeDeps["mergePr"];
+  /**
+   * Pre-built respond callback (rarely used directly; tests/specialized wiring).
+   * Prefer {@link respondOps}, which lets the engine bind the store + audit.
+   */
   respond?: PrNodeDeps["respond"];
+  /**
+   * The CLI-injected GitHub/git/agent ops backing the U5 review-response run.
+   * When present, {@link buildPrNodeDeps} constructs the `respond` callback from
+   * these + the engine-owned store, so the CLI layer never holds a store
+   * reference. The slice excludes `entity`/`store`/`audit`/`signal`, which the
+   * engine supplies per run.
+   */
+  respondOps?: PrRespondGithubOps;
   audit?: PrNodeDeps["audit"];
 }
+
+/**
+ * The CLI-injected slice for the U5 review-response run: the GitHub-client thread
+ * ops (which close over the dashboard `GitHubClient`, kept out of the engine) and
+ * a `getCwd` resolver mapping an entity to its PR-branch worktree path. The
+ * engine builds the git ops + agent runner itself ({@link buildRespondCallback}
+ * via {@link makePrResponseGitOps}/{@link makePrResponseAgentRunner}), so the CLI
+ * layer never holds the store/settings/session-helper concerns. Optional
+ * overrides (bot denylist, secret scanner, cap) pass through.
+ */
+export interface PrRespondGithubOps {
+  getReviewThreads: PrResponseRunDeps["getReviewThreads"];
+  getViewerLogin: PrResponseRunDeps["getViewerLogin"];
+  checkPrStillOpen: PrResponseRunDeps["checkPrStillOpen"];
+  replyToThread: PrResponseRunDeps["replyToThread"];
+  resolveThread: PrResponseRunDeps["resolveThread"];
+  /** Resolve the PR-branch worktree path for an entity (drives git ops + agent). */
+  getCwd: (entity: PrEntity) => string;
+  /** Resolve the task id used for the agent session / token accounting. */
+  getTaskId: (entity: PrEntity) => string;
+  /** Optional bot-denylist override (default `*[bot]`). */
+  isBot?: PrResponseRunDeps["isBot"];
+  /** Optional secret-scanner override. */
+  scanSecrets?: PrResponseRunDeps["scanSecrets"];
+  /** Optional iteration-cap override (R8). */
+  maxResponseRounds?: number;
+}
+
+/**
+ * Build the `respond` callback (U5) from the engine-owned store + CLI-injected
+ * GitHub ops. Assembles the git ops + mutating-agent runner here (engine-side,
+ * with store/settings/session helpers). Detached-turn safe:
+ * {@link runPrResponseRun} never throws, so this maps its result to the node's
+ * `{ value }` shape (the routing value the `pr-respond` node emits).
+ */
+export function buildRespondCallback(
+  getStore: () => PrNodeStore,
+  ops: PrRespondGithubOps,
+  audit?: PrNodeDeps["audit"],
+): NonNullable<PrNodeDeps["respond"]> {
+  const gitOps = makePrResponseGitOps(ops.getCwd);
+  return async ({ entity }) => {
+    const store = getStore();
+    // The engine owns a concrete TaskStore behind the structural PrNodeStore; the
+    // agent runner + git ops need its settings + worktree. Resolve at run time.
+    const fullStore = store as unknown as import("@fusion/core").TaskStore;
+    const settings = await fullStore.getSettings();
+    const taskId = ops.getTaskId(entity);
+    const cwd = ops.getCwd(entity);
+    const runAgent = makePrResponseAgentRunner(fullStore, settings, taskId, cwd);
+
+    const result = await runPrResponseRun({
+      entity,
+      store,
+      getReviewThreads: ops.getReviewThreads,
+      getViewerLogin: ops.getViewerLogin,
+      checkPrStillOpen: ops.checkPrStillOpen,
+      replyToThread: ops.replyToThread,
+      resolveThread: ops.resolveThread,
+      runAgent: ({ prompt, systemPrompt, threads, signal }) =>
+        runAgent({ prompt, systemPrompt, threads, signal }),
+      getChangedContent: gitOps.getChangedContent,
+      getWorktreeHeadOid: gitOps.getWorktreeHeadOid,
+      fetchAndFastForwardPush: gitOps.fetchAndFastForwardPush,
+      isBot: ops.isBot,
+      scanSecrets: ops.scanSecrets,
+      maxResponseRounds: ops.maxResponseRounds,
+      audit: audit ? (reason, detail) => audit(reason, detail) : undefined,
+    });
+    return { value: result.value };
+  };
+}
+
+// Touch imported types so they participate in the public surface (re-exported via
+// index.ts) without an unused-import diagnostic when only referenced indirectly.
+export type { PrReviewThread, PrPushResult };
 
 /**
  * Assemble full {@link PrNodeDeps} from the engine-owned store + the CLI-injected
@@ -145,12 +241,17 @@ export interface PrNodeGithubOps {
  * any store reference and the engine never imports the dashboard client.
  */
 export function buildPrNodeDeps(getStore: () => PrNodeStore, ops: PrNodeGithubOps): PrNodeDeps {
+  // U5: when the CLI injects `respondOps`, build the real review-response run
+  // callback here (the engine binds the store + audit). An explicit `respond`
+  // takes precedence (tests/specialized wiring); absent both → inert default.
+  const respond = ops.respond
+    ?? (ops.respondOps ? buildRespondCallback(getStore, ops.respondOps, ops.audit) : undefined);
   return {
     getStore,
     resolvePrSource: ops.resolvePrSource,
     createPr: ops.createPr,
     mergePr: ops.mergePr,
-    respond: ops.respond,
+    respond,
     audit: ops.audit,
   };
 }

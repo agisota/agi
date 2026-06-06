@@ -303,6 +303,39 @@ interface PrReviewDetails {
   reviews: GhReviewJson[];
 }
 
+/** A review thread with the U5 review-response fields (see getPrReviewThreadsDetailed). */
+export interface PrReviewThreadDetail {
+  id: string;
+  isResolved: boolean;
+  isOutdated: boolean;
+  viewerCanResolve: boolean;
+  comments: Array<{ author: string; body: string; viewerDidAuthor: boolean }>;
+}
+
+interface GraphQlReviewThreadsPayload {
+  data?: {
+    repository?: {
+      pullRequest?: {
+        reviewThreads?: {
+          nodes?: Array<{
+            id: string;
+            isResolved?: boolean | null;
+            isOutdated?: boolean | null;
+            viewerCanResolve?: boolean | null;
+            comments?: {
+              nodes?: Array<{
+                body?: string | null;
+                author?: { login?: string | null } | null;
+                viewerDidAuthor?: boolean | null;
+              } | null> | null;
+            } | null;
+          } | null> | null;
+        } | null;
+      } | null;
+    } | null;
+  };
+}
+
 interface GraphQlPageInfo {
   hasNextPage?: boolean | null;
   endCursor?: string | null;
@@ -1903,6 +1936,96 @@ export class GitHubClient {
       resolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } }
     }`;
     await this.runGraphqlMutation(query, { threadId });
+  }
+
+  /**
+   * The authenticated viewer's login (single-user gh auth). Used by the U5
+   * review-response run for marker authentication (anti-spoof) — a fusion marker
+   * only suppresses a thread when authored by this login.
+   */
+  async getViewerLogin(): Promise<string> {
+    const payload = await this.runGraphqlQuery<{ viewer?: { login?: string | null } | null }>(
+      `query { viewer { login } }`,
+      {},
+    );
+    return payload?.viewer?.login ?? "";
+  }
+
+  /**
+   * Deep-fetch the PR's review threads with the per-thread + per-comment fields
+   * the U5 review-response run needs: isResolved, isOutdated, viewerCanResolve,
+   * and each comment's author + body + viewerDidAuthor. GraphQL only.
+   */
+  async getPrReviewThreadsDetailed(
+    owner: string | undefined,
+    repo: string | undefined,
+    number: number,
+  ): Promise<PrReviewThreadDetail[]> {
+    const resolved = this.resolveRepo(owner, repo);
+    const query = `query($owner: String!, $repo: String!, $number: Int!) {
+      repository(owner: $owner, name: $repo) {
+        pullRequest(number: $number) {
+          reviewThreads(first: 100) {
+            nodes {
+              id
+              isResolved
+              isOutdated
+              viewerCanResolve
+              comments(first: 100) {
+                nodes { body author { login } viewerDidAuthor }
+              }
+            }
+          }
+        }
+      }
+    }`;
+    const payload = await this.runGraphqlQuery<GraphQlReviewThreadsPayload["data"]>(query, {
+      owner: resolved.owner,
+      repo: resolved.repo,
+      number,
+    });
+    const nodes = payload?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
+    return nodes.filter((n): n is NonNullable<typeof n> => n != null).map((n) => ({
+      id: n.id,
+      isResolved: n.isResolved ?? false,
+      isOutdated: n.isOutdated ?? false,
+      viewerCanResolve: n.viewerCanResolve ?? false,
+      comments: (n.comments?.nodes ?? [])
+        .filter((c): c is NonNullable<typeof c> => c != null)
+        .map((c) => ({
+          author: c.author?.login ?? "",
+          body: c.body ?? "",
+          viewerDidAuthor: c.viewerDidAuthor ?? false,
+        })),
+    }));
+  }
+
+  /** Run a read-only GraphQL query (gh CLI when available, else token/REST). */
+  private async runGraphqlQuery<T>(query: string, variables: Record<string, string | number>): Promise<T | undefined> {
+    if (this.hasGhAuth()) {
+      const args = ["api", "graphql", "-f", `query=${query}`];
+      for (const [key, value] of Object.entries(variables)) {
+        const flag = typeof value === "number" ? "-F" : "-f";
+        args.push(flag, `${key}=${value}`);
+      }
+      const output = await runGhAsync(args);
+      const payload = JSON.parse(output) as { data?: T; errors?: Array<{ message: string }> };
+      if (payload.errors?.length) throw new Error(payload.errors[0].message);
+      return payload.data;
+    }
+    if (this.token) {
+      const response = await fetch(`${this.baseUrl}/graphql`, {
+        method: "POST",
+        headers: { ...this.buildHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables }),
+      });
+      const payload = (await response.json()) as { data?: T; errors?: Array<{ message: string }> };
+      if (!response.ok || payload.errors?.length) {
+        throw new Error(`GitHub API error: ${response.status} ${payload.errors?.[0]?.message || response.statusText}`);
+      }
+      return payload.data;
+    }
+    throw new Error("GitHub CLI (gh) is not available or not authenticated, and no GITHUB_TOKEN provided.");
   }
 
   /**

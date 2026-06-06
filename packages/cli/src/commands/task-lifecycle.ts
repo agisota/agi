@@ -52,6 +52,24 @@ interface GitHubOperations {
   }>;
   mergePr(params: { number: number; method?: "merge" | "squash" | "rebase"; expectedHeadOid?: string }): Promise<PrInfo>;
   getPrStatus(owner: string, repo: string, number: number): Promise<PrInfo>;
+  /** Reply to a specific review thread (U2). */
+  replyToReviewThread(threadId: string, body: string): Promise<void>;
+  /** Resolve a review thread (U2); caller checks viewerCanResolve first. */
+  resolveReviewThread(threadId: string): Promise<void>;
+  /** Authenticated viewer login — anti-spoof marker authentication (U5). */
+  getViewerLogin(): Promise<string>;
+  /** Deep-fetch review threads with the U5 fields (resolved/outdated/viewer*). */
+  getPrReviewThreadsDetailed(
+    owner: string | undefined,
+    repo: string | undefined,
+    number: number,
+  ): Promise<Array<{
+    id: string;
+    isResolved: boolean;
+    isOutdated: boolean;
+    viewerCanResolve: boolean;
+    comments: Array<{ author: string; body: string; viewerDidAuthor: boolean }>;
+  }>>;
   updatePr(params: { owner?: string; repo?: string; number: number; title?: string; body?: string }): Promise<PrInfo>;
   closePr(params: { number: number }): Promise<PrInfo>;
   /** ETag-conditional change probe (U2/U4); 304 ⇒ unchanged, rate-limit-free. */
@@ -356,8 +374,28 @@ function isStaleHeadError(err: unknown): boolean {
  *   falls back to its inert `disagreed-only` default.
  */
 export function createPrNodeGithubOps(
-  github: Pick<GitHubOperations, "createPr" | "mergePr">,
+  github: Pick<
+    GitHubOperations,
+    | "createPr"
+    | "mergePr"
+    | "getPrStatus"
+    | "replyToReviewThread"
+    | "resolveReviewThread"
+    | "getViewerLogin"
+    | "getPrReviewThreadsDetailed"
+  >,
+  options: {
+    /**
+     * Resolve the PR-branch worktree path for a task id (the U5 response agent +
+     * git ops run there). Defaults to the process cwd when not supplied (the
+     * single-project daemon/serve case).
+     */
+    getTaskWorktree?: (taskId: string) => string | undefined;
+  } = {},
 ): PrNodeGithubOps {
+  const getCwd = (entity: { sourceId: string }): string =>
+    options.getTaskWorktree?.(entity.sourceId) ?? process.cwd();
+
   return {
     resolvePrSource: (task) => {
       const repo = getCurrentRepo();
@@ -397,6 +435,30 @@ export function createPrNodeGithubOps(
         if (isStaleHeadError(err)) return { status: "stale-head" };
         throw err;
       }
+    },
+    // U5: the GitHub-client slice of the review-response run. The engine builds
+    // the git ops + mutating-agent runner from these + its store/settings.
+    respondOps: {
+      getReviewThreads: async (entity) => {
+        if (entity.prNumber == null) return [];
+        const { owner, name } = splitRepoSlug(entity.repo);
+        return github.getPrReviewThreadsDetailed(owner, name, entity.prNumber);
+      },
+      getViewerLogin: () => github.getViewerLogin(),
+      checkPrStillOpen: async (entity) => {
+        if (entity.prNumber == null) return { open: false, headOid: null };
+        const { owner, name } = splitRepoSlug(entity.repo);
+        try {
+          const info = await github.getPrStatus(owner ?? "", name ?? "", entity.prNumber);
+          return { open: info.status === "open" || info.status === "draft", headOid: null };
+        } catch {
+          return { open: false, headOid: null };
+        }
+      },
+      replyToThread: (threadId, body) => github.replyToReviewThread(threadId, body),
+      resolveThread: (threadId) => github.resolveReviewThread(threadId),
+      getCwd,
+      getTaskId: (entity) => entity.sourceId,
     },
   };
 }
