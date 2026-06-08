@@ -1300,6 +1300,54 @@ describe("TaskDetailModal", () => {
   });
 
   describe("description truncation", () => {
+    it("expands long triage title by default with Show less button", () => {
+      const longTitle = "Triage title ".repeat(25);
+      const { container } = render(
+        <TaskDetailModal
+          task={makeTask({
+            column: "triage",
+            title: longTitle,
+            description: "Triage planning context",
+          })}
+          onClose={noop}
+          onMoveTask={noopMove}
+          onDeleteTask={noopDelete}
+          onMergeTask={noopMerge}
+          onOpenDetail={noopOpenDetail}
+          addToast={noop}
+        />,
+      );
+
+      const h2 = container.querySelector("h2.detail-title");
+      expect(h2?.textContent).toBe(longTitle);
+      const toggle = container.querySelector(".detail-description-toggle");
+      expect(toggle?.textContent).toBe("Show less");
+    });
+
+    it("expands long triage description by default when title is missing", () => {
+      const longDescription = "Triage description ".repeat(20);
+      const { container } = render(
+        <TaskDetailModal
+          task={makeTask({
+            column: "triage",
+            title: undefined,
+            description: longDescription,
+          })}
+          onClose={noop}
+          onMoveTask={noopMove}
+          onDeleteTask={noopDelete}
+          onMergeTask={noopMerge}
+          onOpenDetail={noopOpenDetail}
+          addToast={noop}
+        />,
+      );
+
+      const h2 = container.querySelector("h2.detail-title");
+      expect(h2?.textContent).toBe(longDescription);
+      const toggle = container.querySelector(".detail-description-toggle");
+      expect(toggle?.textContent).toBe("Show less");
+    });
+
     it("truncates description over 200 characters with Show more button", () => {
       const longDescription = "A".repeat(250);
       const { container } = render(
@@ -1350,6 +1398,43 @@ describe("TaskDetailModal", () => {
       expect(toggle.textContent).toBe("Show less");
     });
 
+    it("lets Show less and Show more override the triage default for the current task", async () => {
+      const longDescription = "C".repeat(250);
+      const { container } = render(
+        <TaskDetailModal
+          task={makeTask({
+            column: "triage",
+            title: undefined,
+            description: longDescription,
+          })}
+          onClose={noop}
+          onMoveTask={noopMove}
+          onDeleteTask={noopDelete}
+          onMergeTask={noopMerge}
+          onOpenDetail={noopOpenDetail}
+          addToast={noop}
+        />,
+      );
+
+      const toggle = container.querySelector(".detail-description-toggle") as HTMLButtonElement;
+      expect(container.querySelector("h2.detail-title")?.textContent).toBe("C".repeat(250));
+      expect(toggle.textContent).toBe("Show less");
+
+      await act(async () => {
+        fireEvent.click(toggle);
+      });
+
+      expect(container.querySelector("h2.detail-title")?.textContent).toBe("C".repeat(200) + "…");
+      expect(toggle.textContent).toBe("Show more");
+
+      await act(async () => {
+        fireEvent.click(toggle);
+      });
+
+      expect(container.querySelector("h2.detail-title")?.textContent).toBe("C".repeat(250));
+      expect(toggle.textContent).toBe("Show less");
+    });
+
     it("collapses description when Show less is clicked", async () => {
       const longDescription = "C".repeat(250);
       const { container } = render(
@@ -1381,6 +1466,29 @@ describe("TaskDetailModal", () => {
       const h2 = container.querySelector("h2.detail-title");
       expect(h2?.textContent).toBe("C".repeat(200) + "…");
       expect(toggle.textContent).toBe("Show more");
+    });
+
+    it("does not show toggle for empty title and description fallback to task id", () => {
+      const { container } = render(
+        <TaskDetailModal
+          task={makeTask({
+            id: "FN-EMPTY",
+            column: "triage",
+            title: undefined,
+            description: undefined,
+          })}
+          onClose={noop}
+          onMoveTask={noopMove}
+          onDeleteTask={noopDelete}
+          onMergeTask={noopMerge}
+          onOpenDetail={noopOpenDetail}
+          addToast={noop}
+        />,
+      );
+
+      const h2 = container.querySelector("h2.detail-title");
+      expect(h2?.textContent).toBe("FN-EMPTY");
+      expect(container.querySelector(".detail-description-toggle")).toBeNull();
     });
 
     it("does not show toggle for description under 200 characters", () => {
@@ -1447,6 +1555,52 @@ describe("TaskDetailModal", () => {
       expect(h2?.textContent).toBe("D".repeat(200) + "…");
       const toggle = container.querySelector(".detail-description-toggle");
       expect(toggle?.textContent).toBe("Show more");
+    });
+
+    it("resets to expanded when switching from a non-triage task to a triage task", async () => {
+      const todoDescription = "G".repeat(250);
+      const triageDescription = "H".repeat(250);
+      const { container, rerender } = render(
+        <TaskDetailModal
+          task={makeTask({
+            id: "FN-TODO",
+            column: "todo",
+            title: undefined,
+            description: todoDescription,
+          })}
+          onClose={noop}
+          onMoveTask={noopMove}
+          onDeleteTask={noopDelete}
+          onMergeTask={noopMerge}
+          onOpenDetail={noopOpenDetail}
+          addToast={noop}
+        />,
+      );
+
+      expect(container.querySelector("h2.detail-title")?.textContent).toBe("G".repeat(200) + "…");
+      expect(container.querySelector(".detail-description-toggle")?.textContent).toBe("Show more");
+
+      rerender(
+        <TaskDetailModal
+          task={makeTask({
+            id: "FN-TRIAGE",
+            column: "triage",
+            title: undefined,
+            description: triageDescription,
+          })}
+          onClose={noop}
+          onMoveTask={noopMove}
+          onDeleteTask={noopDelete}
+          onMergeTask={noopMerge}
+          onOpenDetail={noopOpenDetail}
+          addToast={noop}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(container.querySelector("h2.detail-title")?.textContent).toBe("H".repeat(250));
+      });
+      expect(container.querySelector(".detail-description-toggle")?.textContent).toBe("Show less");
     });
 
     it("resets expanded state when task changes", async () => {

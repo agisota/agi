@@ -659,12 +659,12 @@ export function TaskDetailContent({
 
   // Reset description expanded state when task changes
   useEffect(() => {
-    setDescriptionExpanded(false);
-  }, [task.id]);
+    setDescriptionExpanded(task.column === "triage");
+  }, [task.column, task.id]);
 
   const [logSubview, setLogSubview] = useState<"activity" | "agent-log">("activity");
   const [highlightStallCode, setHighlightStallCode] = useState<string | null>(null);
-  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(() => task.column === "triage");
   const [attachments, setAttachments] = useState<TaskAttachment[]>(task.attachments || []);
   const [uploading, setUploading] = useState(false);
   const [dependencies, setDependencies] = useState<string[]>(task.dependencies || []);
