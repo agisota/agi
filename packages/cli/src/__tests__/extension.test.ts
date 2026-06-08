@@ -153,6 +153,22 @@ describe("fn pi extension tool copy guardrails", () => {
     expect(guidelines).toMatch(/soft.?delete/i);
     expect(guidelines).not.toMatch(/permanent|cannot be recovered|cannot be undone|deleted immediately|irrecoverable/i);
   });
+
+  it("describes fn_agent_stop as allowing error-state agents to be paused (FN-6018)", () => {
+    const api = createMockAPI();
+    kbExtension(api);
+
+    const tool = api.tools.get("fn_agent_stop") as
+      | { description?: string; promptGuidelines?: string[] }
+      | undefined;
+
+    expect(tool).toBeDefined();
+
+    const guidelines = (tool?.promptGuidelines ?? []).join(" ");
+    expect(guidelines).toMatch(/running, active, or in error/i);
+    expect(guidelines).toMatch(/idle.*already-paused/i);
+    expect(guidelines).not.toMatch(/idle, 'error', or already-paused/i);
+  });
 });
 
 // Audited in FN-3189: this exhaustive suite is expensive (~62s) and stale

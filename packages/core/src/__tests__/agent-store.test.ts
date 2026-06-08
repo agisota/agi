@@ -1669,6 +1669,22 @@ describe("AgentStore", () => {
       expect(updated.state).toBe("active");
     });
 
+    it("error → paused transition succeeds", async () => {
+      const agent = await createReadyAgent(store, "ErrorToPaused");
+      await store.updateAgentState(agent.id, "active");
+      await store.updateAgentState(agent.id, "error");
+      const updated = await store.updateAgentState(agent.id, "paused");
+      expect(updated.state).toBe("paused");
+    });
+
+    it("error → idle transition succeeds", async () => {
+      const agent = await createReadyAgent(store, "ErrorToIdle");
+      await store.updateAgentState(agent.id, "active");
+      await store.updateAgentState(agent.id, "error");
+      const updated = await store.updateAgentState(agent.id, "idle");
+      expect(updated.state).toBe("idle");
+    });
+
     it("rejects active → terminated transition", async () => {
       const agent = await createReadyAgent(store, "ActiveToTerminated");
       await store.updateAgentState(agent.id, "active");

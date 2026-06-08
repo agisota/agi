@@ -797,6 +797,10 @@ export function AgentDetailView({ agentId, projectId, onClose, addToast, onChild
                     <Square size={14} />
                     <span className="agent-detail-control-label">{t("agents.stop", "Stop")}</span>
                   </button>
+                  <button className="btn btn--danger btn--compact agent-detail-mobile-icon-control" onClick={handleDelete} aria-label={t("agents.delete", "Delete")}>
+                    <Trash2 size={14} />
+                    <span className="agent-detail-control-label">{t("agents.delete", "Delete")}</span>
+                  </button>
                 </>
               )}
             </div>

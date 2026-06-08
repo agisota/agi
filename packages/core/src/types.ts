@@ -5501,7 +5501,7 @@ export const AGENT_VALID_TRANSITIONS: Record<AgentState, AgentState[]> = {
   active: ["idle", "running", "paused", "error"],
   running: ["idle", "active", "paused", "error"],
   paused: ["idle", "active"],
-  error: ["idle", "active"],
+  error: ["idle", "active", "paused"],
 };
 
 /**

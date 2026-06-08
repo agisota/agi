@@ -2102,12 +2102,12 @@ describe("AgentsView", () => {
   });
 
   describe("delete agent", () => {
-    it("shows Delete button for idle and paused agents in default view", async () => {
+    it("shows Delete button for idle, paused, and error agents in default view", async () => {
       render(<AgentsView addToast={mockAddToast} />);
 
       await waitFor(() => {
         const deleteButtons = screen.getAllByTitle("Delete");
-        expect(deleteButtons.length).toBeGreaterThanOrEqual(2);
+        expect(deleteButtons.length).toBeGreaterThanOrEqual(3);
       });
     });
 
@@ -2130,6 +2130,23 @@ describe("AgentsView", () => {
         const pausedCard = allCards.find((card) => card.textContent?.includes("agent-003")) ?? null;
 
         expect((pausedCard as Element | null)?.querySelector('[title="Delete"]')).toBeTruthy();
+      });
+    });
+
+    it("shows Delete button for error agents in board view", async () => {
+      render(<AgentsView addToast={mockAddToast} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Agents")).toBeTruthy();
+      });
+
+      fireEvent.click(screen.getByTitle("Board view"));
+
+      await waitFor(() => {
+        const boardCards = Array.from(document.querySelectorAll(".agent-board-card"));
+        const errorCard = boardCards.find((card) => card.textContent?.includes("agent-004")) ?? null;
+
+        expect((errorCard as Element | null)?.querySelector('[title="Delete"]')).toBeTruthy();
       });
     });
 
@@ -2173,6 +2190,29 @@ describe("AgentsView", () => {
 
       await waitFor(() => {
         expect(mockDeleteAgent).toHaveBeenCalledWith("agent-003", undefined);
+      });
+    });
+
+    it("deletes error agent after confirmation (from board view)", async () => {
+      render(<AgentsView addToast={mockAddToast} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Agents")).toBeTruthy();
+      });
+
+      fireEvent.click(screen.getByTitle("Board view"));
+
+      await waitFor(() => {
+        const errorCard = Array.from(document.querySelectorAll(".agent-board-card")).find(
+          (card) => card.textContent?.includes("agent-004"),
+        ) ?? null;
+        const errorDeleteBtn = (errorCard as Element | null)?.querySelector('[title="Delete"]') as HTMLElement;
+        expect(errorDeleteBtn).toBeTruthy();
+        fireEvent.click(errorDeleteBtn);
+      });
+
+      await waitFor(() => {
+        expect(mockDeleteAgent).toHaveBeenCalledWith("agent-004", undefined);
       });
     });
   });

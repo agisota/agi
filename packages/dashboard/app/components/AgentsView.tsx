@@ -1937,7 +1937,7 @@ export function AgentsView({ addToast, projectId, onOpenTaskLogs, agentOnboardin
                       >
                         <Info size={14} /> <span className="agent-card-action-label">{t("agents.details", "Details")}</span>
                       </button>
-                      {(agent.state === "idle" || agent.state === "paused") && (
+                      {(agent.state === "idle" || agent.state === "paused" || agent.state === "error") && (
                         <button
                           className="btn btn-sm btn-danger"
                           onClick={() => void handleDelete(agent.id, agent.name)}

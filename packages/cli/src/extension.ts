@@ -3592,9 +3592,9 @@ export default function kbExtension(pi: ExtensionAPI) {
       "Transitions the agent from running/active to paused state.",
     promptSnippet: "Stop (pause) a running Fusion agent",
     promptGuidelines: [
-      "Use to pause an agent that is currently running or active",
+      "Use to pause an agent that is currently running, active, or in error",
       "Stopped agents can be resumed with fn_agent_start",
-      "Agents in 'idle', 'error', or already-paused state cannot be stopped",
+      "Agents in 'idle' or already-paused state cannot be stopped",
     ],
     parameters: Type.Object({
       id: Type.String({ description: "Agent ID to stop (e.g., agent-abc123)" }),

@@ -967,7 +967,7 @@ it("transitions running agent to paused when Stop is clicked", async () => {
   });
 });
 
-it("shows Retry and Stop buttons for error agent", async () => {
+it("shows Retry, Stop, and Delete buttons for error agent", async () => {
   mockFetchAgent.mockResolvedValue(createMockAgent({ state: "error" }));
 
   render(
@@ -981,7 +981,11 @@ it("shows Retry and Stop buttons for error agent", async () => {
   await waitFor(() => {
     expect(screen.getByText("Retry")).toBeInTheDocument();
     expect(screen.getByText("Stop")).toBeInTheDocument();
+    expect(screen.getByText("Delete")).toBeInTheDocument();
   });
+
+  const deleteButton = screen.getByRole("button", { name: "Delete" });
+  expect(deleteButton.className).toContain("agent-detail-mobile-icon-control");
 });
 
 it("transitions error agent to paused when Stop is clicked", async () => {
@@ -999,6 +1003,24 @@ it("transitions error agent to paused when Stop is clicked", async () => {
 
   await waitFor(() => {
     expect(mockUpdateAgentState).toHaveBeenCalledWith("agent-001", "paused", undefined);
+  });
+});
+
+it("deletes error agent when Delete is clicked", async () => {
+  mockFetchAgent.mockResolvedValue(createMockAgent({ state: "error" }));
+
+  render(
+    <AgentDetailView
+      agentId="agent-001"
+      onClose={vi.fn()}
+      addToast={vi.fn()}
+    />
+  );
+
+  await userEvent.click(await screen.findByText("Delete"));
+
+  await waitFor(() => {
+    expect(mockDeleteAgent).toHaveBeenCalledWith("agent-001", undefined);
   });
 });
 
