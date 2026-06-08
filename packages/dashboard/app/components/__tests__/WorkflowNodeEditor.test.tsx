@@ -213,6 +213,7 @@ describe("WorkflowNodeEditor", () => {
   });
 
   afterEach(() => {
+    localStorage.removeItem("fusion:wf-sidebar-settings-collapsed");
     cleanup();
     vi.clearAllMocks();
   });

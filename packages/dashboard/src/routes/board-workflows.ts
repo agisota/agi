@@ -183,9 +183,11 @@ export async function buildBoardWorkflowsPayload(
       if (definition.kind === "fragment") continue;
       referenced.add(definition.id);
     }
-  } catch {
+  } catch (err) {
     // Older/partial test stores may not expose definition listing; the referenced
-    // workflow set above is still sufficient for task rendering.
+    // workflow set above is still sufficient for task rendering. Production
+    // failures are logged so empty workflow definitions do not disappear silently.
+    console.warn("[board-workflows] listWorkflowDefinitions failed; using referenced workflows only", err);
   }
 
   const workflows: BoardWorkflowDefinition[] = [];

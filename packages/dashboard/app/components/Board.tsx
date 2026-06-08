@@ -452,23 +452,25 @@ export function Board({ tasks, projectId, maxConcurrent, onMoveTask, onPauseTask
   if (workflowMode && selectedWorkflow) {
     return (
       <div className="board-workflow-view">
-        {workflowOptions.length > 1 && (
+        {(workflowOptions.length > 1 || onCreateWorkflow || onOpenWorkflowEditor) && (
           <div className="board-workflow-toolbar">
-            <label className="list-workflow-selector board-workflow-selector">
-              <span>Workflow</span>
-              <select
-                className="select list-workflow-select"
-                value={selectedWorkflow.id}
-                onChange={(event) => setSelectedWorkflowId(event.target.value)}
-                aria-label="Select workflow"
-              >
-                {workflowOptions.map((workflow) => (
-                  <option key={workflow.id} value={workflow.id}>
-                    {workflow.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {workflowOptions.length > 1 && (
+              <label className="list-workflow-selector board-workflow-selector">
+                <span>Workflow</span>
+                <select
+                  className="select list-workflow-select"
+                  value={selectedWorkflow.id}
+                  onChange={(event) => setSelectedWorkflowId(event.target.value)}
+                  aria-label="Select workflow"
+                >
+                  {workflowOptions.map((workflow) => (
+                    <option key={workflow.id} value={workflow.id}>
+                      {workflow.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {onCreateWorkflow && (
               <button
                 type="button"

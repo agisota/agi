@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Settings, TaskDetail, WorkflowDefinition, WorkflowIr } from "@fusion/core";
 
 import { WorkflowGraphTaskRunner, type WorkflowGraphRunnerStore } from "../workflow-graph-task-runner.js";
@@ -165,9 +165,10 @@ describe("WorkflowGraphTaskRunner (CU-U2)", () => {
 
   it("resolves built-in workflow selections without requiring the store to return a definition", async () => {
     const calls: string[] = [];
+    const getWorkflowDefinition = vi.fn(async () => undefined);
     const store: WorkflowGraphRunnerStore = {
       getTaskWorkflowSelection: () => ({ workflowId: "builtin:coding", stepIds: [] }),
-      getWorkflowDefinition: async () => undefined,
+      getWorkflowDefinition,
     };
     const runner = new WorkflowGraphTaskRunner({
       store,
@@ -180,6 +181,7 @@ describe("WorkflowGraphTaskRunner (CU-U2)", () => {
     expect(result.disposition).toBe("completed");
     expect(calls).toEqual(["execute", "review", "merge"]);
     expect(result.reason).toBeUndefined();
+    expect(getWorkflowDefinition).not.toHaveBeenCalled();
   });
 
   it("falls back (never strands the task) when the interpreter throws", async () => {

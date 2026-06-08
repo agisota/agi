@@ -649,9 +649,6 @@ export class StuckTaskDetector {
     const stuckTasks: string[] = [];
 
     for (const [taskId, entry] of this.tracked) {
-      if (entry.recoveryInProgress) {
-        continue;
-      }
       const reason = this.classifyStuckReason(taskId, timeoutMs);
       if (reason !== null) {
         // U8: suppress flagging while the CLI session is waitingOnInput

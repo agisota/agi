@@ -631,11 +631,10 @@ export function ListView({
   const handleListQuickCreate = useCallback((input: TaskCreateInput) => {
     const create = onQuickCreate ?? (async () => addToast(t("listView.taskCreationUnavailable", "Task creation not available"), "error"));
     if (workflowMode && selectedWorkflow && createTargetColumn) {
-      const explicitWorkflowId = selectedWorkflow.id.startsWith("builtin:") ? undefined : selectedWorkflow.id;
       return create({
         ...input,
         column: input.column ?? createTargetColumn,
-        workflowId: input.workflowId ?? explicitWorkflowId,
+        workflowId: input.workflowId ?? selectedWorkflow.id,
       });
     }
     return create(input);
@@ -873,16 +872,16 @@ export function ListView({
     const selectedTasks = Array.from(selectedTaskIds)
       .map((id) => tasks.find((task) => task.id === id))
       .filter((task): task is Task => Boolean(task));
-    const archivedTasks = selectedTasks.filter((task) => task.column === "archived");
-    const deletableTasks = selectedTasks.filter((task) => task.column !== "archived");
+    const archivedTasks = selectedTasks.filter((task) => isArchivedColumn(task.column));
+    const deletableTasks = selectedTasks.filter((task) => !isArchivedColumn(task.column));
 
     if (deletableTasks.length === 0) {
       addToast(t("listView.bulkDeleteNoTasks", "No selected tasks can be deleted (archived tasks are excluded)"), "error");
       return;
     }
 
-    const doneTasks = deletableTasks.filter((task) => task.column === "done");
-    const otherTasks = deletableTasks.filter((task) => task.column !== "done");
+    const doneTasks = deletableTasks.filter((task) => isCompleteColumn(task.column));
+    const otherTasks = deletableTasks.filter((task) => !isCompleteColumn(task.column));
 
     let shouldDeleteAll = false;
     let shouldArchiveDoneInstead = false;
@@ -1070,7 +1069,7 @@ export function ListView({
       : t("listView.bulkDeleteSummary", { count: deletedIds.length, skipped: skippedIds.length, failed: failedIds.length, defaultValue_one: "Deleted {{count}} task · {{skipped}} archived skipped · {{failed}} failed", defaultValue_other: "Deleted {{count}} tasks · {{skipped}} archived skipped · {{failed}} failed" });
 
     addToast(summaryMessage, failedIds.length > 0 ? "error" : "success");
-  }, [addToast, confirm, confirmWithChoice, onArchiveTask, onDeleteTask, selectedTaskIds, tasks]);
+  }, [addToast, confirm, confirmWithChoice, isArchivedColumn, isCompleteColumn, onArchiveTask, onDeleteTask, selectedTaskIds, tasks]);
 
   const handleBulkPause = useCallback(async () => {
     if (selectedTaskIds.size === 0) return;
@@ -1082,7 +1081,7 @@ export function ListView({
     const selectedTasks = Array.from(selectedTaskIds)
       .map((id) => tasks.find((task) => task.id === id))
       .filter((task): task is Task => Boolean(task));
-    const actionableTasks = selectedTasks.filter((task) => task.column !== "archived" && task.paused !== true);
+    const actionableTasks = selectedTasks.filter((task) => !isArchivedColumn(task.column) && task.paused !== true);
     const skippedCount = selectedTasks.length - actionableTasks.length;
 
     if (actionableTasks.length === 0) {
@@ -1121,7 +1120,7 @@ export function ListView({
       t("listView.bulkPauseSummary", "Paused {{paused}} · {{skipped}} skipped · {{failed}} failed", { paused: pausedIds.length, skipped: skippedCount, failed: failedIds.length }),
       failedIds.length > 0 ? "error" : "success",
     );
-  }, [addToast, onPauseTask, selectedTaskIds, tasks]);
+  }, [addToast, isArchivedColumn, onPauseTask, selectedTaskIds, tasks]);
 
   const handleBulkUnpause = useCallback(async () => {
     if (selectedTaskIds.size === 0) return;
@@ -1133,7 +1132,7 @@ export function ListView({
     const selectedTasks = Array.from(selectedTaskIds)
       .map((id) => tasks.find((task) => task.id === id))
       .filter((task): task is Task => Boolean(task));
-    const actionableTasks = selectedTasks.filter((task) => task.column !== "archived" && task.paused === true);
+    const actionableTasks = selectedTasks.filter((task) => !isArchivedColumn(task.column) && task.paused === true);
     const skippedCount = selectedTasks.length - actionableTasks.length;
 
     if (actionableTasks.length === 0) {
@@ -1172,7 +1171,7 @@ export function ListView({
       t("listView.bulkUnpauseSummary", "Unpaused {{unpaused}} · {{skipped}} skipped · {{failed}} failed", { unpaused: unpausedIds.length, skipped: skippedCount, failed: failedIds.length }),
       failedIds.length > 0 ? "error" : "success",
     );
-  }, [addToast, onUnpauseTask, selectedTaskIds, tasks]);
+  }, [addToast, isArchivedColumn, onUnpauseTask, selectedTaskIds, tasks]);
 
   const handleBulkArchive = useCallback(async () => {
     if (selectedTaskIds.size === 0) return;
@@ -1512,7 +1511,7 @@ export function ListView({
       if (!taskId) return;
 
       // Prevent dropping into archived column
-      if (column === "archived" || columnFlagsById.get(column)?.archived) {
+      if (isArchivedColumn(column)) {
         addToast(t("listView.archiveViaButton", "Tasks can only be archived via the archive button"), "error");
         return;
       }
@@ -1520,7 +1519,10 @@ export function ListView({
       try {
         const task = tasks.find((candidate) => candidate.id === taskId);
         const hasStepProgress = task?.steps.some((step) => step.status !== "pending") ?? false;
-        const shouldPrompt = (column === "todo" || column === "triage") && hasStepProgress;
+        const targetFlags = columnFlagsById.get(column);
+        const shouldPrompt = hasStepProgress && (
+          column === "todo" || column === "triage" || Boolean(targetFlags?.intake || targetFlags?.hold)
+        );
 
         let moveOptions: { preserveProgress?: boolean } | undefined;
         if (shouldPrompt) {
@@ -1552,7 +1554,7 @@ export function ListView({
         addToast(getErrorMessage(err), "error");
       }
     },
-    [addToast, columnFlagsById, confirm, onMoveTask, tasks, t]
+    [addToast, columnFlagsById, confirm, isArchivedColumn, onMoveTask, tasks, t]
   );
 
   const getSortIcon = (field: SortField) => {
@@ -1941,7 +1943,7 @@ export function ListView({
                         <div className="list-empty-cell list-card-empty">{t("listView.noTasks", "No tasks")}</div>
                       ) : (
                         columnTasks.map((task) => {
-                          const isDoneColumn = task.column === "done";
+                          const isDoneColumn = isCompleteColumn(task.column);
                           const visualStatus = isDoneColumn ? "done" : task.status;
                           const isFailed = !isDoneColumn && task.status === "failed";
                           const isPaused = !isDoneColumn && task.paused === true;
@@ -1975,7 +1977,7 @@ export function ListView({
                                       toggleTaskSelection(task.id);
                                     }}
                                     onClick={(e) => e.stopPropagation()}
-                                    disabled={task.column === "archived"}
+                                    disabled={isArchivedColumn(task.column)}
                                     aria-label={t("listView.selectTask", "Select {{taskId}}", { taskId: task.id })}
                                   />
                                 </label>
@@ -2134,7 +2136,7 @@ export function ListView({
                           </tr>
                         ) : (
                           columnTasks.map((task) => {
-                            const isDoneColumn = task.column === "done";
+                            const isDoneColumn = isCompleteColumn(task.column);
                             const visualStatus = isDoneColumn ? "done" : task.status;
                             const isFailed = !isDoneColumn && task.status === "failed";
                             const isPaused = !isDoneColumn && task.paused === true;
@@ -2171,7 +2173,7 @@ export function ListView({
                                         toggleTaskSelection(task.id);
                                       }}
                                       onClick={(e) => e.stopPropagation()}
-                                      disabled={task.column === "archived"}
+                                      disabled={isArchivedColumn(task.column)}
                                       aria-label={t("listView.selectTask", "Select {{taskId}}", { taskId: task.id })}
                                     />
                                   </td>

@@ -1350,6 +1350,52 @@ describe("ListView", () => {
     });
   });
 
+  it("prompts to preserve progress when dropping task with completed steps to a workflow hold column", async () => {
+    const tasks = [createMockTask({
+      id: "FN-001",
+      column: "doing",
+      steps: [
+        { title: "Step 1", status: "done" },
+        { title: "Step 2", status: "pending" },
+      ],
+    })];
+    const mockOnMoveTask = vi.fn(() => Promise.resolve(tasks[0]));
+    mockConfirm.mockResolvedValueOnce(true);
+    vi.mocked(fetchBoardWorkflows).mockResolvedValue({
+      flagEnabled: true,
+      defaultWorkflowId: "wf-custom",
+      workflows: [
+        {
+          id: "wf-custom",
+          name: "Custom",
+          columns: [
+            { id: "queue", name: "Queue", flags: { hold: true } },
+            { id: "doing", name: "Doing", flags: { countsTowardWip: true } },
+            { id: "shipped", name: "Shipped", flags: { complete: true } },
+          ],
+        },
+      ],
+      taskWorkflowIds: { "FN-001": "wf-custom" },
+    });
+
+    renderListView({ tasks, onMoveTask: mockOnMoveTask });
+    await waitFor(() => expect(document.querySelector('[data-column="queue"].list-drop-zone')).toBeTruthy());
+
+    fireEvent.drop(document.querySelector('[data-column="queue"].list-drop-zone')!, {
+      preventDefault: vi.fn(),
+      dataTransfer: {
+        getData: vi.fn(() => "FN-001"),
+      },
+    });
+
+    await waitFor(() => {
+      expect(mockConfirm).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Preserve Progress?",
+      }));
+      expect(mockOnMoveTask).toHaveBeenCalledWith("FN-001", "queue", { preserveProgress: true });
+    });
+  });
+
   it("does not set draggable for paused tasks", () => {
     const tasks = [createMockTask({ id: "FN-001", paused: true })];
 
@@ -2334,6 +2380,42 @@ describe("ListView Quick Entry", () => {
     });
   });
 
+  it("preserves selected built-in workflow id when quick-creating in workflow mode", async () => {
+    const mockOnQuickCreate = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(fetchBoardWorkflows).mockResolvedValue({
+      flagEnabled: true,
+      defaultWorkflowId: "builtin:default",
+      workflows: [
+        {
+          id: "builtin:default",
+          name: "Default",
+          columns: [{ id: "triage", name: "Triage", flags: { intake: true } }],
+        },
+        {
+          id: "builtin:coding",
+          name: "Coding",
+          columns: [{ id: "triage", name: "Triage", flags: { intake: true } }],
+        },
+      ],
+      taskWorkflowIds: {},
+    });
+    renderListView({ onQuickCreate: mockOnQuickCreate });
+
+    const selector = await screen.findByLabelText("Select workflow") as HTMLSelectElement;
+    fireEvent.change(selector, { target: { value: "builtin:coding" } });
+    const input = screen.getByTestId("quick-entry-input");
+    fireEvent.change(input, { target: { value: "Built-in workflow task" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(mockOnQuickCreate).toHaveBeenCalledWith(expect.objectContaining({
+        description: "Built-in workflow task",
+        column: "triage",
+        workflowId: "builtin:coding",
+      }));
+    });
+  });
+
   it("shows error toast when onQuickCreate fails and keeps input content", async () => {
     const mockOnQuickCreate = vi.fn().mockRejectedValue(new Error("Create failed"));
     renderListView({ onQuickCreate: mockOnQuickCreate });
@@ -2728,6 +2810,33 @@ describe("ListView - Bulk Selection", () => {
     expect(checkbox).toBeDisabled();
   });
 
+  it("disables checkbox for workflow archived columns", async () => {
+    vi.mocked(fetchBoardWorkflows).mockResolvedValue({
+      flagEnabled: true,
+      defaultWorkflowId: "wf-custom",
+      workflows: [
+        {
+          id: "wf-custom",
+          name: "Custom",
+          columns: [
+            { id: "active", name: "Active", flags: { countsTowardWip: true } },
+            { id: "parked", name: "Parked", flags: { archived: true } },
+          ],
+        },
+      ],
+      taskWorkflowIds: { "FN-001": "wf-custom" },
+    });
+    const tasks = [
+      createMockTask({ id: "FN-001", column: "parked" }),
+    ];
+
+    render(<ListView tasks={tasks} onMoveTask={vi.fn()} onOpenDetail={vi.fn()} addToast={mockAddToast} projectId={TEST_PROJECT_ID} />);
+    await waitFor(() => expect(screen.queryAllByText("Parked").length).toBeGreaterThan(0));
+    enterBulkEditMode();
+
+    expect(screen.getByLabelText("Select FN-001")).toBeDisabled();
+  });
+
   it("shows selection count when tasks are selected", () => {
     const tasks = [
       createMockTask({ id: "FN-001" }),
@@ -3020,6 +3129,78 @@ describe("ListView - Bulk Selection", () => {
       expect(mockAddToast).toHaveBeenCalledWith("Archived 1 · 1 skipped · 0 failed", "success");
     });
 
+    it("skips workflow archived-column tasks when pausing in bulk", async () => {
+      const user = userEvent.setup();
+      vi.mocked(fetchBoardWorkflows).mockResolvedValue({
+        flagEnabled: true,
+        defaultWorkflowId: "wf-custom",
+        workflows: [
+          {
+            id: "wf-custom",
+            name: "Custom",
+            columns: [
+              { id: "active", name: "Active", flags: { countsTowardWip: true } },
+              { id: "parked", name: "Parked", flags: { archived: true } },
+            ],
+          },
+        ],
+        taskWorkflowIds: { "FN-001": "wf-custom", "FN-002": "wf-custom" },
+      });
+      const tasks = [
+        createMockTask({ id: "FN-001", column: "active", paused: false }),
+        createMockTask({ id: "FN-002", column: "parked", paused: false }),
+      ];
+      const onPauseTask = vi.fn(async () => createMockTask());
+      localStorage.setItem(scopedStorageKey("kb-dashboard-selected-tasks"), JSON.stringify(["FN-001", "FN-002"]));
+
+      renderListView({ tasks, onPauseTask });
+      enterBulkEditMode();
+      await waitFor(() => expect(screen.queryAllByText("Parked").length).toBeGreaterThan(0));
+      await user.click(screen.getByRole("button", { name: /^pause selected$/i }));
+
+      await waitFor(() => {
+        expect(onPauseTask).toHaveBeenCalledTimes(1);
+        expect(onPauseTask).toHaveBeenCalledWith("FN-001");
+      });
+      expect(mockAddToast).toHaveBeenCalledWith("Paused 1 · 1 skipped · 0 failed", "success");
+    });
+
+    it("skips workflow archived-column tasks when unpausing in bulk", async () => {
+      const user = userEvent.setup();
+      vi.mocked(fetchBoardWorkflows).mockResolvedValue({
+        flagEnabled: true,
+        defaultWorkflowId: "wf-custom",
+        workflows: [
+          {
+            id: "wf-custom",
+            name: "Custom",
+            columns: [
+              { id: "active", name: "Active", flags: { countsTowardWip: true } },
+              { id: "parked", name: "Parked", flags: { archived: true } },
+            ],
+          },
+        ],
+        taskWorkflowIds: { "FN-001": "wf-custom", "FN-002": "wf-custom" },
+      });
+      const tasks = [
+        createMockTask({ id: "FN-001", column: "active", paused: true }),
+        createMockTask({ id: "FN-002", column: "parked", paused: true }),
+      ];
+      const onUnpauseTask = vi.fn(async () => createMockTask());
+      localStorage.setItem(scopedStorageKey("kb-dashboard-selected-tasks"), JSON.stringify(["FN-001", "FN-002"]));
+
+      renderListView({ tasks, onUnpauseTask });
+      enterBulkEditMode();
+      await waitFor(() => expect(screen.queryAllByText("Parked").length).toBeGreaterThan(0));
+      await user.click(screen.getByRole("button", { name: /^unpause selected$/i }));
+
+      await waitFor(() => {
+        expect(onUnpauseTask).toHaveBeenCalledTimes(1);
+        expect(onUnpauseTask).toHaveBeenCalledWith("FN-001");
+      });
+      expect(mockAddToast).toHaveBeenCalledWith("Unpaused 1 · 1 skipped · 0 failed", "success");
+    });
+
     it("shows error summary when pause has failures", async () => {
       const user = userEvent.setup();
       const tasks = [createMockTask({ id: "FN-001", paused: false })];
@@ -3106,6 +3287,48 @@ describe("ListView - Bulk Selection", () => {
       });
       expect(mockAddToast).toHaveBeenCalledWith("Deleted 1 task · 1 archived skipped · 0 failed", "success");
       expect(screen.getByText("1 selected")).toBeInTheDocument();
+    });
+
+    it("uses workflow complete and archived flags when bulk delete archives done tasks", async () => {
+      const user = userEvent.setup();
+      vi.mocked(fetchBoardWorkflows).mockResolvedValue({
+        flagEnabled: true,
+        defaultWorkflowId: "wf-custom",
+        workflows: [
+          {
+            id: "wf-custom",
+            name: "Custom",
+            columns: [
+              { id: "doing", name: "Doing", flags: { countsTowardWip: true } },
+              { id: "shipped", name: "Shipped", flags: { complete: true } },
+              { id: "parked", name: "Parked", flags: { archived: true } },
+            ],
+          },
+        ],
+        taskWorkflowIds: { "FN-001": "wf-custom", "FN-002": "wf-custom", "FN-003": "wf-custom" },
+      });
+      const tasks = [
+        createMockTask({ id: "FN-001", column: "shipped" }),
+        createMockTask({ id: "FN-002", column: "doing" }),
+        createMockTask({ id: "FN-003", column: "parked" }),
+      ];
+      const onArchiveTask = vi.fn(async () => createMockTask());
+      const onDeleteTask = vi.fn(async () => createMockTask());
+      mockConfirmWithChoice.mockResolvedValueOnce("tertiary");
+      localStorage.setItem(scopedStorageKey("kb-dashboard-selected-tasks"), JSON.stringify(["FN-001", "FN-002", "FN-003"]));
+
+      renderListView({ tasks, onArchiveTask, onDeleteTask });
+      enterBulkEditMode();
+      await waitFor(() => expect(screen.queryAllByText("Shipped").length).toBeGreaterThan(0));
+      await user.click(screen.getByRole("button", { name: /delete selected/i }));
+
+      await waitFor(() => {
+        expect(onArchiveTask).toHaveBeenCalledTimes(1);
+        expect(onArchiveTask).toHaveBeenCalledWith("FN-001");
+        expect(onDeleteTask).toHaveBeenCalledTimes(1);
+        expect(onDeleteTask).toHaveBeenCalledWith("FN-002");
+      });
+      expect(mockAddToast).toHaveBeenCalledWith("Archived 1, deleted 1, failed 0", "success");
     });
 
     it("does nothing when delete confirm is cancelled", async () => {

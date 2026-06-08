@@ -386,11 +386,10 @@ function ColumnComponent({ column, tasks, projectId, maxConcurrent, onMoveTask, 
     (input: TaskCreateInput) => {
       if (!onQuickCreate) return Promise.resolve();
       if (workflowMode) {
-        const explicitWorkflowId = workflowId?.startsWith("builtin:") ? undefined : workflowId;
         return onQuickCreate({
           ...input,
           column,
-          ...(explicitWorkflowId ? { workflowId: explicitWorkflowId } : {}),
+          ...(workflowId ? { workflowId } : {}),
         });
       }
       return onQuickCreate(input);

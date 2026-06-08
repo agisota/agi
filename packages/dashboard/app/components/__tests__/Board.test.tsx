@@ -971,6 +971,26 @@ describe("Board", () => {
       expect(screen.getByTestId("column-idea").getAttribute("data-has-quick-create")).toBe("yes");
     });
 
+    it("keeps workflow create and edit actions visible when only one workflow exists", async () => {
+      const onCreateWorkflow = vi.fn();
+      const onOpenWorkflowEditor = vi.fn();
+      enableFlag({ "FN-1": "builtin:coding" }, [DEFAULT_WORKFLOW]);
+
+      renderBoard({
+        tasks: [mkTask({ id: "FN-1", column: "triage" })],
+        onCreateWorkflow,
+        onOpenWorkflowEditor,
+      });
+
+      await waitFor(() => expect(screen.getByTestId("column-triage")).toBeDefined());
+      expect(screen.queryByLabelText("Select workflow")).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "New workflow" }));
+      fireEvent.click(screen.getByRole("button", { name: "Edit workflows" }));
+      expect(onCreateWorkflow).toHaveBeenCalledTimes(1);
+      expect(onOpenWorkflowEditor).toHaveBeenCalledTimes(1);
+    });
+
     it("renders one selected workflow at a time and switches workflows from the dropdown", async () => {
       const onCreateWorkflow = vi.fn();
       enableFlag(
