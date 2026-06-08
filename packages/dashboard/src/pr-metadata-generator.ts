@@ -7,6 +7,7 @@ import { resolveTaskPlanningModel } from "@fusion/core";
 import { createFnAgent } from "@fusion/engine";
 
 const execAsync = promisify(execCb);
+const PR_METADATA_TIMEOUT_MS = 60_000;
 
 export interface GeneratedPrMetadata {
   title: string;
@@ -134,22 +135,58 @@ function fillTemplate(template: string, result: AiMetadataResult, taskId: string
   return out.join("\n");
 }
 
-async function runCommand(command: string, cwd: string): Promise<string> {
+async function runCommand(command: string, cwd: string, signal?: AbortSignal): Promise<string> {
   const { stdout } = await execAsync(command, {
     cwd,
     timeout: 15_000,
     maxBuffer: 10 * 1024 * 1024,
+    signal,
   });
   return stdout.trim();
 }
 
-async function resolveBaseBranch(task: Task, repoRoot: string): Promise<string> {
+function createAbortError(): Error {
+  const error = new Error("PR metadata generation aborted");
+  error.name = "AbortError";
+  return error;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) {
+    return;
+  }
+  throw signal.reason instanceof Error ? signal.reason : createAbortError();
+}
+
+function waitForAbort(signal: AbortSignal): Promise<never> {
+  return new Promise((_, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason instanceof Error ? signal.reason : createAbortError());
+      return;
+    }
+    signal.addEventListener(
+      "abort",
+      () => reject(signal.reason instanceof Error ? signal.reason : createAbortError()),
+      { once: true },
+    );
+  });
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  return Boolean(
+    error
+      && typeof error === "object"
+      && ("name" in error ? (error as { name?: unknown }).name === "AbortError" : false),
+  );
+}
+
+async function resolveBaseBranch(task: Task, repoRoot: string, signal?: AbortSignal): Promise<string> {
   if (task.prInfo?.baseBranch) {
     return task.prInfo.baseBranch;
   }
 
   try {
-    const stdout = await runCommand("gh repo view --json defaultBranchRef -q .defaultBranchRef.name", repoRoot);
+    const stdout = await runCommand("gh repo view --json defaultBranchRef -q .defaultBranchRef.name", repoRoot, signal);
     if (stdout) return stdout;
   } catch {
     // fallback below
@@ -162,81 +199,109 @@ export async function generatePrMetadata(input: {
   repoRoot: string;
   settings: ProjectSettings & GlobalSettings;
   signal?: AbortSignal;
+  timeoutMs?: number;
 }): Promise<GeneratedPrMetadata> {
-  const { task, repoRoot, settings, signal } = input;
+  const { task, repoRoot, settings, signal, timeoutMs = PR_METADATA_TIMEOUT_MS } = input;
   const fallback = buildFallback(task);
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort(signal?.reason instanceof Error ? signal.reason : createAbortError());
+  const timeoutId = setTimeout(() => controller.abort(createAbortError()), timeoutMs);
+  const combinedSignal = controller.signal;
+  const callerSignalWasActive = Boolean(signal && !signal.aborted);
 
-  const baseBranch = await resolveBaseBranch(task, repoRoot);
-  const [logOut, diffStatOut] = await Promise.all([
-    runCommand(`git log --no-merges ${baseBranch}..HEAD --format=%s%n%b`, repoRoot).catch(() => ""),
-    runCommand(`git diff --stat ${baseBranch}..HEAD`, repoRoot).catch(() => ""),
-  ]);
-
-  let promptContent = "";
-  try {
-    const promptPath = join(repoRoot, ".fusion", "tasks", task.id, "PROMPT.md");
-    promptContent = (await readFile(promptPath, "utf8")).trim();
-  } catch {
-    promptContent = "";
+  if (signal) {
+    if (signal.aborted) {
+      abortFromCaller();
+    } else {
+      signal.addEventListener("abort", abortFromCaller, { once: true });
+    }
   }
 
-  const templatePath = join(repoRoot, ".github", "pull_request_template.md");
-  const templateExists = await access(templatePath).then(() => true).catch(() => false);
-  const template = templateExists ? await readFile(templatePath, "utf8") : "";
-
-  const model = resolveTaskPlanningModel(task, settings as Partial<Settings>);
-  let aiText = "";
-  const { session } = await createFnAgent({
-    cwd: repoRoot,
-    tools: "readonly",
-    defaultProvider: model.provider,
-    defaultModelId: model.modelId,
-    systemPrompt: [
-      "Generate GitHub PR metadata.",
-      "Respond with strict JSON only.",
-      "Schema: {title, summary, changes, testing, linkedTask}",
-    ].join("\n"),
-    onText: (delta: string) => {
-      aiText += delta;
-    },
-  });
-
   try {
-    const contextPrompt = [
-      `Task ID: ${task.id}`,
-      `Task title: ${task.title}`,
-      `Task description: ${task.description ?? ""}`,
-      `Base branch: ${baseBranch}`,
-      "Commit log:",
-      logOut || "(none)",
-      "Diff stat:",
-      diffStatOut || "(none)",
-      "Task prompt:",
-      promptContent || "(none)",
-    ].join("\n\n");
+    throwIfAborted(combinedSignal);
 
-    if (signal?.aborted) {
-      throw new Error("Metadata generation aborted");
-    }
+    const baseBranch = await resolveBaseBranch(task, repoRoot, combinedSignal);
+    const [logOut, diffStatOut] = await Promise.all([
+      runCommand(`git log --no-merges ${baseBranch}..HEAD --format=%s%n%b`, repoRoot, combinedSignal).catch(() => ""),
+      runCommand(`git diff --stat ${baseBranch}..HEAD`, repoRoot, combinedSignal).catch(() => ""),
+    ]);
 
-    await session.prompt(contextPrompt);
-  } finally {
+    let promptContent = "";
     try {
-      session.dispose();
+      const promptPath = join(repoRoot, ".fusion", "tasks", task.id, "PROMPT.md");
+      promptContent = (await readFile(promptPath, "utf8")).trim();
     } catch {
-      // best effort
+      promptContent = "";
+    }
+
+    const templatePath = join(repoRoot, ".github", "pull_request_template.md");
+    const templateExists = await access(templatePath).then(() => true).catch(() => false);
+    const template = templateExists ? await readFile(templatePath, "utf8") : "";
+
+    const model = resolveTaskPlanningModel(task, settings as Partial<Settings>);
+    let aiText = "";
+    const { session } = await createFnAgent({
+      cwd: repoRoot,
+      tools: "readonly",
+      defaultProvider: model.provider,
+      defaultModelId: model.modelId,
+      systemPrompt: [
+        "Generate GitHub PR metadata.",
+        "Respond with strict JSON only.",
+        "Schema: {title, summary, changes, testing, linkedTask}",
+      ].join("\n"),
+      onText: (delta: string) => {
+        aiText += delta;
+      },
+    });
+
+    try {
+      const contextPrompt = [
+        `Task ID: ${task.id}`,
+        `Task title: ${task.title}`,
+        `Task description: ${task.description ?? ""}`,
+        `Base branch: ${baseBranch}`,
+        "Commit log:",
+        logOut || "(none)",
+        "Diff stat:",
+        diffStatOut || "(none)",
+        "Task prompt:",
+        promptContent || "(none)",
+      ].join("\n\n");
+
+      throwIfAborted(combinedSignal);
+      await Promise.race([
+        (session.prompt as (prompt: string, options?: { signal?: AbortSignal }) => Promise<unknown>)(contextPrompt, { signal: combinedSignal }),
+        waitForAbort(combinedSignal),
+      ]);
+    } finally {
+      try {
+        session.dispose();
+      } catch {
+        // best effort
+      }
+    }
+
+    const parsed = parseAiResult(aiText);
+    if (!parsed) {
+      return fallback;
+    }
+
+    const body = templateExists ? fillTemplate(template, parsed, task.id) : buildBody(parsed, task.id);
+    return {
+      title: parsed.title,
+      body,
+      templateUsed: templateExists,
+    };
+  } catch (error) {
+    if (isAbortLikeError(error)) {
+      return fallback;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    if (callerSignalWasActive) {
+      signal?.removeEventListener("abort", abortFromCaller);
     }
   }
-
-  const parsed = parseAiResult(aiText);
-  if (!parsed) {
-    return fallback;
-  }
-
-  const body = templateExists ? fillTemplate(template, parsed, task.id) : buildBody(parsed, task.id);
-  return {
-    title: parsed.title,
-    body,
-    templateUsed: templateExists,
-  };
 }

@@ -134,13 +134,17 @@ describe("PR metadata/preflight/options routes", () => {
     }
   });
 
-  it("POST /pr/generate-metadata returns generated metadata", async () => {
+  it("POST /pr/generate-metadata returns generated metadata and forwards an abort signal", async () => {
     const app = createServer(createStore(createTask()));
     const response = await performRequest(app, "POST", "/api/tasks/FN-001/pr/generate-metadata", "{}", { "content-type": "application/json" });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ title: "Generated title", body: "Generated body", templateUsed: true });
-    expect(mockGeneratePrMetadata).toHaveBeenCalledWith(expect.objectContaining({ task: expect.objectContaining({ id: "FN-001" }), repoRoot: "/tmp/project" }));
+    expect(mockGeneratePrMetadata).toHaveBeenCalledWith(expect.objectContaining({
+      task: expect.objectContaining({ id: "FN-001" }),
+      repoRoot: "/tmp/project",
+      signal: expect.any(AbortSignal),
+    }));
   });
 
   it("POST /pr/generate-metadata returns 404 for missing task", async () => {

@@ -4849,6 +4849,10 @@ export function registerGitGitHubRoutes(ctx: ApiRoutesContext): void {
    * Returns: { title, body, templateUsed }
    */
   router.post("/tasks/:id/pr/generate-metadata", async (req, res) => {
+    const controller = new AbortController();
+    const abortRequest = () => controller.abort();
+    req.on("close", abortRequest);
+
     try {
       const { store: scopedStore } = await getProjectContext(req);
       const task = await scopedStore.getTask(req.params.id);
@@ -4857,7 +4861,11 @@ export function registerGitGitHubRoutes(ctx: ApiRoutesContext): void {
         task,
         repoRoot: scopedStore.getRootDir(),
         settings,
+        signal: controller.signal,
       });
+      if (req.destroyed || res.writableEnded || res.writableFinished || controller.signal.aborted) {
+        return;
+      }
       res.json(metadata);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -4867,6 +4875,8 @@ export function registerGitGitHubRoutes(ctx: ApiRoutesContext): void {
         throw notFound(`Task ${req.params.id} not found`);
       }
       rethrowAsApiError(err, "Failed to generate PR metadata");
+    } finally {
+      req.off("close", abortRequest);
     }
   });
 
