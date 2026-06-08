@@ -115,7 +115,7 @@ describe("foreach validation", () => {
       edges: [] as WorkflowIrEdge[],
     };
     expect(() => parseWorkflowIr(graphWithForeach({ template: tmpl }))).toThrow(
-      /nested foreach/,
+      /nested (loop\/)?foreach/,
     );
   });
 

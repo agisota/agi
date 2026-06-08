@@ -175,8 +175,13 @@ Important execution nuance:
 
 - Why defer now:
   - FN-5943 already landed the lower-risk fix for the observed incident: fewer rewrites, bounded merge/optimize maintenance, and threshold-triggered rebuild.
+  - FN-6008 rechecked the post-FN-5943 operational evidence against the live project DB and the defer condition still holds:
+    - recent `runAuditEvents` telemetry for `target: "tasks_fts"` shows the live index staying bounded in the **tens to low hundreds of KB**, not MB-scale bloat;
+    - the sampled maintenance window showed **0 rebuild events**, with `merge`/`optimize` repeatedly pulling the index back down (for example `141186 → 43990` bytes and `96571 → 40693` bytes);
+    - a direct `tasks_fts_data` size check during the review was only about **50 KB** for **36** live tasks;
+    - no concrete post-FN-5943 runtime evidence of recurring live `tasks_fts` corruption was found in the reviewed logs.
   - The attached-file idea still improves corruption isolation, but it would trade away the current same-file trigger-maintained index for a manual two-file sync architecture with weaker crash atomicity under WAL.
-- Revisit only if post-FN-5943 production evidence shows recurring `fusion.db`-coupled FTS corruption or materially persistent live-index bloat significant enough to justify a contentless/manual-sync redesign.
+- Revisit only if post-FN-5943 production evidence shows recurring `fusion.db`-coupled FTS corruption or materially persistent live-index bloat significant enough to justify a contentless/manual-sync redesign. Until then, keep the single-file external-content design and existing maintenance path.
 
 ## SQLite write-path lock recovery (FN-4042 / FN-4083)
 
