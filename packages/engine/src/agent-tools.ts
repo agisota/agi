@@ -779,6 +779,7 @@ export async function createAgentTask(
       input.githubTracking?.enabled !== false && resolvedTracking.enabled;
     const createInput: TaskCreateInput = {
       ...input,
+      summarize: !input.title?.trim() ? true : undefined,
       source: nextSource,
       githubTracking: shouldPrefillGithubTrackingEnabled
         ? {

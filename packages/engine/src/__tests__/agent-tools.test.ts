@@ -144,6 +144,7 @@ describe("createTaskCreateTool", () => {
       dependencies: ["PROJ-001"],
       column: "triage",
       priority: undefined,
+      summarize: true,
       source: undefined,
     }, {
       settings: { autoSummarizeTitles: false },
@@ -167,6 +168,7 @@ describe("createTaskCreateTool", () => {
 
     expect(store.createTask).toHaveBeenCalledWith(expect.objectContaining({
       priority: "high",
+      summarize: true,
     }), expect.objectContaining({ settings: { autoSummarizeTitles: false } }));
   });
 
@@ -220,6 +222,7 @@ describe("createTaskCreateTool", () => {
     await tool.execute("call-1", { description: "Test" } as any, undefined, undefined, {} as any);
 
     expect(store.createTask).toHaveBeenCalledWith(expect.objectContaining({
+      summarize: true,
       source: {
         sourceType: "agent_heartbeat",
         sourceAgentId: "agent-123",
@@ -245,6 +248,7 @@ describe("createTaskCreateTool", () => {
     await tool.execute("call-1", { description: "spawn follow-up" } as any, undefined, undefined, {} as any);
 
     expect(store.createTask).toHaveBeenCalledWith(expect.objectContaining({
+      summarize: true,
       source: {
         sourceType: "agent_heartbeat",
         sourceAgentId: "agent-123",
@@ -296,6 +300,65 @@ describe("createTaskCreateTool", () => {
     expect(second.task.id).toBe("FN-200");
     expect(second.wasDuplicate).toBe(true);
     expect(store.createTask).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes summarize: true when no title provided", async () => {
+    const created = { id: "FN-201", description: "untitled follow-up", dependencies: [], column: "triage" };
+    const store = {
+      getSettings: vi.fn().mockResolvedValue({ autoSummarizeTitles: false }),
+      createTask: vi.fn().mockResolvedValue(created),
+    };
+
+    await createAgentTask(store as any, { description: "untitled follow-up" } as any);
+
+    expect(store.createTask).toHaveBeenCalledWith(expect.objectContaining({
+      description: "untitled follow-up",
+      summarize: true,
+    }), expect.objectContaining({ settings: { autoSummarizeTitles: false } }));
+  });
+
+  it("does not set summarize when title is provided", async () => {
+    const created = { id: "FN-202", title: "Explicit title", description: "titled follow-up", dependencies: [], column: "triage" };
+    const store = {
+      getSettings: vi.fn().mockResolvedValue({ autoSummarizeTitles: false }),
+      createTask: vi.fn().mockResolvedValue(created),
+    };
+
+    await createAgentTask(store as any, { title: "Explicit title", description: "titled follow-up" } as any);
+
+    expect(store.createTask).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Explicit title",
+      summarize: undefined,
+    }), expect.objectContaining({ settings: { autoSummarizeTitles: false } }));
+  });
+
+  it("summarize triggers title generation even when autoSummarizeTitles is false", async () => {
+    const summarizeSpy = vi.spyOn(core, "summarizeTitle").mockResolvedValue("Generated title");
+    const created = { id: "FN-203", description: "untitled follow-up", dependencies: [], column: "triage" };
+    const store = {
+      getSettings: vi.fn().mockResolvedValue({
+        autoSummarizeTitles: false,
+        titleSummarizerProvider: "openai",
+        titleSummarizerModelId: "gpt-4o-mini",
+      }),
+      createTask: vi.fn().mockResolvedValue(created),
+    };
+
+    await createAgentTask(store as any, { description: "untitled follow-up" } as any, { rootDir: "/repo" });
+
+    const createInput = vi.mocked(store.createTask).mock.calls[0]?.[0];
+    const createOptions = vi.mocked(store.createTask).mock.calls[0]?.[1] as { onSummarize?: (description: string) => Promise<string | null> };
+    expect(createInput).toEqual(expect.objectContaining({
+      description: "untitled follow-up",
+      summarize: true,
+    }));
+    expect(createOptions).toEqual(expect.objectContaining({
+      settings: { autoSummarizeTitles: false },
+    }));
+    expect(createOptions.onSummarize).toBeTypeOf("function");
+    await expect(createOptions.onSummarize?.("Long agent-created task description")).resolves.toBe("Generated title");
+    expect(summarizeSpy).toHaveBeenCalledWith("Long agent-created task description", "/repo", "openai", "gpt-4o-mini");
+    summarizeSpy.mockRestore();
   });
 });
 
