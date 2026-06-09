@@ -1,7 +1,6 @@
 import "./Lane.css";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight } from "lucide-react";
 import type { Task, TaskDetail, Column as ColumnType, TaskCreateInput, GithubIssueAction } from "@fusion/core";
 import { Column } from "./Column";
 import { sortTasksForDisplayColumn } from "./taskSorting";
@@ -153,9 +152,7 @@ function LaneComponent(props: LaneProps) {
             ? t("lane.expand", "Expand {{name}} lane", { name: workflow.name })
             : t("lane.collapse", "Collapse {{name}} lane", { name: workflow.name })}
           data-testid={`lane-toggle-${workflow.id}`}
-        >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-        </button>
+        />
         <h2 className="lane-name">{workflow.name}</h2>
         <span className="lane-count" data-testid={`lane-count-${workflow.id}`}>{tasks.length}</span>
       </div>

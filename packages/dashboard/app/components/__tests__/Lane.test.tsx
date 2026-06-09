@@ -24,9 +24,7 @@ vi.mock("../PluginSlot", () => ({ PluginSlot: () => null }));
 vi.mock("lucide-react", () => ({
   Link: () => null,
   Clock: () => null,
-  ChevronDown: () => null,
   ChevronUp: () => null,
-  ChevronRight: () => null,
   Archive: () => null,
   MoreVertical: () => null,
   AlertTriangle: () => null,
@@ -120,6 +118,11 @@ describe("Lane", () => {
     render(<Lane {...props} />);
     fireEvent.click(screen.getByTestId("lane-toggle-builtin:coding"));
     expect(props.onToggleCollapse).toHaveBeenCalledWith("builtin:coding");
+  });
+
+  it("does not render a chevron icon in the lane toggle", () => {
+    render(<Lane {...baseProps()} />);
+    expect(screen.getByTestId("lane-toggle-builtin:coding").querySelector("svg")).toBeNull();
   });
 
   it("shows the auto-merge toggle for human-review workflow columns", () => {
