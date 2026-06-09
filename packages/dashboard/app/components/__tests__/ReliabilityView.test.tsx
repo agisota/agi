@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ReliabilityView } from "../ReliabilityView";
@@ -34,7 +34,52 @@ const baseResponse = {
 
 describe("ReliabilityView", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it("shows loading spinner while data is loading", () => {
+    vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise<Response>(() => {}));
+
+    render(<ReliabilityView />);
+
+    expect(screen.getByTestId("reliability-loading")).toBeInTheDocument();
+    expect(screen.getByText("Loading reliability data...")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Reliability" })).not.toBeInTheDocument();
+  });
+
+  it("shows error message when fetch fails", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network unavailable"));
+
+    render(<ReliabilityView />);
+
+    await waitFor(() => expect(screen.getByTestId("reliability-error")).toBeInTheDocument());
+    expect(screen.getByRole("alert")).toHaveTextContent("Network unavailable");
+    expect(screen.queryByRole("heading", { name: "Reliability" })).not.toBeInTheDocument();
+  });
+
+  it("shows data after successful load even if loading refresh is pending", async () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({ ok: true, json: async () => baseResponse } as Response)
+      .mockReturnValueOnce(new Promise<Response>(() => {}));
+
+    render(<ReliabilityView />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByText("80.0%")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("80.0%")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Reliability" })).toBeInTheDocument();
+    expect(screen.queryByTestId("reliability-loading")).not.toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   it("renders headline percent and details disclosure", async () => {
@@ -90,10 +135,10 @@ describe("ReliabilityView", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, json: async () => ({ ...baseResponse, perDay: [] }) } as Response);
 
     const { container } = render(<ReliabilityView />);
-    const root = container.querySelector(".reliability-view");
-    expect(root).not.toBeNull();
+    await waitFor(() => expect(container.querySelector(".reliability-view")).not.toBeNull());
+    const root = container.querySelector(".reliability-view") as HTMLElement;
 
-    const computed = getComputedStyle(root as HTMLElement);
+    const computed = getComputedStyle(root);
     expect(computed.overflowY).toBe("auto");
     expect(computed.height).not.toBe("");
   });
