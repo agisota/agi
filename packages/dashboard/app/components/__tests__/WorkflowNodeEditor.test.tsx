@@ -2222,8 +2222,12 @@ describe("WorkflowNodeEditor — U10 design-with-AI", () => {
     vi.mocked(designWorkflow).mockResolvedValue(designedResult());
 
     renderWithConfirm(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} />);
+    // Wait for the editor to fully stabilize before interacting — clicking
+    // the name strip mid-hydration races the initial render cycle.
+    await screen.findByText("Save");
+    await waitFor(() => expect(screen.getAllByLabelText(/Column name/i).length).toBeGreaterThan(0));
     // Make a dirty edit first (inline rename) so we can prove it survives a cancel.
-    fireEvent.click(await screen.findByTestId("wf-workflow-name"));
+    fireEvent.click(screen.getByTestId("wf-workflow-name"));
     const input = await screen.findByTestId("wf-workflow-name-input");
     fireEvent.change(input, { target: { value: "Kept name" } });
     fireEvent.keyDown(input, { key: "Enter" });
