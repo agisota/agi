@@ -169,7 +169,7 @@ function builtinDef(): WorkflowDefinition {
 function builtinPrDef(): WorkflowDefinition {
   return {
     id: "builtin:pr-workflow",
-    kind: "workflow",
+    kind: "fragment",
     name: "PR lifecycle (built-in)",
     description: "Ships with Fusion",
     ir: BUILTIN_PR_WORKFLOW_IR,
@@ -271,6 +271,7 @@ describe("workflow-flow-mapping", () => {
     expect(BUILTIN_WORKFLOWS.map((workflow) => workflow.id).sort()).toEqual(
       expect.arrayContaining(["builtin:coding", "builtin:stepwise-coding", "builtin:pr-workflow"]),
     );
+    expect(BUILTIN_WORKFLOWS.find((workflow) => workflow.id === "builtin:pr-workflow")?.kind).toBe("fragment");
 
     for (const workflow of BUILTIN_WORKFLOWS) {
       edgeRenderableAssertion(workflow);

@@ -15,7 +15,7 @@ export function isBuiltinWorkflowId(id: string): boolean {
 }
 
 export function defaultEnabledBuiltinWorkflowIds(): string[] {
-  return BUILTIN_WORKFLOWS.map((workflow) => workflow.id);
+  return BUILTIN_WORKFLOWS.filter((workflow) => workflow.kind !== "fragment").map((workflow) => workflow.id);
 }
 
 export function isBuiltinWorkflowEnabled(id: string, enabledIds?: readonly string[]): boolean {
@@ -69,7 +69,8 @@ function linear(spec: BuiltinSpec): WorkflowDefinition {
     id: spec.id,
     name: spec.name,
     description: spec.description,
-    // Built-ins are always selectable workflows, never fragments (KTD-1).
+    // Linear built-ins remain selectable workflows; catalog entries authored
+    // directly below may opt into fragment kind when they are palette templates.
     kind: "workflow",
     ir,
     layout,
@@ -215,7 +216,7 @@ export const BUILTIN_WORKFLOWS: WorkflowDefinition[] = [
     name: "PR lifecycle (built-in)",
     description:
       "The unified PR lifecycle as graph nodes: create the PR, await review, respond to changes (bounded rework loop), gate on auto-merge, then merge — with GitHub reconciliation advancing the await holds. Requires the workflow graph executor.",
-    kind: "workflow",
+    kind: "fragment",
     ir: BUILTIN_PR_WORKFLOW_IR,
     layout: {
       start: { x: 60, y: 160 },

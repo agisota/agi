@@ -16,17 +16,16 @@ import { createTaskStoreTestHarness } from "./store-test-helpers.js";
 const EXECUTE_NODE_MAX_RETRIES = 2;
 
 describe("built-in workflows", () => {
-  // Graph-only built-ins (step inversion, KTD-9) model branching/foreach/rework
-  // structure the linear compiler cannot lower to a step list — they run only
-  // under the workflow graph executor. They still must parse as valid IR.
-  const GRAPH_ONLY_BUILTIN_IDS = new Set(["builtin:stepwise-coding", "builtin:pr-workflow"]);
+  // Non-compiler built-ins model graph-only node kinds or reusable fragments the
+  // linear compiler cannot lower to a step list. They still must parse as valid IR.
+  const NON_COMPILABLE_BUILTIN_IDS = new Set(["builtin:stepwise-coding", "builtin:pr-workflow"]);
 
   it("every built-in has a valid IR; linear built-ins compile without error", () => {
     expect(BUILTIN_WORKFLOWS.length).toBeGreaterThanOrEqual(4);
     for (const wf of BUILTIN_WORKFLOWS) {
       expect(isBuiltinWorkflowId(wf.id)).toBe(true);
       expect(() => parseWorkflowIr(wf.ir)).not.toThrow();
-      if (!GRAPH_ONLY_BUILTIN_IDS.has(wf.id)) {
+      if (!NON_COMPILABLE_BUILTIN_IDS.has(wf.id)) {
         expect(() => compileWorkflowToSteps(wf.ir)).not.toThrow();
       }
     }
@@ -51,6 +50,8 @@ describe("built-in workflows", () => {
   it("includes the PR lifecycle built-in wiring the PR nodes end to end (U9)", () => {
     const pr = getBuiltinWorkflow("builtin:pr-workflow");
     expect(pr).toBeDefined();
+    expect(pr!.kind).toBe("fragment");
+    expect(BUILTIN_WORKFLOWS.some((workflow) => workflow.id === "builtin:pr-workflow")).toBe(true);
     const ir = parseWorkflowIr(pr!.ir);
     if (ir.version !== "v2") throw new Error("expected v2");
 
@@ -143,7 +144,11 @@ describe("built-in workflows", () => {
     expect(getBuiltinWorkflow("builtin:coding")?.ir).toBe(BUILTIN_CODING_WORKFLOW_IR);
     expect(getBuiltinWorkflow("builtin:coding")?.ir).toBe(BUILTIN_CODING_WORKFLOW_IR);
     expect(BUILTIN_WORKFLOWS.find((workflow) => workflow.id === "builtin:coding")?.ir).toBe(BUILTIN_CODING_WORKFLOW_IR);
-    expect(defaultEnabledBuiltinWorkflowIds()).toEqual(BUILTIN_WORKFLOWS.map((workflow) => workflow.id));
+    expect(defaultEnabledBuiltinWorkflowIds()).toEqual(
+      BUILTIN_WORKFLOWS.filter((workflow) => workflow.kind !== "fragment").map((workflow) => workflow.id),
+    );
+    expect(defaultEnabledBuiltinWorkflowIds()).not.toContain("builtin:pr-workflow");
+    expect(getBuiltinWorkflow("builtin:pr-workflow")!.kind).toBe("fragment");
     expect(defaultEnabledBuiltinWorkflowIds().slice(0, 5)).toEqual([
       "builtin:coding",
       "builtin:quick-fix",
@@ -294,6 +299,13 @@ describe("built-in workflows", () => {
       const task = await store.createTask({ description: "T", enabledWorkflowSteps: [] });
       await store.selectTaskWorkflow(task.id, "builtin:compound-engineering");
       expect(store.getTaskWorkflowSelection(task.id)?.workflowId).toBe("builtin:compound-engineering");
+    });
+
+    it("rejects selecting the PR lifecycle fragment for a task", async () => {
+      const task = await store.createTask({ description: "T", enabledWorkflowSteps: [] });
+      await expect(store.selectTaskWorkflow(task.id, "builtin:pr-workflow")).rejects.toThrow(
+        "is a fragment and cannot be selected for a task",
+      );
     });
   });
 });

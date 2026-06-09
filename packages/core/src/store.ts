@@ -13299,7 +13299,7 @@ ${stepsSection}`;
 
   /** Read (and cache) the full merged workflow-definition set, oldest first.
    *  Built-in templates lead the list and cannot be edited/deleted; built-ins
-   *  are always kind "workflow". */
+   *  may be selectable workflows or reusable fragments. */
   private async readAllWorkflowDefinitions(): Promise<WorkflowDefinition[]> {
     if (this.workflowDefinitionsCache) return this.workflowDefinitionsCache;
     const rows = this.db.prepare("SELECT * FROM workflows ORDER BY createdAt ASC").all() as Array<{
