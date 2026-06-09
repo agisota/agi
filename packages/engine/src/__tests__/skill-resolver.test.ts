@@ -553,7 +553,7 @@ describe("createSkillsOverrideFromSelection", () => {
       expect(result.skills[0].name).toBe("foo");
     });
 
-    it("appends warning diagnostic for allowed paths not matching any skill", () => {
+    it("appends info diagnostic for allowed paths not matching any skill", () => {
       const selection: SkillSelectionResult = {
         allowedSkillPaths: new Set(["/path/nonexistent"]),
         excludedSkillPaths: new Set<string>(),
@@ -573,7 +573,7 @@ describe("createSkillsOverrideFromSelection", () => {
 
       expect(result.skills).toHaveLength(0);
       expect(result.diagnostics).toHaveLength(1);
-      expect(result.diagnostics[0].type).toBe("warning");
+      expect(result.diagnostics[0].type).toBe("info");
       expect(result.diagnostics[0].message).toContain("not found in discovered skills");
     });
 
@@ -648,8 +648,8 @@ describe("createSkillsOverrideFromSelection", () => {
 
       override(base);
 
-      expect(mockPiLog.warn).toHaveBeenCalled();
-      const lastCall = mockPiLog.warn.mock.calls[mockPiLog.warn.mock.calls.length - 1][0] as string;
+      expect(mockPiLog.log).toHaveBeenCalled();
+      const lastCall = mockPiLog.log.mock.calls[mockPiLog.log.mock.calls.length - 1][0] as string;
       expect(lastCall).toContain("[skills]");
       expect(lastCall).toContain("nonexistent");
     });
@@ -748,10 +748,9 @@ describe("createSkillsOverrideFromSelection", () => {
       expect(result.skills[0].name).toBe("allowed-skill");
 
       // Should have 2 diagnostics:
-      // 1. Warning for missing-skill (allowed path not found in discovered skills)
+      // 1. Info for missing-skill (allowed path not found in discovered skills)
       // 2. Warning for disabled-skill (exists but was excluded by patterns)
-      // Both are "warning" type since ResourceDiagnostic only supports warning|error|collision
-      // The distinction is made via message content
+      // The distinction is made via type and message content
       expect(result.diagnostics).toHaveLength(2);
 
       const missingDiag = result.diagnostics.find(d => d.message.includes("missing-skill"));
@@ -875,7 +874,7 @@ describe("createSkillsOverrideFromSelection", () => {
       ).toBe(false);
     });
 
-    it("uses structured piLog.warn for skill override diagnostics", () => {
+    it("uses structured piLog.log for configured skill pattern diagnostics", () => {
       const selection: SkillSelectionResult = {
         allowedSkillPaths: new Set(["/path/ghost"]),
         excludedSkillPaths: new Set<string>(),
@@ -889,8 +888,8 @@ describe("createSkillsOverrideFromSelection", () => {
 
       override({ skills: [], diagnostics: [] });
 
-      expect(mockPiLog.warn).toHaveBeenCalledWith(
-        expect.stringContaining("[skills] warning: Configured skill pattern '/path/ghost' not found in discovered skills [executor]"),
+      expect(mockPiLog.log).toHaveBeenCalledWith(
+        expect.stringContaining("[skills] info: Configured skill pattern '/path/ghost' not found in discovered skills [executor]"),
       );
     });
 
@@ -912,7 +911,7 @@ describe("createSkillsOverrideFromSelection", () => {
 
       override({ skills: [], diagnostics: [] });
 
-      expect(mockPiLog.warn).toHaveBeenCalled();
+      expect(mockPiLog.log).toHaveBeenCalled();
       expect(consoleErrorSpy).not.toHaveBeenCalled();
       expect(consoleWarnSpy).not.toHaveBeenCalled();
       expect(consoleLogSpy).not.toHaveBeenCalled();

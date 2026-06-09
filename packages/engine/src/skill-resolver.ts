@@ -448,7 +448,7 @@ export function createSkillsOverrideFromSelection(
     for (const allowedPath of allowedSkillPaths) {
       if (!hasDiscoveredMatch(allowedPath)) {
         newDiagnostics.push({
-          type: "warning",
+          type: "info" as ResourceDiagnostic["type"],
           message: `Configured skill pattern '${allowedPath}' not found in discovered skills${purpose}`,
           path: allowedPath,
         });
