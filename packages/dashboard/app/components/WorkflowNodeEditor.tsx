@@ -176,6 +176,8 @@ interface WorkflowNodeEditorProps {
   initialPanel?: "settings";
   /** When "create" the editor opens with the new-workflow dialog active. */
   initialAction?: "create";
+  /** Workflow id to preselect when the editor opens from workflow-aware surfaces. */
+  initialWorkflowId?: string;
 }
 
 let nodeSeq = 0;
@@ -671,6 +673,7 @@ function InnerEditor({
   projectId,
   initialPanel,
   initialAction,
+  initialWorkflowId,
   modalRef,
 }: Omit<WorkflowNodeEditorProps, "isOpen"> & { modalRef: React.RefObject<HTMLDivElement | null> }) {
   const [workflows, setWorkflows] = useState<WorkflowDefinition[]>([]);
@@ -704,6 +707,7 @@ function InnerEditor({
   // "New workflow" button (NewTaskModal focus pattern).
   const [createOpen, setCreateOpen] = useState(initialAction === "create");
   const newWorkflowBtnRef = useRef<HTMLButtonElement>(null);
+  const mobileInitialWorkflowDismissedRef = useRef<string | null>(null);
   // Inline-editable name/description (KTD-10). `name`/`description` mirror the
   // active workflow and are persisted through handleSave; `editingName`/
   // `editingDescription` flag the active inline input.
@@ -1006,6 +1010,9 @@ function InnerEditor({
       setWorkflows(data);
       setActiveId((prev) => {
         if (prev && data.some((workflow) => workflow.id === prev)) return prev;
+        if (initialAction !== "create" && initialWorkflowId && data.some((workflow) => workflow.id === initialWorkflowId)) {
+          return initialWorkflowId;
+        }
         return isMobileViewport ? null : data[0]?.id ?? null;
       });
     } catch (err) {
@@ -1013,11 +1020,19 @@ function InnerEditor({
     } finally {
       setLoading(false);
     }
-  }, [projectId, addToast, isMobileViewport]);
+  }, [projectId, addToast, isMobileViewport, initialAction, initialWorkflowId]);
 
   useEffect(() => {
     void loadWorkflows();
   }, [loadWorkflows]);
+
+  useEffect(() => {
+    if (!initialWorkflowId || !isMobileViewport || !workflowListStageOpen) return;
+    if (activeId !== initialWorkflowId) return;
+    if (mobileInitialWorkflowDismissedRef.current === initialWorkflowId) return;
+    mobileInitialWorkflowDismissedRef.current = initialWorkflowId;
+    setWorkflowListStageOpen(false);
+  }, [activeId, initialWorkflowId, isMobileViewport, workflowListStageOpen]);
 
   // U2/R5: fire the lazy legacy-step migration once on editor open, then reload
   // the workflow list so any newly created fragments / "Migrated steps" workflow
@@ -4126,13 +4141,29 @@ function InnerEditor({
   );
 }
 
-export function WorkflowNodeEditor({ isOpen, ...rest }: WorkflowNodeEditorProps) {
+export function WorkflowNodeEditor({
+  isOpen,
+  onClose,
+  addToast,
+  projectId,
+  initialPanel,
+  initialAction,
+  initialWorkflowId,
+}: WorkflowNodeEditorProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   useModalResizePersist(modalRef, isOpen, "fusion:workflow-node-editor-size");
   if (!isOpen) return null;
   return (
     <ReactFlowProvider>
-      <InnerEditor {...rest} modalRef={modalRef} />
+      <InnerEditor
+        onClose={onClose}
+        addToast={addToast}
+        projectId={projectId}
+        initialPanel={initialPanel}
+        initialAction={initialAction}
+        initialWorkflowId={initialWorkflowId}
+        modalRef={modalRef}
+      />
     </ReactFlowProvider>
   );
 }

@@ -373,6 +373,40 @@ describe("WorkflowNodeEditor", () => {
     expect(screen.getByTestId("wf-mobile-tab-actions")).toBeInTheDocument();
   });
 
+  it("preselects the matching initial workflow id on desktop", async () => {
+    vi.mocked(fetchWorkflows).mockResolvedValue([def(), v2Def()]);
+
+    render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} initialWorkflowId="WF-002" />);
+
+    expect(await screen.findByTestId("wf-workflow-name")).toHaveTextContent("Custom");
+    expect(screen.queryByTestId("wf-mobile-select-note")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "QA" })).not.toHaveClass("active");
+    expect(screen.getAllByRole("button", { name: "Custom" })[0]).toHaveClass("active");
+  });
+
+  it("falls back to the first workflow on desktop when the initial workflow id is missing", async () => {
+    vi.mocked(fetchWorkflows).mockResolvedValue([def(), v2Def()]);
+
+    render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} initialWorkflowId="WF-missing" />);
+
+    expect(await screen.findByTestId("wf-workflow-name")).toHaveTextContent("QA");
+    expect(screen.queryByTestId("wf-mobile-select-note")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "QA" })[0]).toHaveClass("active");
+    expect(screen.getByRole("button", { name: "Custom" })).not.toHaveClass("active");
+  });
+
+  it("skips the mobile workflow list stage when the initial workflow id is valid", async () => {
+    mockWorkflowEditorViewport("mobile");
+    vi.mocked(fetchWorkflows).mockResolvedValue([def(), v2Def()]);
+
+    render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} initialWorkflowId="WF-002" />);
+
+    expect(await screen.findByTestId("wf-workflow-name")).toHaveTextContent("Custom");
+    expect(screen.queryByTestId("wf-mobile-select-note")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "QA" })).not.toHaveClass("active");
+    expect(screen.getAllByRole("button", { name: "Custom" })[0]).toHaveClass("active");
+  });
+
   it("opens populated mobile workflows on the list with no preselected workflow", async () => {
     mockWorkflowEditorViewport("mobile");
     vi.mocked(fetchWorkflows).mockResolvedValue([def(), v2Def()]);
