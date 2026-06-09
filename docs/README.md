@@ -65,6 +65,7 @@ For a full walkthrough (installation, onboarding, first task, and daily workflow
 | [Sandbox Backends](./sandbox.md) | Pluggable sandbox backends for executor command isolation (bubblewrap, spawn-based) |
 | [Secrets](./secrets.md) | Encrypted secrets storage, per-secret access policies, scopes, and agent tool wiring |
 | [Testing](./testing.md) | Full testing lanes, worker fanout guidance, test taxonomy, and file organization |
+| [Solutions Catalog](./solutions/) | Documented solutions to past problems (bugs, architecture patterns, best practices) organized by category |
 | [Mobile](../MOBILE.md) | Capacitor/PWA mobile development setup and workflow |
 
 ### Plugins
@@ -76,6 +77,8 @@ For a full walkthrough (installation, onboarding, first task, and daily workflow
 | [Reports Plugin](./plugins/reports.md) | Reports plugin rendering, export, standalone HTML generation, and section configuration |
 | [Even Realities Plugin API](./even-realities-plugin-api.md) | Even Realities plugin API endpoint reference and test coverage matrix |
 | [Memory Plugin Contract](./memory-plugin-contract.md) | Pluggable memory backend architecture, interface contract, and migration strategy |
+| [Compound Engineering Plugin](./plugins/compound-engineering.md) | CE workflow dashboard surface: artifact hub, interactive sessions, work→board bridge, and bidirectional sync |
+| [External Plugin Authoring](./plugins/external-authoring.md) | Step-by-step guide for authoring plugins using an installed `fn` CLI (no monorepo access needed) |
 
 ### Audit Reports
 | Report | Description |
@@ -112,6 +115,8 @@ For a full walkthrough (installation, onboarding, first task, and daily workflow
 | [Test Speed Audit (FN-5048)](./test-speed-audit-FN-5048.md) | Measured baseline test performance, offender list, and optimization priorities |
 | [Soft-Delete Verification Matrix](./soft-delete-verification-matrix.md) | Authoritative checklist for the FN-5105 → FN-5143 soft-delete stream: scenario × layer coverage |
 | [Self-Healing Backward Move Audit](./self-healing-backward-move-audit.md) | Audit of self-healing backward-move safety checks and edge-case validation |
+| [Test-Speed Baseline (2026-06-03)](./test-speed-baseline-2026-06-03.md) | Measured per-file test timing baseline and optimization targets (successor to FN-5048 audit) |
+| [ACP Runtime Contract](./acp-contract.md) | Agent Client Protocol plugin launch/readiness contract and failure taxonomy |
 
 | [Lost-Work Tasks Incident (2026-05-23)](./incidents/2026-05-23-lost-work-tasks.md) | Incident catalog of 9 lost-work tasks from no-op finalize and reuse-handoff bugs |
 
