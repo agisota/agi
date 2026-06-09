@@ -455,8 +455,6 @@ export function QuickEntryBox({ onCreate, addToast, tasks = [], availableModels,
     setActiveModelSubmenu(null);
     setIsRefineMenuOpen(false);
     setIsRefining(false);
-    setIsExpanded(false); // Collapse textarea height on reset
-    setIsDisclosureExpanded(false); // Always reset controls to collapsed after creation
     justResetRef.current = true;
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
