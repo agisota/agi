@@ -20,7 +20,6 @@ export const PROJECT_STORAGE_KEYS: string[] = [
   "kb-dashboard-board-workflow-collapsed",
   "kb-quick-entry-text",
   "kb-inline-create-text",
-  "kb-board-workflow-selector-collapsed",
   "fn-agent-view",
   "kb-terminal-tabs",
   "kb-planning-last-description",

@@ -26,17 +26,6 @@
   gap: var(--space-xs);
 }
 
-.workflow-selector-toggle {
-  flex-shrink: 0;
-}
-
-.workflow-selector-collapsed-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  white-space: nowrap;
-}
-
 .workflow-selector select {
   padding: var(--space-xs) var(--space-sm);
   background: var(--bg-secondary);
@@ -71,8 +60,7 @@
   }
 
   .workflow-selector select,
-  .workflow-selector-manage,
-  .workflow-selector-collapsed-button {
+  .workflow-selector-manage {
     width: 100%;
   }
 
