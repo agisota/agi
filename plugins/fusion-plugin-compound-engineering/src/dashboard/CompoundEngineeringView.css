@@ -444,9 +444,6 @@
   word-break: break-word;
   font-size: 0.86rem;
 }
-.ce-flow-turn-question {
-  border-left: 3px solid var(--todo);
-}
 .ce-flow-turn-answer.is-steering {
   border-left: 3px solid var(--color-warning);
 }

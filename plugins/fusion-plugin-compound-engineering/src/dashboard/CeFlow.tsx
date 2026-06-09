@@ -43,7 +43,6 @@ const BOTTOM_FOLLOW_THRESHOLD_PX = 50;
 
 type DisplayItem =
   | { kind: "chat"; role: "user" | "agent"; text: string }
-  | { kind: "qa-question"; question: PlanningQuestion }
   | { kind: "qa-answer"; question?: PlanningQuestion; response: unknown }
   | { kind: "activity"; turns: CeActivityTurn[] }
   | { kind: "complete" };
@@ -78,7 +77,6 @@ function parseHistory(history: CeConversationTurn[]): DisplayItem[] {
       const q = obj.question as PlanningQuestion | undefined;
       if (q && typeof q.id === "string" && typeof q.question === "string") {
         questionsById.set(q.id, q);
-        items.push({ kind: "qa-question", question: q });
         continue;
       }
       const activity = obj.activity as { turns?: CeActivityTurn[] } | undefined;
@@ -211,13 +209,6 @@ function Transcript({ history }: { history: CeConversationTurn[] }) {
               <li key={i} className={`ce-flow-turn ce-flow-turn-${item.role}`} data-role={item.role}>
                 <span className="ce-flow-turn-role">{item.role === "agent" ? "Agent" : "You"}</span>
                 <span className="ce-flow-turn-text">{item.text}</span>
-              </li>
-            );
-          case "qa-question":
-            return (
-              <li key={i} className="ce-flow-turn ce-flow-turn-agent ce-flow-turn-question" data-testid="ce-flow-past-question">
-                <span className="ce-flow-turn-role">Agent asked</span>
-                <span className="ce-flow-turn-text">{item.question.question}</span>
               </li>
             );
           case "qa-answer": {

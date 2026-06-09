@@ -252,18 +252,30 @@ describe("CeFlow — Q&A transcript rendering", () => {
     ];
   }
 
-  it("renders past questions and answers as bubbles, mapping option ids to labels", () => {
+  it("renders past answers as bubbles, mapping option ids to labels", () => {
     render(
       <CeFlow
         session={makeSession({ status: "active", conversationHistory: historyWith("y") })}
         onAnswer={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("ce-flow-past-question")).toHaveTextContent("Which path?");
+    expect(screen.queryByTestId("ce-flow-past-question")).not.toBeInTheDocument();
     // The answer shows the LABEL, not the raw option id.
     expect(screen.getByTestId("ce-flow-past-answer")).toHaveTextContent("The Y path");
     // The opening message renders as a plain user bubble.
     expect(screen.getByText("kick off")).toBeInTheDocument();
+  });
+
+  it("hides structured question turns while preserving option-label lookup for answers", () => {
+    render(
+      <CeFlow
+        session={makeSession({ status: "active", conversationHistory: historyWith("y") })}
+        onAnswer={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("ce-flow-past-question")).not.toBeInTheDocument();
+    expect(screen.queryByText("Which path?")).not.toBeInTheDocument();
+    expect(screen.getByTestId("ce-flow-past-answer")).toHaveTextContent("The Y path");
   });
 
   it("renders {value, comment} answers with the steering comment attached", () => {
