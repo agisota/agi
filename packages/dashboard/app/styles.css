@@ -1130,7 +1130,7 @@ body {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: color-mix(in srgb, var(--text) 60%, transparent);
   backdrop-filter: blur(4px);
   /* Must remain above sticky top banners (e.g. onboarding/session resume cards). */
   z-index: 100;
@@ -1166,7 +1166,7 @@ body {
   align-items: center;
   padding: var(--modal-padding);
   border-bottom: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.1);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
 }
 .modal-header h3 {
   font-size: 15px;
@@ -1220,7 +1220,7 @@ body {
   gap: 10px;
   padding: var(--modal-padding);
   border-top: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.05);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
 .modal-actions-left {
@@ -1511,7 +1511,7 @@ input[type="range"]:focus-visible {
   overflow-y: auto;
   padding: 10px 8px;
   gap: 2px;
-  background: rgba(0, 0, 0, 0.1);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
   scrollbar-color: var(--border) transparent;
   scrollbar-width: thin;
 }
@@ -2548,7 +2548,7 @@ input[type="range"]:focus-visible {
   z-index: 10;
   pointer-events: none;
   margin-bottom: var(--space-xs);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--text) 20%, transparent);
 }
 
 .step-progress-label {
@@ -2858,7 +2858,7 @@ input[type="range"]:focus-visible {
   background: var(--card-hover);
 }
 .dep-dropdown-item.selected {
-  background: rgba(88, 166, 255, 0.15);
+  background: color-mix(in srgb, var(--todo) 15%, transparent);
 }
 
 .dep-dropdown-id {
@@ -2888,7 +2888,7 @@ input[type="range"]:focus-visible {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--text) 15%, transparent);
   min-width: 200px;
   max-width: 280px;
   z-index: 100;
