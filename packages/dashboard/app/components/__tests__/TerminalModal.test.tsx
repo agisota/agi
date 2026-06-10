@@ -2317,6 +2317,10 @@ describe("TerminalModal — FN-1234 mobile tab switch with keyboard", () => {
     loadAddon: vi.fn(),
     open: vi.fn(),
     onData: vi.fn((_cb: (data: string) => void) => ({ dispose: vi.fn() })),
+    attachCustomKeyEventHandler: vi.fn(),
+    hasSelection: vi.fn(() => false),
+    getSelection: vi.fn(() => ""),
+    paste: vi.fn(),
     dispose: vi.fn(),
     write: vi.fn(),
     clear: vi.fn(),
@@ -2413,8 +2417,12 @@ describe("TerminalModal — FN-1234 mobile tab switch with keyboard", () => {
 
     const xtermModule = await import("@xterm/xterm");
     vi.mocked(xtermModule.Terminal)
-      .mockImplementationOnce(() => terminalOne as any)
-      .mockImplementationOnce(() => terminalTwo as any);
+      .mockImplementationOnce(function TerminalOneMock() {
+        return terminalOne as any;
+      } as never)
+      .mockImplementationOnce(function TerminalTwoMock() {
+        return terminalTwo as any;
+      } as never);
 
     let sessionOneDataCallback: ((data: string) => void) | null = null;
     let sessionTwoDataCallback: ((data: string) => void) | null = null;
@@ -2453,6 +2461,10 @@ describe("TerminalModal — FN-1234 mobile tab switch with keyboard", () => {
       expect(terminalTwo.open).toHaveBeenCalled();
     });
 
+    await waitFor(() => {
+      expect(sessionTwoDataCallback).not.toBeNull();
+    });
+
     Object.defineProperty(mockVV, "height", {
       value: 417,
       writable: true,
@@ -2489,13 +2501,21 @@ describe("TerminalModal — FN-1234 mobile tab switch with keyboard", () => {
 
     const xtermModule = await import("@xterm/xterm");
     vi.mocked(xtermModule.Terminal)
-      .mockImplementationOnce(() => terminalOne as any)
-      .mockImplementationOnce(() => terminalTwo as any);
+      .mockImplementationOnce(function TerminalOneMock() {
+        return terminalOne as any;
+      } as never)
+      .mockImplementationOnce(function TerminalTwoMock() {
+        return terminalTwo as any;
+      } as never);
 
     const fitModule = await import("@xterm/addon-fit");
     vi.mocked(fitModule.FitAddon)
-      .mockImplementationOnce(() => fitOne as any)
-      .mockImplementationOnce(() => fitTwo as any);
+      .mockImplementationOnce(function FitOneMock() {
+        return fitOne as any;
+      } as never)
+      .mockImplementationOnce(function FitTwoMock() {
+        return fitTwo as any;
+      } as never);
 
     mockUseTerminalSessions.mockReturnValue(makeSessionState([tab1, tab2]));
     mockUseTerminal.mockReturnValue(createMockTerminalState({ resize: resizeOne }));
@@ -2578,8 +2598,12 @@ describe("TerminalModal — FN-1234 mobile tab switch with keyboard", () => {
 
     const xtermModule = await import("@xterm/xterm");
     vi.mocked(xtermModule.Terminal)
-      .mockImplementationOnce(() => terminalOne as any)
-      .mockImplementationOnce(() => terminalTwo as any);
+      .mockImplementationOnce(function TerminalOneMock() {
+        return terminalOne as any;
+      } as never)
+      .mockImplementationOnce(function TerminalTwoMock() {
+        return terminalTwo as any;
+      } as never);
 
     let sessionOneScrollbackCallback: ((data: string) => void) | null = null;
     let sessionTwoScrollbackCallback: ((data: string) => void) | null = null;
@@ -2616,6 +2640,10 @@ describe("TerminalModal — FN-1234 mobile tab switch with keyboard", () => {
 
     await waitFor(() => {
       expect(terminalTwo.open).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(sessionTwoScrollbackCallback).not.toBeNull();
     });
 
     Object.defineProperty(mockVV, "height", {
@@ -3656,7 +3684,9 @@ describe("TerminalModal — FN-872 real-device keyboard overlap refinement", () 
     const mockFit = vi.fn();
     const mockFitAddon = { fit: mockFit, dispose: vi.fn() };
     const fitAddonModule = await import("@xterm/addon-fit");
-    (fitAddonModule.FitAddon as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => mockFitAddon);
+    (fitAddonModule.FitAddon as unknown as ReturnType<typeof vi.fn>).mockImplementation(function FitAddonMock() {
+      return mockFitAddon;
+    });
 
     mockUseTerminal.mockReturnValue(
       createMockTerminalState({ connectionStatus: "connected" })
