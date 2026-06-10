@@ -1029,7 +1029,7 @@ describe("Board", () => {
       enableFlag({}, [DEFAULT_WORKFLOW]);
       const { unmount } = renderBoard({ onCreateWorkflow });
 
-      await waitFor(() => expect(screen.getByTestId("column-triage")).toBeDefined());
+      await waitFor(() => expect(document.querySelector(".board-workflow-toolbar")).not.toBeNull());
       expect(workflowToolbarActionNames()).toEqual(["New workflow"]);
       fireEvent.click(screen.getByRole("button", { name: "New workflow" }));
       expect(onCreateWorkflow).toHaveBeenCalledTimes(1);
@@ -1039,7 +1039,7 @@ describe("Board", () => {
       enableFlag({}, [DEFAULT_WORKFLOW]);
       renderBoard({ onOpenWorkflowEditor });
 
-      await waitFor(() => expect(screen.getByTestId("column-triage")).toBeDefined());
+      await waitFor(() => expect(document.querySelector(".board-workflow-toolbar")).not.toBeNull());
       expect(workflowToolbarActionNames()).toEqual(["Edit workflows"]);
       fireEvent.click(screen.getByRole("button", { name: "Edit workflows" }));
       expect(onOpenWorkflowEditor).toHaveBeenCalledTimes(1);
