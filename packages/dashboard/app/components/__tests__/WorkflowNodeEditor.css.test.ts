@@ -96,6 +96,7 @@ describe("WorkflowNodeEditor mobile CSS contract", () => {
 
     const inspectorRule = findRule(mobileBlocks, /\.wf-editor-body--editor-stage \.wf-editor-inspector\s*\{[^}]*\}/);
     expect(inspectorRule).toMatch(/width\s*:\s*100%\s*;/);
+    expect(inspectorRule).toMatch(/max-height\s*:\s*none\s*;/);
     expect(inspectorRule).toMatch(/flex\s*:\s*1 1 auto\s*;/);
     expect(inspectorRule).toMatch(/min-height\s*:\s*0\s*;/);
 
