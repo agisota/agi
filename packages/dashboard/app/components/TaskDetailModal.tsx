@@ -3507,143 +3507,6 @@ export function TaskDetailContent({
               )}
             </div>
           )}
-          {showGithubTrackingSection && (
-            <div className="detail-section detail-github-tracking-section">
-              <div className="detail-source-header">
-                <div className="detail-source-summary">
-                  <span className="detail-source-label">{t("taskDetail.githubTracking.label", "GitHub tracking")}</span>
-                  <span className="detail-source-provider-badge" aria-label={t("taskDetail.githubTracking.statusAriaLabel", "GitHub tracking status")}>
-                    <GitBranch aria-hidden="true" />
-                    <span>{githubTrackingStatus}</span>
-                  </span>
-                  {!githubTrackedIssue && (
-                    <span className="detail-source-empty">
-                      {githubTrackingDetailPending
-                        ? t("taskDetail.githubTracking.checking", "Checking tracking status")
-                        : githubTrackingEnabled
-                          ? t("taskDetail.githubTracking.notYetCreated", "Issue not yet created")
-                          : t("taskDetail.githubTracking.disabled", "Tracking is currently disabled")}
-                    </span>
-                  )}
-                </div>
-                {showInlineGithubTrackingEnableButton && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-primary detail-github-tracking-enable"
-                    aria-label={t("taskDetail.githubTracking.enableAriaLabel", "Enable GitHub tracking")}
-                    disabled={isSavingGithubTracking}
-                    onClick={() => void handleToggleGithubTracking()}
-                  >
-                    {t("taskDetail.githubTracking.enableBtn", "Enable")}
-                  </button>
-                )}
-                {showGithubTrackingSpinner && (
-                  <span
-                    className="detail-github-tracking-spinner"
-                    role="status"
-                    aria-live="polite"
-                    aria-label={isSavingGithubTracking ? t("taskDetail.githubTracking.enablingAriaLabel", "Enabling GitHub tracking") : t("taskDetail.githubTracking.loadingAriaLabel", "Loading GitHub tracking status")}
-                  >
-                    <Loader2 size={16} className="spin" aria-hidden="true" />
-                    <span className="visually-hidden">
-                      {isSavingGithubTracking ? t("taskDetail.githubTracking.enabling", "Enabling GitHub tracking…") : t("taskDetail.githubTracking.loading", "Loading GitHub tracking status…")}
-                    </span>
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="detail-source-toggle"
-                  aria-expanded={githubTrackingExpanded}
-                  aria-label={githubTrackingExpanded ? t("taskDetail.githubTracking.collapse", "Collapse GitHub tracking details") : t("taskDetail.githubTracking.expand", "Expand GitHub tracking details")}
-                  onClick={() => setGithubTrackingExpanded((expanded) => !expanded)}
-                >
-                  <ChevronRight
-                    size={16}
-                    className={githubTrackingExpanded ? "detail-source-chevron--expanded" : undefined}
-                  />
-                </button>
-              </div>
-              {githubTrackingExpanded && (
-                <div className="detail-github-tracking-content">
-                  {githubTrackedIssue && (
-                    <dl className="detail-source-grid detail-github-tracking-grid">
-                      <div>
-                        <dt>{t("taskDetail.githubTracking.issue", "Issue")}</dt>
-                        <dd>
-                          {githubTrackedIssue.url ? (
-                            <a className="detail-source-link" href={githubTrackedIssue.url} target="_blank" rel="noopener noreferrer">
-                              {`${githubTrackedIssue.owner}/${githubTrackedIssue.repo}#${githubTrackedIssue.number}`}
-                            </a>
-                          ) : (
-                            <span>{`${githubTrackedIssue.owner}/${githubTrackedIssue.repo}#${githubTrackedIssue.number}`}</span>
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>{t("taskDetail.githubTracking.state", "State")}</dt>
-                        <dd>
-                          <span className={`detail-github-issue-state ${task.issueInfo?.state === "closed" ? "detail-github-issue-state--closed" : "detail-github-issue-state--open"}`}>
-                            {task.issueInfo?.state ?? "open"}
-                          </span>
-                        </dd>
-                      </div>
-                    </dl>
-                  )}
-                  <div className="detail-github-tracking-controls">
-                    {!githubTrackedIssue && githubTrackingEnabled && (
-                      <>
-                        <button
-                          className="btn btn-sm touch-target"
-                          onClick={() => void handleRetryGithubTrackingIssueCreate()}
-                          disabled={isSavingGithubTracking || !canCreateTrackingIssue}
-                          title={!canCreateTrackingIssue ? t("taskDetail.githubTracking.createIssueDisabledTitle", "Add a title or description so a tracking issue can be created.") : undefined}
-                        >
-                          {t("taskDetail.githubTracking.createIssueBtn", "Create tracking issue")}
-                        </button>
-                        {!canCreateTrackingIssue && (
-                          <small className="detail-github-tracking-helper">{t("taskDetail.githubTracking.createIssueHelper", "Tracking issue will be created once this task has a title or description to summarize.")}</small>
-                        )}
-                      </>
-                    )}
-                    {canEditGithubTracking && (
-                      <>
-                        <label className="checkbox-label" htmlFor="detail-github-tracking-toggle">
-                          <input
-                            id="detail-github-tracking-toggle"
-                            type="checkbox"
-                            checked={githubTrackingEnabled}
-                            disabled={isSavingGithubTracking}
-                            onChange={() => void handleToggleGithubTracking()}
-                          />
-                          {t("taskDetail.githubTracking.enableCheckboxLabel", "Enable GitHub tracking")}
-                        </label>
-                        <div className="detail-github-tracking-repo-row">
-                          <input
-                            className="input"
-                            value={githubRepoOverrideDraft}
-                            onChange={(event) => {
-                              setGithubRepoOverrideDraft(event.target.value);
-                              setGithubRepoOverrideError(null);
-                            }}
-                            placeholder={effectiveGithubRepoDefault || "owner/repo"}
-                          />
-                          <button className="btn btn-sm" onClick={() => void handleSaveGithubRepoOverride()} disabled={isSavingGithubTracking}>
-                            {t("common.save", "Save")}
-                          </button>
-                        </div>
-                        {githubRepoOverrideError && <small className="detail-github-tracking-error">{githubRepoOverrideError}</small>}
-                        {githubTrackedIssue && (
-                          <button className="btn btn-sm touch-target" onClick={() => void handleUnlinkGithubIssue()} disabled={isSavingGithubTracking}>
-                            {t("taskDetail.githubTracking.unlinkBtn", "Unlink GitHub issue")}
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
           <div className="detail-section detail-agent-section">
             <div className="detail-meta-row">
               <div className="detail-meta-left">
@@ -3809,6 +3672,143 @@ export function TaskDetailContent({
               <div className="detail-prompt">{t("taskDetail.spec.noPrompt", "(no prompt)")}</div>
             )}
           </div>
+          {showGithubTrackingSection && (
+            <div className="detail-section detail-github-tracking-section">
+              <div className="detail-source-header">
+                <div className="detail-source-summary">
+                  <span className="detail-source-label">{t("taskDetail.githubTracking.label", "GitHub tracking")}</span>
+                  <span className="detail-source-provider-badge" aria-label={t("taskDetail.githubTracking.statusAriaLabel", "GitHub tracking status")}>
+                    <GitBranch aria-hidden="true" />
+                    <span>{githubTrackingStatus}</span>
+                  </span>
+                  {!githubTrackedIssue && (
+                    <span className="detail-source-empty">
+                      {githubTrackingDetailPending
+                        ? t("taskDetail.githubTracking.checking", "Checking tracking status")
+                        : githubTrackingEnabled
+                          ? t("taskDetail.githubTracking.notYetCreated", "Issue not yet created")
+                          : t("taskDetail.githubTracking.disabled", "Tracking is currently disabled")}
+                    </span>
+                  )}
+                </div>
+                {showInlineGithubTrackingEnableButton && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary detail-github-tracking-enable"
+                    aria-label={t("taskDetail.githubTracking.enableAriaLabel", "Enable GitHub tracking")}
+                    disabled={isSavingGithubTracking}
+                    onClick={() => void handleToggleGithubTracking()}
+                  >
+                    {t("taskDetail.githubTracking.enableBtn", "Enable")}
+                  </button>
+                )}
+                {showGithubTrackingSpinner && (
+                  <span
+                    className="detail-github-tracking-spinner"
+                    role="status"
+                    aria-live="polite"
+                    aria-label={isSavingGithubTracking ? t("taskDetail.githubTracking.enablingAriaLabel", "Enabling GitHub tracking") : t("taskDetail.githubTracking.loadingAriaLabel", "Loading GitHub tracking status")}
+                  >
+                    <Loader2 size={16} className="spin" aria-hidden="true" />
+                    <span className="visually-hidden">
+                      {isSavingGithubTracking ? t("taskDetail.githubTracking.enabling", "Enabling GitHub tracking…") : t("taskDetail.githubTracking.loading", "Loading GitHub tracking status…")}
+                    </span>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="detail-source-toggle"
+                  aria-expanded={githubTrackingExpanded}
+                  aria-label={githubTrackingExpanded ? t("taskDetail.githubTracking.collapse", "Collapse GitHub tracking details") : t("taskDetail.githubTracking.expand", "Expand GitHub tracking details")}
+                  onClick={() => setGithubTrackingExpanded((expanded) => !expanded)}
+                >
+                  <ChevronRight
+                    size={16}
+                    className={githubTrackingExpanded ? "detail-source-chevron--expanded" : undefined}
+                  />
+                </button>
+              </div>
+              {githubTrackingExpanded && (
+                <div className="detail-github-tracking-content">
+                  {githubTrackedIssue && (
+                    <dl className="detail-source-grid detail-github-tracking-grid">
+                      <div>
+                        <dt>{t("taskDetail.githubTracking.issue", "Issue")}</dt>
+                        <dd>
+                          {githubTrackedIssue.url ? (
+                            <a className="detail-source-link" href={githubTrackedIssue.url} target="_blank" rel="noopener noreferrer">
+                              {`${githubTrackedIssue.owner}/${githubTrackedIssue.repo}#${githubTrackedIssue.number}`}
+                            </a>
+                          ) : (
+                            <span>{`${githubTrackedIssue.owner}/${githubTrackedIssue.repo}#${githubTrackedIssue.number}`}</span>
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{t("taskDetail.githubTracking.state", "State")}</dt>
+                        <dd>
+                          <span className={`detail-github-issue-state ${task.issueInfo?.state === "closed" ? "detail-github-issue-state--closed" : "detail-github-issue-state--open"}`}>
+                            {task.issueInfo?.state ?? "open"}
+                          </span>
+                        </dd>
+                      </div>
+                    </dl>
+                  )}
+                  <div className="detail-github-tracking-controls">
+                    {!githubTrackedIssue && githubTrackingEnabled && (
+                      <>
+                        <button
+                          className="btn btn-sm touch-target"
+                          onClick={() => void handleRetryGithubTrackingIssueCreate()}
+                          disabled={isSavingGithubTracking || !canCreateTrackingIssue}
+                          title={!canCreateTrackingIssue ? t("taskDetail.githubTracking.createIssueDisabledTitle", "Add a title or description so a tracking issue can be created.") : undefined}
+                        >
+                          {t("taskDetail.githubTracking.createIssueBtn", "Create tracking issue")}
+                        </button>
+                        {!canCreateTrackingIssue && (
+                          <small className="detail-github-tracking-helper">{t("taskDetail.githubTracking.createIssueHelper", "Tracking issue will be created once this task has a title or description to summarize.")}</small>
+                        )}
+                      </>
+                    )}
+                    {canEditGithubTracking && (
+                      <>
+                        <label className="checkbox-label" htmlFor="detail-github-tracking-toggle">
+                          <input
+                            id="detail-github-tracking-toggle"
+                            type="checkbox"
+                            checked={githubTrackingEnabled}
+                            disabled={isSavingGithubTracking}
+                            onChange={() => void handleToggleGithubTracking()}
+                          />
+                          {t("taskDetail.githubTracking.enableCheckboxLabel", "Enable GitHub tracking")}
+                        </label>
+                        <div className="detail-github-tracking-repo-row">
+                          <input
+                            className="input"
+                            value={githubRepoOverrideDraft}
+                            onChange={(event) => {
+                              setGithubRepoOverrideDraft(event.target.value);
+                              setGithubRepoOverrideError(null);
+                            }}
+                            placeholder={effectiveGithubRepoDefault || "owner/repo"}
+                          />
+                          <button className="btn btn-sm" onClick={() => void handleSaveGithubRepoOverride()} disabled={isSavingGithubTracking}>
+                            {t("common.save", "Save")}
+                          </button>
+                        </div>
+                        {githubRepoOverrideError && <small className="detail-github-tracking-error">{githubRepoOverrideError}</small>}
+                        {githubTrackedIssue && (
+                          <button className="btn btn-sm touch-target" onClick={() => void handleUnlinkGithubIssue()} disabled={isSavingGithubTracking}>
+                            {t("taskDetail.githubTracking.unlinkBtn", "Unlink GitHub issue")}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="detail-section detail-no-commits-expected-section">
             <div className="form-group">
               <label className="checkbox-label" htmlFor="detail-no-commits-expected-toggle">
