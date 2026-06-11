@@ -837,6 +837,8 @@ Project-scoped model lane used for task title auto-summarization, GitHub trackin
 5. Global `defaultProvider` + `defaultModelId`
 6. Automatic provider/model resolution
 
+If the configured title summarizer provider/model is stale and no longer exists in the pi model registry, title generation logs a warning with the stale id and retries once with automatic provider/model resolution. Other AI failures (auth, empty output, unavailable engine) still fail normally.
+
 > **Note:** Runtime fallback precedence logic is implemented in engine and dashboard routes. The hierarchies above reflect current runtime behavior.
 
 ---

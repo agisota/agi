@@ -198,31 +198,22 @@ export function validateDescription(description: unknown): string {
 /** Debug flag for AI operations */
 const DEBUG = process.env.FUSION_DEBUG_AI === "true";
 
-/**
- * Summarize a task description into a concise title using AI.
- * @param description - The task description to summarize (must be 201-2000 chars)
- * @param rootDir - Project root directory for AI agent context
- * @param provider - Optional AI model provider (e.g., "anthropic")
- * @param modelId - Optional AI model ID (e.g., "claude-sonnet-4-5")
- * @returns The generated title (guaranteed ≤60 characters), or null if validation fails
- */
-export async function summarizeTitle(
+function isConfiguredModelNotFoundError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /Configured model .+ was not found in the pi model registry/.test(message);
+}
+
+function formatConfiguredModel(provider?: string, modelId?: string): string {
+  return provider && modelId ? `${provider}/${modelId}` : "unknown configured model";
+}
+
+async function runTitleSummarizer(
+  createFnAgent: NonNullable<Awaited<ReturnType<typeof getFnAgent>>>,
   description: string,
   rootDir: string,
   provider?: string,
-  modelId?: string
-): Promise<string | null> {
-  // Validate description length first
-  if (description.length <= 200) {
-    return null; // Too short for summarization
-  }
-
-  const createFnAgent = await getFnAgent();
-  if (!createFnAgent) {
-    if (DEBUG) console.log("[ai-summarize] AI engine not available");
-    throw new AiServiceError("AI engine not available");
-  }
-
+  modelId?: string,
+): Promise<string> {
   const agentOptions: {
     cwd: string;
     systemPrompt: string;
@@ -320,6 +311,56 @@ export async function summarizeTitle(
       agentResult.session.dispose?.();
     } catch {
       // Ignore disposal errors
+    }
+  }
+}
+
+/**
+ * Summarize a task description into a concise title using AI.
+ * @param description - The task description to summarize (must be 201-2000 chars)
+ * @param rootDir - Project root directory for AI agent context
+ * @param provider - Optional AI model provider (e.g., "anthropic")
+ * @param modelId - Optional AI model ID (e.g., "claude-sonnet-4-5")
+ * @returns The generated title (guaranteed ≤60 characters), or null if validation fails
+ */
+export async function summarizeTitle(
+  description: string,
+  rootDir: string,
+  provider?: string,
+  modelId?: string
+): Promise<string | null> {
+  // Validate description length first
+  if (description.length <= 200) {
+    return null; // Too short for summarization
+  }
+
+  const createFnAgent = await getFnAgent();
+  if (!createFnAgent) {
+    if (DEBUG) console.log("[ai-summarize] AI engine not available");
+    throw new AiServiceError("AI engine not available");
+  }
+
+  try {
+    return await runTitleSummarizer(createFnAgent, description, rootDir, provider, modelId);
+  } catch (err) {
+    if (!provider || !modelId || !isConfiguredModelNotFoundError(err)) {
+      throw err;
+    }
+
+    const staleModel = formatConfiguredModel(provider, modelId);
+    console.warn(
+      `[ai-summarize] Configured title summarizer model ${staleModel} was not found in the pi model registry; `
+      + "retrying with automatic model resolution.",
+    );
+
+    try {
+      return await runTitleSummarizer(createFnAgent, description, rootDir);
+    } catch (retryError) {
+      const message = retryError instanceof Error ? retryError.message : String(retryError);
+      console.warn(
+        `[ai-summarize] Automatic title summarizer fallback after stale model ${staleModel} failed: ${message}`,
+      );
+      return null;
     }
   }
 }

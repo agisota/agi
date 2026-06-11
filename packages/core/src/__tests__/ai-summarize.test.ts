@@ -255,6 +255,108 @@ describe("ai-summarize", () => {
       const title = await summarizeTitle("a".repeat(201), "/tmp");
       expect(title).toBe("Refactor merger title fallback");
     });
+
+    it("retries stale configured model ids with automatic resolution and logs the stale id", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const createFnAgent = vi
+        .fn()
+        .mockRejectedValueOnce(new Error(
+          "Configured model fireworksai/accounts/fireworks/routers/kimi-k2p5-turbo (primary selection) "
+          + "was not found in the pi model registry.",
+        ))
+        .mockResolvedValueOnce({
+          session: {
+            prompt: vi.fn().mockResolvedValue(undefined),
+            dispose: vi.fn(),
+            state: {
+              messages: [{ role: "assistant", content: "Fix pi upgrade regressions" }],
+            },
+          },
+        });
+      getFnAgentMock.mockResolvedValue(createFnAgent);
+
+      const title = await summarizeTitle(
+        "a".repeat(201),
+        "/tmp",
+        "fireworksai",
+        "accounts/fireworks/routers/kimi-k2p5-turbo",
+      );
+
+      expect(title).toBe("Fix pi upgrade regressions");
+      expect(createFnAgent).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        defaultProvider: "fireworksai",
+        defaultModelId: "accounts/fireworks/routers/kimi-k2p5-turbo",
+      }));
+      expect(createFnAgent).toHaveBeenNthCalledWith(2, expect.not.objectContaining({
+        defaultProvider: expect.any(String),
+        defaultModelId: expect.any(String),
+      }));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("fireworksai/accounts/fireworks/routers/kimi-k2p5-turbo"));
+      warnSpy.mockRestore();
+    });
+
+    it("keeps valid configured model ids on the primary summarizer path", async () => {
+      const createFnAgent = vi.fn().mockResolvedValue({
+        session: {
+          prompt: vi.fn().mockResolvedValue(undefined),
+          dispose: vi.fn(),
+          state: {
+            messages: [{ role: "assistant", content: "Keep configured model" }],
+          },
+        },
+      });
+      getFnAgentMock.mockResolvedValue(createFnAgent);
+
+      const title = await summarizeTitle("a".repeat(201), "/tmp", "anthropic", "claude-sonnet-4-5");
+
+      expect(title).toBe("Keep configured model");
+      expect(createFnAgent).toHaveBeenCalledTimes(1);
+      expect(createFnAgent).toHaveBeenCalledWith(expect.objectContaining({
+        defaultProvider: "anthropic",
+        defaultModelId: "claude-sonnet-4-5",
+      }));
+    });
+
+    it("returns null when stale-model automatic resolution also fails", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const createFnAgent = vi
+        .fn()
+        .mockRejectedValueOnce(new Error(
+          "Configured model fireworksai/accounts/fireworks/routers/kimi-k2p5-turbo (primary selection) "
+          + "was not found in the pi model registry.",
+        ))
+        .mockRejectedValueOnce(new Error("No model selected"));
+      getFnAgentMock.mockResolvedValue(createFnAgent);
+
+      await expect(summarizeTitle(
+        "a".repeat(201),
+        "/tmp",
+        "fireworksai",
+        "accounts/fireworks/routers/kimi-k2p5-turbo",
+      )).resolves.toBeNull();
+      expect(createFnAgent).toHaveBeenCalledTimes(2);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("retrying with automatic model resolution"));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Automatic title summarizer fallback"));
+      warnSpy.mockRestore();
+    });
+
+    it("does not mask genuine AI service errors", async () => {
+      getFnAgentMock.mockResolvedValue(() =>
+        Promise.resolve({
+          session: {
+            prompt: vi.fn().mockResolvedValue(undefined),
+            dispose: vi.fn(),
+            state: {
+              error: "authentication failed",
+              messages: [],
+            },
+          },
+        })
+      );
+
+      await expect(summarizeTitle("a".repeat(201), "/tmp", "anthropic", "claude-sonnet-4-5"))
+        .rejects.toThrow("AI session error: authentication failed");
+    });
   });
 
   describe("sanitizeTitle", () => {
