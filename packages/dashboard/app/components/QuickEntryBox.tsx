@@ -105,8 +105,8 @@ export function QuickEntryBox({ onCreate, addToast, tasks = [], availableModels,
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const touchButtonRef = useRef<HTMLButtonElement | null>(null);
-  const suppressRefocusRef = useRef(false);
   const justResetRef = useRef(false);
+  const justSubmittedRef = useRef(false);
   const previousProjectIdRef = useRef(projectId);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const pendingImagesRef = useRef<PendingImage[]>([]);
@@ -321,17 +321,20 @@ export function QuickEntryBox({ onCreate, addToast, tasks = [], availableModels,
     }
   }, [description, isExpanded, autoResize]);
 
-  // Restore focus after submission completes (when textarea is re-enabled)
+  // Restore focus after an in-component submission completes (when textarea is re-enabled).
   useEffect(() => {
-    if (!isSubmitting && description === "" && textareaRef.current) {
-      // Use setTimeout to ensure focus happens after React re-enables the textarea
-      const focusTimeout = setTimeout(() => {
-        if (typeof window !== "undefined" && window.innerWidth > MOBILE_BREAKPOINT_PX) {
-          textareaRef.current?.focus();
-        }
-      }, 0);
-      return () => clearTimeout(focusTimeout);
+    if (!justSubmittedRef.current || isSubmitting || description !== "" || !textareaRef.current) {
+      return;
     }
+
+    justSubmittedRef.current = false;
+    // Use setTimeout to ensure focus happens after React re-enables the textarea.
+    const focusTimeout = setTimeout(() => {
+      if (typeof window !== "undefined" && window.innerWidth > MOBILE_BREAKPOINT_PX) {
+        textareaRef.current?.focus();
+      }
+    }, 0);
+    return () => clearTimeout(focusTimeout);
   }, [isSubmitting, description]);
 
   // Clear dep search when dropdown closes
@@ -541,6 +544,7 @@ export function QuickEntryBox({ onCreate, addToast, tasks = [], availableModels,
         }
       }
       resetForm();
+      justSubmittedRef.current = true;
     } catch (err) {
       setDescription(originalDescription);
       addToast(getErrorMessage(err) || t("tasks.createFailed", "Failed to create task"), "error");
@@ -737,11 +741,6 @@ export function QuickEntryBox({ onCreate, addToast, tasks = [], availableModels,
   }, []);
 
   const handleFocus = useCallback(() => {
-    if (suppressRefocusRef.current) {
-      textareaRef.current?.blur();
-      return;
-    }
-
     // Auto-expand on focus when autoExpand prop is true (default)
     if (autoExpand) {
       setIsExpanded(true);
@@ -1497,20 +1496,13 @@ export function QuickEntryBox({ onCreate, addToast, tasks = [], availableModels,
                   e.preventDefault();
                 }
                 touchButtonRef.current = button;
-                suppressRefocusRef.current = true;
               }
             }}
             onTouchEnd={() => {
               touchButtonRef.current = null;
-              window.setTimeout(() => {
-                suppressRefocusRef.current = false;
-              }, 150);
             }}
             onTouchCancel={() => {
               touchButtonRef.current = null;
-              window.setTimeout(() => {
-                suppressRefocusRef.current = false;
-              }, 150);
             }}
           >
             <button
