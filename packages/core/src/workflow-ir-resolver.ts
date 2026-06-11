@@ -26,6 +26,34 @@ export interface WorkflowIrResolverStore {
 }
 
 /**
+ * Extract the planning seam prompt from a resolved workflow IR.
+ *
+ * Planning seam nodes are prompt nodes with `config.seam === "planning"`;
+ * `config.prompt` carries the text installed by builtinPromptConfig or a custom
+ * workflow author. Empty/missing prompts return undefined so callers can apply
+ * their own fail-soft fallback.
+ */
+export function resolvePlanningPromptFromIr(ir: WorkflowIr): string | undefined {
+  for (const node of ir.nodes) {
+    if (node.kind !== "prompt") continue;
+    if (node.config?.seam !== "planning") continue;
+    const prompt = node.config.prompt;
+    if (typeof prompt === "string" && prompt.trim().length > 0) return prompt;
+  }
+  return undefined;
+}
+
+/** Resolve a task's planning seam prompt via its selected workflow IR. */
+export async function resolveTaskPlanningPrompt(
+  store: WorkflowIrResolverStore,
+  taskId: string,
+  irCache?: Map<string, WorkflowIr>,
+): Promise<string | undefined> {
+  const ir = await resolveWorkflowIrForTask(store, taskId, irCache);
+  return resolvePlanningPromptFromIr(ir);
+}
+
+/**
  * Resolve a workflow IR by its id (built-in or custom).
  *
  * @param irCache optional cache keyed by workflowId so each distinct workflow's

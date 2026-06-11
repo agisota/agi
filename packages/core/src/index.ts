@@ -309,6 +309,8 @@ export {
 export {
   resolveWorkflowIrForTask,
   resolveWorkflowIrById,
+  resolvePlanningPromptFromIr,
+  resolveTaskPlanningPrompt,
   type WorkflowIrResolverStore,
 } from "./workflow-ir-resolver.js";
 export {

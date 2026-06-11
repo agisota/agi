@@ -8,7 +8,10 @@ import {
   getAvailableTemplates,
   getTemplatesForRole,
 } from "../agent-prompts.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../builtin-coding-workflow-ir.js";
+import { resolvePlanningPromptFromIr } from "../workflow-ir-resolver.js";
 import type { AgentPromptsConfig, AgentPromptTemplate } from "../types.js";
+import type { WorkflowIr } from "../workflow-ir-types.js";
 
 // ---------------------------------------------------------------------------
 // resolveAgentPrompt
@@ -257,36 +260,43 @@ describe("resolveAgentPrompt", () => {
     expect(result).toContain("task_document_write");
   });
 
-  it("triage prompt broad-scope decomposition block is present and identical in core and engine templates", () => {
+  it("triage planning prompt is sourced from workflow IR without an engine duplicate", () => {
     const corePrompt = resolveAgentPrompt("triage");
+    const planningPrompt = resolvePlanningPromptFromIr(BUILTIN_CODING_WORKFLOW_IR);
     const triageSource = readFileSync(
       resolve(fileURLToPath(new URL("..", import.meta.url)), "..", "..", "engine", "src", "triage.ts"),
       "utf8",
     );
-    const enginePromptMatch = triageSource.match(/export const TRIAGE_SYSTEM_PROMPT = `([\s\S]*?)`;/);
-    expect(enginePromptMatch?.[1]).toBeTruthy();
-    const enginePrompt = enginePromptMatch![1].replaceAll("\\`", "`");
 
-    for (const prompt of [corePrompt, enginePrompt]) {
-      expect(prompt).toContain("**Broad-scope decomposition signals:**");
-      expect(prompt).toContain("step count would reach 9 or more");
-      expect(prompt).toContain("would reach 12 or more");
-      expect(prompt).toContain("20 or more entries");
-      expect(prompt).toContain("at or above 30 items");
-    }
+    expect(triageSource).not.toMatch(/export const TRIAGE_SYSTEM_PROMPT\s*=/);
+    expect(triageSource).not.toMatch(/export const (?!FAST_TRIAGE_SYSTEM_PROMPT)[A-Z_]*TRIAGE[A-Z_]*SYSTEM_PROMPT\s*=/);
+    expect(planningPrompt).toBe(corePrompt);
+    expect(corePrompt).toContain("**Broad-scope decomposition signals:**");
+    expect(corePrompt).toContain("step count would reach 9 or more");
+    expect(corePrompt).toContain("would reach 12 or more");
+    expect(corePrompt).toContain("20 or more entries");
+    expect(corePrompt).toContain("at or above 30 items");
+  });
 
-    const marker = "**Broad-scope decomposition signals:**";
-    const blockRegex = /\*\*Broad-scope decomposition signals:\*\*[\s\S]*?(?=\n\n(?:##|\*\*))/;
-    const coreStart = corePrompt.indexOf(marker);
-    const engineStart = enginePrompt.indexOf(marker);
-    expect(coreStart).toBeGreaterThanOrEqual(0);
-    expect(engineStart).toBeGreaterThanOrEqual(0);
+  it("resolves custom planning prompts and ignores IRs without planning prompts", () => {
+    const customIr: WorkflowIr = {
+      version: "v1",
+      name: "custom",
+      nodes: [
+        { id: "start", kind: "start" },
+        { id: "planning", kind: "prompt", config: { seam: "planning", prompt: "custom planning prompt" } },
+      ],
+      edges: [],
+    };
+    const noPlanningIr: WorkflowIr = {
+      version: "v1",
+      name: "no-planning",
+      nodes: [{ id: "execute", kind: "prompt", config: { seam: "execute", prompt: "executor" } }],
+      edges: [],
+    };
 
-    const coreBlock = corePrompt.slice(coreStart).match(blockRegex)?.[0];
-    const engineBlock = enginePrompt.slice(engineStart).match(blockRegex)?.[0];
-    expect(coreBlock).toBeTruthy();
-    expect(engineBlock).toBeTruthy();
-    expect(coreBlock).toBe(engineBlock);
+    expect(resolvePlanningPromptFromIr(customIr)).toBe("custom planning prompt");
+    expect(resolvePlanningPromptFromIr(noPlanningIr)).toBeUndefined();
   });
 
   it("built-in triage prompt requires surface enumeration for bug-fix specs", () => {
