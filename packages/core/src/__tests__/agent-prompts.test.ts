@@ -10,7 +10,7 @@ import {
 } from "../agent-prompts.js";
 import { BUILTIN_CODING_WORKFLOW_IR } from "../builtin-coding-workflow-ir.js";
 import { renderTriagePolicyPlaceholders } from "../builtin-workflow-settings.js";
-import { resolvePlanningPromptFromIr } from "../workflow-ir-resolver.js";
+import { resolvePlanningPromptFromIr, resolveSeamPromptFromIr } from "../workflow-ir-resolver.js";
 import type { AgentPromptsConfig, AgentPromptTemplate } from "../types.js";
 import type { WorkflowIr } from "../workflow-ir-types.js";
 
@@ -286,13 +286,14 @@ describe("resolveAgentPrompt", () => {
     expect(renderedPrompt).not.toContain("{{");
   });
 
-  it("resolves custom planning prompts and ignores IRs without planning prompts", () => {
+  it("resolves custom seam prompts and ignores IRs without matching prompts", () => {
     const customIr: WorkflowIr = {
       version: "v1",
       name: "custom",
       nodes: [
         { id: "start", kind: "start" },
         { id: "planning", kind: "prompt", config: { seam: "planning", prompt: "custom planning prompt" } },
+        { id: "review", kind: "prompt", config: { seam: "review", prompt: "custom review prompt" } },
       ],
       edges: [],
     };
@@ -304,7 +305,10 @@ describe("resolveAgentPrompt", () => {
     };
 
     expect(resolvePlanningPromptFromIr(customIr)).toBe("custom planning prompt");
+    expect(resolveSeamPromptFromIr(customIr, "review")).toBe("custom review prompt");
+    expect(resolveSeamPromptFromIr(BUILTIN_CODING_WORKFLOW_IR, "review")).toBe(resolveAgentPrompt("reviewer"));
     expect(resolvePlanningPromptFromIr(noPlanningIr)).toBeUndefined();
+    expect(resolveSeamPromptFromIr(noPlanningIr, "review")).toBeUndefined();
   });
 
   it("built-in triage prompt requires surface enumeration for bug-fix specs", () => {

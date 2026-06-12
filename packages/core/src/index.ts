@@ -314,7 +314,9 @@ export {
 export {
   resolveWorkflowIrForTask,
   resolveWorkflowIrById,
+  resolveSeamPromptFromIr,
   resolvePlanningPromptFromIr,
+  resolveTaskSeamPrompt,
   resolveTaskPlanningPrompt,
   type WorkflowIrResolverStore,
 } from "./workflow-ir-resolver.js";
