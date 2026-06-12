@@ -57,7 +57,10 @@ Lifecycle states are `launching → active → awaiting_input → completed`, pl
 `error` and `interrupted`. On interrupt or error the orchestrator **auto-saves
 progress and emits an observable event — never silent loss** — and an
 `interrupted`/`error` session can be resumed/retried back to its current
-question.
+question. If the server restarts while a session is already `awaiting_input`,
+submitting the pending answer rehydrates the live interactive handle from the
+persisted conversation history before continuing, so old answerable sessions do
+not require a separate resume action.
 
 ### Multiple sessions
 

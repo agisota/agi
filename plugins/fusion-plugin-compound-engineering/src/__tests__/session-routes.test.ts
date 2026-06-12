@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PluginContext, PluginRouteResponse } from "@fusion/core";
+import type { PlanningQuestion, PluginContext, PluginRouteResponse } from "@fusion/core";
 import { createSessionRoutes } from "../routes/session-routes.js";
-import { makeHarness, type TestHarness } from "./_harness.js";
+import { makeHarness, makeScriptedSession, scriptedFactory, type TestHarness } from "./_harness.js";
 
 /**
  * Routes-level smoke test for the POLLING transport. Exercises validation and
@@ -10,6 +10,16 @@ import { makeHarness, type TestHarness } from "./_harness.js";
  * activeAiSession is absent (non-engine context), so `start` returns a 400 —
  * which is the correct, non-hanging behavior.
  */
+
+const QUESTION: PlanningQuestion = {
+  id: "q1",
+  type: "single_select",
+  question: "Which direction?",
+  options: [
+    { id: "a", label: "A" },
+    { id: "b", label: "B" },
+  ],
+};
 
 let h: TestHarness;
 beforeEach(() => {
@@ -98,5 +108,63 @@ describe("session routes (polling transport)", () => {
   it("POST /sessions/:id/answer validates questionId and response", async () => {
     const res = await call("POST", "/sessions/:id/answer", { params: { id: "x" }, body: {} }, h.ctx);
     expect(res.status).toBe(400);
+  });
+
+  it("POST /sessions/:id/answer rehydrates an old awaiting_input session instead of returning call-resume-first", async () => {
+    const { getCeSessionStore } = await import("../session/session-store.js");
+    const store = getCeSessionStore(h.ctx);
+    const created = store.create({ stage: "brainstorm" });
+    store.appendHistory(created.id, { role: "user", text: "kick off", at: new Date().toISOString() });
+    store.appendHistory(created.id, {
+      role: "agent",
+      text: JSON.stringify({ question: QUESTION }),
+      at: new Date().toISOString(),
+    });
+    store.update(created.id, { status: "awaiting_input", currentQuestion: QUESTION });
+
+    h.ctx.createInteractiveAiSession = scriptedFactory(
+      makeScriptedSession([
+        { type: "question", data: QUESTION },
+        { type: "complete", data: { artifact: "# Done\n" } },
+      ]),
+    );
+
+    const res = await call(
+      "POST",
+      "/sessions/:id/answer",
+      { params: { id: created.id }, body: { questionId: "q1", response: "a" } },
+      h.ctx,
+    );
+    expect(res.status).toBe(200);
+    expect((res.body as { session: { status: string } }).session.status).toBe("active");
+
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(store.get(created.id)!.status).toBe("completed");
+  });
+
+  it("POST /sessions/:id/answer returns an honest no-factory error without corrupting an old awaiting_input session", async () => {
+    const { getCeSessionStore } = await import("../session/session-store.js");
+    const store = getCeSessionStore(h.ctx);
+    const created = store.create({ stage: "brainstorm" });
+    store.appendHistory(created.id, { role: "user", text: "kick off", at: new Date().toISOString() });
+    store.appendHistory(created.id, {
+      role: "agent",
+      text: JSON.stringify({ question: QUESTION }),
+      at: new Date().toISOString(),
+    });
+    store.update(created.id, { status: "awaiting_input", currentQuestion: QUESTION });
+
+    const res = await call(
+      "POST",
+      "/sessions/:id/answer",
+      { params: { id: created.id }, body: { questionId: "q1", response: "a" } },
+      h.ctx,
+    );
+    expect(res.status).toBe(409);
+    expect((res.body as { error: string }).error).toMatch(/cannot be continued in this process/i);
+    expect((res.body as { error: string }).error).not.toMatch(/call resume\(\) first/i);
+    const after = store.get(created.id)!;
+    expect(after.status).toBe("awaiting_input");
+    expect(after.currentQuestion?.id).toBe("q1");
   });
 });
