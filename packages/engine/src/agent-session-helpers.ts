@@ -144,6 +144,10 @@ function pickSettingsThenRuntimeModel(
   settingsModel: ResolvedModelSelection,
   assignedAgentRuntimeConfig?: Record<string, unknown>,
 ): { provider: string | undefined; modelId: string | undefined } {
+  // Project/task/global settings are the authoritative model hierarchy. The
+  // assigned durable agent runtime model is only a final compatibility fallback
+  // when the hierarchy produced no complete pair; partial runtime pairs must
+  // never be mixed with settings fields or mask saved project overrides.
   if (settingsModel.provider && settingsModel.modelId) {
     return {
       provider: settingsModel.provider,

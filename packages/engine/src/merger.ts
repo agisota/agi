@@ -4056,6 +4056,7 @@ async function buildDeterministicMergeMessage(params: {
 }
 
 export { buildDeterministicMergeMessage as __testOnlyBuildDeterministicMergeMessage };
+export { resolveSafeCommitBody as __testOnlyResolveSafeCommitBody };
 export { resolveComplexRebaseConflictsWithAi as __testOnlyResolveComplexRebaseConflictsWithAi };
 
 /**
@@ -6672,25 +6673,12 @@ async function resolveSafeCommitBody(opts: {
   const cleanStat = opts.diffStat.trim();
   if (cleanStat.length > 0) {
     if (opts.settings.useAiMergeCommitSummary) {
-      // Prefer the dedicated title-summarization model — a small, fast tier
-      // intended for short summarization. Falls back to the project / global
-      // default model when the summarizer lane isn't configured. The core
-      // `summarizeCommitBody` helper handles missing-runtime / timeout / empty
-      // response gracefully and returns null.
-      const useTitleSummarizer =
-        !!opts.settings.titleSummarizerProvider && !!opts.settings.titleSummarizerModelId;
-      const provider = useTitleSummarizer
-        ? opts.settings.titleSummarizerProvider!
-        : (opts.settings.defaultProviderOverride && opts.settings.defaultModelIdOverride
-            ? opts.settings.defaultProviderOverride
-            : opts.settings.defaultProvider);
-      const modelId = useTitleSummarizer
-        ? opts.settings.titleSummarizerModelId!
-        : (opts.settings.defaultProviderOverride && opts.settings.defaultModelIdOverride
-            ? opts.settings.defaultModelIdOverride
-            : opts.settings.defaultModelId);
+      // Prefer the dedicated title-summarization lane and its documented
+      // fallbacks. The core `summarizeCommitBody` helper handles missing-runtime
+      // / timeout / empty response gracefully and returns null.
+      const resolved = resolveTitleSummarizerSettingsModel(opts.settings);
 
-      const ai = await summarizeCommitBody(cleanStat, opts.rootDir, provider, modelId, {
+      const ai = await summarizeCommitBody(cleanStat, opts.rootDir, resolved.provider, resolved.modelId, {
         branch: opts.branch,
         taskId: opts.taskId,
         signal: opts.signal,

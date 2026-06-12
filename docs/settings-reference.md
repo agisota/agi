@@ -788,26 +788,26 @@ Fusion resolves task models through workflow-backed lane values first, then glob
 
 ### Executor model
 
-1. Assigned durable agent runtime model (`runtimeConfig.model` or `runtimeConfig.modelProvider` + `runtimeConfig.modelId`) when both provider and model ID are set
-2. Per-task `modelProvider` + `modelId`
-3. Default workflow lane value `executionProvider` + `executionModelId`
-4. Global `executionGlobalProvider` + `executionGlobalModelId`
-5. Project `defaultProviderOverride` + `defaultModelIdOverride`
-6. Global `defaultProvider` + `defaultModelId`
+1. Per-task `modelProvider` + `modelId`
+2. Default workflow lane value `executionProvider` + `executionModelId`
+3. Global `executionGlobalProvider` + `executionGlobalModelId`
+4. Project `defaultProviderOverride` + `defaultModelIdOverride`
+5. Global `defaultProvider` + `defaultModelId`
+6. Assigned durable agent runtime model (`runtimeConfig.model` or `runtimeConfig.modelProvider` + `runtimeConfig.modelId`) when both provider and model ID are set and no task/lane/default pair is configured
 7. Automatic provider/model resolution
 
 ### Heartbeat model (durable agents)
 
 Heartbeat sessions for durable agents use this order:
 
-1. Assigned durable agent runtime model (`runtimeConfig.model` or `runtimeConfig.modelProvider` + `runtimeConfig.modelId`) when present
-2. Default workflow lane value `executionProvider` + `executionModelId`
-3. Global `executionGlobalProvider` + `executionGlobalModelId`
-4. Project `defaultProviderOverride` + `defaultModelIdOverride`
-5. Global `defaultProvider` + `defaultModelId`
+1. Default workflow lane value `executionProvider` + `executionModelId`
+2. Global `executionGlobalProvider` + `executionGlobalModelId`
+3. Project `defaultProviderOverride` + `defaultModelIdOverride`
+4. Global `defaultProvider` + `defaultModelId`
+5. Assigned durable agent runtime model (`runtimeConfig.model` or `runtimeConfig.modelProvider` + `runtimeConfig.modelId`) when both provider and model ID are set and no execution/default pair is configured
 6. Automatic provider/model resolution
 
-When heartbeat has both (1) and (2-5), the runtime model is used as primary and the execution-lane model is passed as fallback. On timer-triggered runs, unrecoverable missing-provider credential/registry failures complete as `heartbeat_model_unavailable` instead of permanently setting the durable agent to `state=error`.
+On timer-triggered runs, unrecoverable missing-provider credential/registry failures complete as `heartbeat_model_unavailable` instead of permanently setting the durable agent to `state=error`.
 
 ### Reviewer model
 
@@ -818,13 +818,13 @@ When heartbeat has both (1) and (2-5), the runtime model is used as primary and 
 5. Global `defaultProvider` + `defaultModelId`
 6. Automatic provider/model resolution
 
-Mission validation sessions use this same validator lane, with an assigned durable agent runtime model taking precedence when the linked task has one.
+Mission validation sessions use this same validator lane; assigned durable agent runtime models are only used as a fallback when no complete validator/default pair is configured.
 
 ### Merger model
 
-1. Assigned durable agent runtime model (`runtimeConfig.model` or `runtimeConfig.modelProvider` + `runtimeConfig.modelId`) when both provider and model ID are set
-2. Project `defaultProviderOverride` + `defaultModelIdOverride`
-3. Global `defaultProvider` + `defaultModelId`
+1. Project `defaultProviderOverride` + `defaultModelIdOverride`
+2. Global `defaultProvider` + `defaultModelId`
+3. Assigned durable agent runtime model (`runtimeConfig.model` or `runtimeConfig.modelProvider` + `runtimeConfig.modelId`) when both provider and model ID are set and no default pair is configured
 4. Automatic provider/model resolution
 
 For post-merge prompt workflow steps, explicit step-level `modelProvider` + `modelId` overrides take precedence over the merger lane above.

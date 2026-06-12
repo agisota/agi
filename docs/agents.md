@@ -260,23 +260,23 @@ Programmatic equivalent:
 
 ### Assigned-agent runtime model precedence for task execution
 
-When a task is executed by an assigned durable agent, executor session model selection now prefers that agent's explicit runtime model when it is fully specified.
+When a task is executed by an assigned durable agent, executor session model selection prefers fresh task and settings values before the agent's stored runtime model.
 
 Executor precedence for task runs:
-1. Assigned agent `runtimeConfig` model pair (combined `runtimeConfig.model = "provider/modelId"` or separate `runtimeConfig.modelProvider` + `runtimeConfig.modelId`) when both provider and model ID are present
-2. Task `modelProvider` + `modelId`
-3. Project/global execution lane fallbacks (same resolution as unassigned runs)
+1. Task `modelProvider` + `modelId`
+2. Project/global execution lane fallbacks (same resolution as unassigned runs)
+3. Assigned agent `runtimeConfig` model pair (combined `runtimeConfig.model = "provider/modelId"` or separate `runtimeConfig.modelProvider` + `runtimeConfig.modelId`) only when both provider and model ID are present and no task/settings pair is configured
 
-If the assigned agent runtime model is missing or incomplete, Fusion falls back to the normal task/settings execution hierarchy.
+If the assigned agent runtime model is missing or incomplete, Fusion continues to automatic provider/model resolution without mixing partial runtime fields into the selected pair.
 
 ### Durable-agent heartbeat model precedence and unavailable-provider behavior
 
-Heartbeat sessions for durable agents resolve models with heartbeat-specific fallback semantics:
+Heartbeat sessions for durable agents resolve models with the same fresh-settings-first rule:
 
-1. Agent runtime model (`runtimeConfig.model` or `runtimeConfig.modelProvider` + `runtimeConfig.modelId`) when present
-2. Execution-lane settings fallback (`executionProvider`/`executionModelId` → `executionGlobalProvider`/`executionGlobalModelId` → project/global defaults)
+1. Execution-lane settings fallback (`executionProvider`/`executionModelId` → `executionGlobalProvider`/`executionGlobalModelId` → project/global defaults)
+2. Agent runtime model (`runtimeConfig.model` or `runtimeConfig.modelProvider` + `runtimeConfig.modelId`) only when both provider and model ID are present and no execution/default pair is configured
 
-When the runtime model is present and differs from execution-lane settings, heartbeat passes the execution-lane model as a fallback pair for session creation.
+Heartbeat no longer passes a stale runtime model ahead of a saved execution lane or project default override.
 
 Task-scoped heartbeat runs for durable agents execute inside the task's git worktree (same as ephemeral task execution), while no-task heartbeat runs continue to execute from the project root.
 Heartbeat and executor system prompts share the same active-goal context injector (`buildGoalContextSection`), so both lanes receive identical goal preambles when active goals exist.
