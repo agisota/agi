@@ -32,7 +32,7 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readdirSync, realpathSync, rmSync, statSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -106,6 +106,13 @@ function describeCleanupError(err: unknown): string {
   return stderr ? `${message}: ${stderr.trim()}` : message;
 }
 
+export function isBenignAbsentWorktreeError(err: unknown): boolean {
+  const code = getErrorStringProperty(err, "code");
+  if (code === "ENOENT") return true;
+  const description = describeCleanupError(err);
+  return /is not a working tree|No such file or directory|spawn\s+.*\bENOENT\b/i.test(description);
+}
+
 export async function pruneExistingAiMergeWorktrees(
   taskId: string,
   projectRootDir: string,
@@ -149,20 +156,32 @@ export async function pruneExistingAiMergeWorktrees(
       continue;
     }
 
+    let alreadyAbsent = false;
     try {
       await execFileAsync("git", ["worktree", "remove", "--force", canonicalPath], {
         cwd: projectRootDir,
         timeout: 30_000,
       });
     } catch (err: unknown) {
-      await log(`AI merge pre-merge prune: git worktree remove failed for ${canonicalPath}: ${describeCleanupError(err)} — falling back to filesystem removal`);
+      if (isBenignAbsentWorktreeError(err)) {
+        alreadyAbsent = true;
+        await log(`AI merge pre-merge prune: worktree ${canonicalPath} was already absent/de-registered; treating cleanup as idempotent`);
+      } else {
+        await log(`AI merge pre-merge prune: git worktree remove failed for ${canonicalPath}: ${describeCleanupError(err)} — falling back to filesystem removal`);
+      }
     }
 
     try {
       rmSync(canonicalPath, { recursive: true, force: true });
-      await audit.git({ type: "merge:ai-worktree-cleanup", target: canonicalPath, metadata: { taskId, mergeRoot: canonicalPath, phase: "pre-merge-prune", success: true } });
+      await audit.git({ type: "merge:ai-worktree-cleanup", target: canonicalPath, metadata: { taskId, mergeRoot: canonicalPath, phase: "pre-merge-prune", success: true, ...(alreadyAbsent ? { alreadyAbsent: true, idempotent: true } : {}) } });
       pruned++;
     } catch (err: unknown) {
+      if (isBenignAbsentWorktreeError(err)) {
+        await log(`AI merge pre-merge prune: worktree ${canonicalPath} was already absent during filesystem cleanup; treating cleanup as idempotent`);
+        await audit.git({ type: "merge:ai-worktree-cleanup", target: canonicalPath, metadata: { taskId, mergeRoot: canonicalPath, phase: "pre-merge-prune", success: true, alreadyAbsent: true, idempotent: true } });
+        pruned++;
+        continue;
+      }
       const error = getErrorMessage(err);
       const code = getErrorStringProperty(err, "code");
       await log(`AI merge pre-merge prune: filesystem rm failed for ${canonicalPath}${code ? ` (${code})` : ""}: ${error}`);
@@ -184,23 +203,41 @@ export async function cleanupAiMergeWorktree(input: {
   rmRunner?: typeof rm;
 }): Promise<void> {
   const { taskId, mergeRoot, projectRootDir, worktreeAdded, audit, log, gitRunner = git, rmRunner = rm } = input;
+  let alreadyAbsent = false;
   if (worktreeAdded) {
-    try {
-      await gitRunner(["worktree", "remove", "--force", mergeRoot], projectRootDir);
-      await audit.git({ type: "merge:ai-worktree-cleanup", target: mergeRoot, metadata: { taskId, mergeRoot, phase: "git-remove", success: true } });
-    } catch (err: unknown) {
-      const error = describeCleanupError(err);
-      const code = getErrorStringProperty(err, "code");
-      await log(`AI merge cleanup: git worktree remove failed for ${mergeRoot}${code ? ` (${code})` : ""}: ${error}`);
-      await audit.git({ type: "merge:ai-worktree-cleanup", target: mergeRoot, metadata: { taskId, mergeRoot, phase: "git-remove", success: false, error, ...(code ? { code } : {}) } });
+    if (!existsSync(mergeRoot)) {
+      alreadyAbsent = true;
+      await log(`AI merge cleanup: worktree ${mergeRoot} was already absent before git removal; treating cleanup as idempotent`);
+      await audit.git({ type: "merge:ai-worktree-cleanup", target: mergeRoot, metadata: { taskId, mergeRoot, phase: "git-remove", success: true, alreadyAbsent: true, idempotent: true, code: "ENOENT" } });
+    } else {
+      try {
+        await gitRunner(["worktree", "remove", "--force", mergeRoot], projectRootDir);
+        await audit.git({ type: "merge:ai-worktree-cleanup", target: mergeRoot, metadata: { taskId, mergeRoot, phase: "git-remove", success: true } });
+      } catch (err: unknown) {
+        const error = describeCleanupError(err);
+        const code = getErrorStringProperty(err, "code");
+        if (isBenignAbsentWorktreeError(err)) {
+          alreadyAbsent = true;
+          await log(`AI merge cleanup: worktree ${mergeRoot} was already absent/de-registered during git removal; treating cleanup as idempotent`);
+          await audit.git({ type: "merge:ai-worktree-cleanup", target: mergeRoot, metadata: { taskId, mergeRoot, phase: "git-remove", success: true, alreadyAbsent: true, idempotent: true, error, ...(code ? { code } : {}) } });
+        } else {
+          await log(`AI merge cleanup: git worktree remove failed for ${mergeRoot}${code ? ` (${code})` : ""}: ${error}`);
+          await audit.git({ type: "merge:ai-worktree-cleanup", target: mergeRoot, metadata: { taskId, mergeRoot, phase: "git-remove", success: false, error, ...(code ? { code } : {}) } });
+        }
+      }
     }
   }
   try {
     await rmRunner(mergeRoot, { recursive: true, force: true });
-    await audit.git({ type: "merge:ai-worktree-cleanup", target: mergeRoot, metadata: { taskId, mergeRoot, phase: "fs-rm", success: true } });
+    await audit.git({ type: "merge:ai-worktree-cleanup", target: mergeRoot, metadata: { taskId, mergeRoot, phase: "fs-rm", success: true, ...(alreadyAbsent ? { alreadyAbsent: true, idempotent: true } : {}) } });
   } catch (err: unknown) {
     const error = getErrorMessage(err);
     const code = getErrorStringProperty(err, "code");
+    if (isBenignAbsentWorktreeError(err)) {
+      await log(`AI merge cleanup: worktree ${mergeRoot} was already absent during filesystem cleanup; treating cleanup as idempotent`);
+      await audit.git({ type: "merge:ai-worktree-cleanup", target: mergeRoot, metadata: { taskId, mergeRoot, phase: "fs-rm", success: true, alreadyAbsent: true, idempotent: true, error, ...(code ? { code } : {}) } });
+      return;
+    }
     await log(`AI merge cleanup: filesystem rm failed for ${mergeRoot}${code ? ` (${code})` : ""}: ${error}`);
     await audit.git({ type: "merge:ai-worktree-cleanup", target: mergeRoot, metadata: { taskId, mergeRoot, phase: "fs-rm", success: false, error, ...(code ? { code } : {}) } });
   }
@@ -924,6 +961,15 @@ export async function runAiMerge(
     const mergeRoot = await mkdtemp(join(tmpdir(), `fusion-ai-merge-${taskId.toLowerCase()}-`));
     let worktreeAdded = false;
     const registeredMergePaths = new Set<string>();
+    const registerMergeRoot = (pathToRegister: string): void => {
+      if (registeredMergePaths.has(pathToRegister)) return;
+      activeSessionRegistry.registerPath(pathToRegister, { taskId, kind: "ai-merge", ownerKey: `ai-merge:${taskId}` });
+      registeredMergePaths.add(pathToRegister);
+    };
+    // Register the tmpdir path as soon as it exists, before `git worktree add`,
+    // so the self-healing tmpdir sweep cannot reap a just-created clean room in
+    // the small window before canonical registration is available.
+    registerMergeRoot(mergeRoot);
     try {
       await git(["worktree", "add", "--detach", mergeRoot, tipSha], projectRootDir);
       worktreeAdded = true;
@@ -934,8 +980,7 @@ export async function runAiMerge(
         canonicalMergeRoot = mergeRoot;
       }
       for (const pathToRegister of new Set([canonicalMergeRoot, mergeRoot])) {
-        activeSessionRegistry.registerPath(pathToRegister, { taskId, kind: "ai-merge", ownerKey: `ai-merge:${taskId}` });
-        registeredMergePaths.add(pathToRegister);
+        registerMergeRoot(pathToRegister);
       }
       await audit.git({ type: "merge:ai-clean-room", target: integrationBranch, metadata: { taskId, tipSha, mergeRoot } });
       await log(`AI merge: merging ${branch} into ${integrationBranch} (clean room at ${short(tipSha)})${advanceRetries ? ` — retry ${advanceRetries} after concurrent advance` : ""}`);

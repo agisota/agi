@@ -169,6 +169,52 @@ describe("AI merge temp worktree cleanup", () => {
     ]));
   });
 
+  it("treats spawn git ENOENT during cleanup as idempotent already-absent success", async () => {
+    const mergeRoot = mkdtempSync(join(tmpdir(), "fusion-ai-merge-fn-1-enoent-cleanup-test-"));
+    tracked.add(mergeRoot);
+    const err = Object.assign(new Error("spawn git ENOENT"), { code: "ENOENT" });
+    const gitRunner = vi.fn(async () => { throw err; });
+
+    const { events, logs } = await cleanup({
+      mergeRoot,
+      gitRunner,
+    });
+
+    expect(gitRunner).toHaveBeenCalledWith(["worktree", "remove", "--force", mergeRoot], process.cwd());
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "merge:ai-worktree-cleanup", metadata: expect.objectContaining({ phase: "git-remove", success: true, alreadyAbsent: true, idempotent: true, code: "ENOENT" }) }),
+      expect.objectContaining({ type: "merge:ai-worktree-cleanup", metadata: expect.objectContaining({ phase: "fs-rm", success: true, alreadyAbsent: true, idempotent: true }) }),
+    ]));
+    expect(logs.join("\n")).toContain("treating cleanup as idempotent");
+  });
+
+  it("removes the directory after git reports the temp path is not a working tree", async () => {
+    const err = new Error("Command failed: git worktree remove --force /tmp/fusion-ai-merge-fn-1\nfatal: '/tmp/fusion-ai-merge-fn-1' is not a working tree");
+
+    const { mergeRoot, events } = await cleanup({
+      gitRunner: vi.fn(async () => { throw err; }),
+    });
+
+    expect(existsSync(mergeRoot)).toBe(false);
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "merge:ai-worktree-cleanup", metadata: expect.objectContaining({ phase: "git-remove", success: true, alreadyAbsent: true, idempotent: true }) }),
+      expect.objectContaining({ type: "merge:ai-worktree-cleanup", metadata: expect.objectContaining({ phase: "fs-rm", success: true, alreadyAbsent: true, idempotent: true }) }),
+    ]));
+  });
+
+  it("still surfaces genuine filesystem cleanup failures", async () => {
+    const err = new Error("Directory not empty") as NodeJS.ErrnoException;
+    err.code = "ENOTEMPTY";
+
+    const { events, logs } = await cleanup({ rmRunner: vi.fn(async () => { throw err; }) as typeof rm });
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "merge:ai-worktree-cleanup", metadata: expect.objectContaining({ phase: "fs-rm", success: false, code: "ENOTEMPTY", error: "Directory not empty" }) }),
+    ]));
+    expect(logs.join("\n")).toContain("filesystem rm failed");
+  });
+
   it("skips git removal but still audits filesystem cleanup when worktree was not added", async () => {
     const gitRunner = vi.fn(async () => "");
 
@@ -191,7 +237,7 @@ describe("AI merge temp worktree cleanup", () => {
 
     expect(existsSync(stale)).toBe(false);
     expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: "merge:ai-worktree-cleanup", metadata: expect.objectContaining({ taskId: "FN-777", mergeRoot: realpathSync(tmpdir()) + "/fusion-ai-merge-fn-777-stale", phase: "pre-merge-prune", success: true }) }),
+      expect.objectContaining({ type: "merge:ai-worktree-cleanup", metadata: expect.objectContaining({ taskId: "FN-777", mergeRoot: realpathSync(tmpdir()) + "/fusion-ai-merge-fn-777-stale", phase: "pre-merge-prune", success: true, alreadyAbsent: true, idempotent: true }) }),
     ]));
   });
 
