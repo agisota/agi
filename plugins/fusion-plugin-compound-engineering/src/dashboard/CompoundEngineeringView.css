@@ -277,9 +277,28 @@
   flex-direction: column;
   gap: 0.4rem;
 }
+.ce-flow-text textarea,
+.ce-flow-guidance-row textarea {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-primary);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
 .ce-flow-text textarea {
   width: 100%;
   resize: vertical;
+}
+.ce-flow-text textarea:focus,
+.ce-flow-guidance-row textarea:focus {
+  border-color: var(--todo);
+  box-shadow: var(--focus-ring);
+}
+.ce-flow-text textarea::placeholder,
+.ce-flow-guidance-row textarea::placeholder {
+  color: var(--text-dim);
 }
 .ce-flow-confirm {
   display: flex;
