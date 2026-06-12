@@ -26,7 +26,9 @@ import {
   TEST_MODE_RESOLVED,
   isTestModeActive,
   resolveTaskValidatorModel,
+  normalizeMissionAssertionType,
 } from "@fusion/core";
+import type { VerificationOutcome } from "./mission-verification.js";
 import { createFnAgent, promptWithFallback, type AgentResult } from "./pi.js";
 import { mergeEffectiveSettings } from "./effective-settings.js";
 import {
@@ -50,8 +52,16 @@ const VALIDATION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
  * per assertion plus an overall status.
  */
 export interface ValidationResult {
-  /** Overall validation status */
-  status: "pass" | "fail" | "blocked" | "error";
+  /**
+   * Overall validation status.
+   *
+   * `inconclusive` is first-class and distinct from `fail`: it means a
+   * behavioral verification run could not run or conclude (no isolating sandbox
+   * backend, timeout, setup failure, rejected proof). In this unit it routes to
+   * a blocked verdict (no remediation); later units track its infra-failure rate
+   * separately.
+   */
+  status: "pass" | "fail" | "blocked" | "error" | "inconclusive";
   /** Per-assertion results */
   assertions: Array<{
     assertionId: string;
@@ -83,6 +93,14 @@ export interface MissionExecutionLoopOptions {
   pluginRunner?: import("./plugin-runner.js").PluginRunner;
   /** Optional agent store for resolving assigned-agent runtime hints. */
   agentStore?: AgentStore;
+  /**
+   * Optional behavioral-verification capability (U3). When provided, behavioral
+   * assertions are confirmed by a non-mutating verification run; the judge's
+   * "pass" on a behavioral assertion is advisory only. When ABSENT, behavioral
+   * assertions still default to fail (U2) but no verification run is attempted —
+   * preserving the behavior of existing construction sites that inject nothing.
+   */
+  verificationCapability?: import("./mission-verification.js").VerificationCapability;
 }
 
 export class MissionExecutionLoop extends EventEmitter {
@@ -94,6 +112,7 @@ export class MissionExecutionLoop extends EventEmitter {
   private missionAutopilot?: MissionExecutionLoopOptions["missionAutopilot"];
   private pluginRunner?: MissionExecutionLoopOptions["pluginRunner"];
   private agentStore?: MissionExecutionLoopOptions["agentStore"];
+  private verificationCapability?: MissionExecutionLoopOptions["verificationCapability"];
   private activeValidations = new Set<string>(); // feature IDs currently being validated
 
   constructor(options: MissionExecutionLoopOptions) {
@@ -105,6 +124,7 @@ export class MissionExecutionLoop extends EventEmitter {
     this.missionAutopilot = options.missionAutopilot;
     this.pluginRunner = options.pluginRunner;
     this.agentStore = options.agentStore;
+    this.verificationCapability = options.verificationCapability;
     loopLog.log("MissionExecutionLoop created");
   }
 
@@ -434,8 +454,11 @@ export class MissionExecutionLoop extends EventEmitter {
         await this.handleValidationPass(feature.id, run.id, result.summary);
       } else if (result.status === "fail") {
         await this.handleValidationFail(feature.id, run.id, result);
-      } else if (result.status === "blocked") {
-        await this.handleValidationBlocked(feature.id, run.id, result.blockedReason);
+      } else if (result.status === "blocked" || result.status === "inconclusive") {
+        // Inconclusive (infra: no isolating backend, timeout, rejected proof)
+        // routes to blocked/needs-attention — distinct from a behavioral fail,
+        // and spawns no Fix Feature (per KTD / R21, fully realized in a later unit).
+        await this.handleValidationBlocked(feature.id, run.id, result.blockedReason ?? result.summary);
       } else if (result.status === "error") {
         await this.handleValidationError(feature.id, run.id, result.summary);
       }
@@ -537,7 +560,12 @@ export class MissionExecutionLoop extends EventEmitter {
 
       // Get the validation result from the session
       // The agent should have returned structured JSON in its response
-      const result = await this.parseValidationResult(session.session, assertions);
+      const judgeResult = await this.parseValidationResult(session.session, assertions);
+
+      // U2/U3: the read-only judge's verdict is authoritative for STATIC
+      // assertions only. BEHAVIORAL assertions default to fail and are confirmed
+      // (or refuted) by a non-mutating verification run instead.
+      const result = await this.applyBehavioralPosture(feature, assertions, judgeResult);
 
       loopLog.log(`Validation completed for feature ${feature.id}: ${result.status}`);
       return result;
@@ -565,6 +593,158 @@ export class MissionExecutionLoop extends EventEmitter {
           loopLog.warn(`Error disposing validation session for ${feature.id}:`, disposeErr);
         }
       }
+    }
+  }
+
+  /**
+   * Apply the behavioral judging posture (U2/U3) to the read-only judge's
+   * verdict.
+   *
+   * - STATIC assertions keep the judge's verdict verbatim (no behavior change).
+   * - BEHAVIORAL assertions DEFAULT TO FAIL. The judge's "pass" on a behavioral
+   *   assertion is advisory; an authoritative pass requires a verification run
+   *   to confirm it. When a verification capability is injected, each behavioral
+   *   assertion is run through it: pass → satisfied; fail → behavioral failure;
+   *   inconclusive → the aggregate becomes inconclusive (infra, no remediation).
+   *   When NO capability is injected, behavioral assertions simply stay failed
+   *   (preserving existing call-site behavior — existing data is all static).
+   *
+   * The aggregate status is recomputed from the post-posture per-assertion
+   * results so the existing pass/fail/blocked/error/inconclusive flow is driven
+   * correctly.
+   */
+  private async applyBehavioralPosture(
+    feature: MissionFeature,
+    assertions: MissionContractAssertion[],
+    judgeResult: ValidationResult,
+  ): Promise<ValidationResult> {
+    // Preserve non-behavioral terminal verdicts untouched (error/blocked from the
+    // judge are not behavioral posture concerns).
+    if (judgeResult.status === "error") {
+      return judgeResult;
+    }
+
+    const typeById = new Map<string, ReturnType<typeof normalizeMissionAssertionType>>();
+    let hasBehavioral = false;
+    for (const a of assertions) {
+      const t = normalizeMissionAssertionType(a.type);
+      typeById.set(a.id, t);
+      if (t === "behavioral") hasBehavioral = true;
+    }
+
+    // Fast path: no behavioral assertions → existing static path is preserved
+    // exactly. This keeps every existing (untyped/static) test green.
+    if (!hasBehavioral) {
+      return judgeResult;
+    }
+
+    const textById = new Map(assertions.map((a) => [a.id, a.assertion]));
+    let sawInconclusive = false;
+    let inconclusiveReason: string | undefined;
+
+    const newAssertionResults = await Promise.all(
+      judgeResult.assertions.map(async (judged) => {
+        const type = typeById.get(judged.assertionId) ?? "static";
+        if (type !== "behavioral") {
+          // Static: keep judge verdict verbatim.
+          return judged;
+        }
+
+        // Behavioral: default to fail unless verification confirms it.
+        if (!this.verificationCapability) {
+          return {
+            ...judged,
+            passed: false,
+            message: "Behavioral assertion defaults to fail: no verification evidence (advisory judge verdict is not authoritative).",
+            expected: judged.expected ?? "Behavior confirmed by a verification run",
+            actual: judged.actual ?? "No verification run was performed",
+          };
+        }
+
+        let outcome: VerificationOutcome;
+        try {
+          outcome = await this.verificationCapability.verifyBehavioralAssertion({
+            assertionId: judged.assertionId,
+            assertion: textById.get(judged.assertionId) ?? "",
+            taskId: feature.taskId,
+            integrationSha: await this.resolveIntegrationSha(feature),
+            signal: undefined,
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          loopLog.warn(`Verification capability threw for assertion ${judged.assertionId}: ${message}`);
+          outcome = { verdict: "inconclusive", assertionId: judged.assertionId, reason: `verification error: ${message}` };
+        }
+
+        if (outcome.verdict === "pass") {
+          return { ...judged, passed: true, message: outcome.reason };
+        }
+        if (outcome.verdict === "inconclusive") {
+          sawInconclusive = true;
+          inconclusiveReason = inconclusiveReason ?? outcome.reason;
+          return {
+            ...judged,
+            passed: false,
+            message: `Behavioral verification inconclusive: ${outcome.reason}`,
+            expected: judged.expected ?? "Behavior confirmed by a verification run",
+            actual: outcome.detail ?? "Verification could not conclude",
+          };
+        }
+        // fail
+        return {
+          ...judged,
+          passed: false,
+          message: outcome.reason,
+          expected: judged.expected ?? "Behavior confirmed by a verification run",
+          actual: outcome.detail ?? judged.actual ?? "Behavior not confirmed",
+        };
+      }),
+    );
+
+    const allPassed = newAssertionResults.every((a) => a.passed);
+
+    // Inconclusive takes precedence over fail: an infra-driven non-pass must not
+    // be mistaken for an observed behavioral failure (no Fix Feature).
+    let status: ValidationResult["status"];
+    if (sawInconclusive && !allPassed) {
+      status = "inconclusive";
+    } else if (allPassed) {
+      status = "pass";
+    } else {
+      status = "fail";
+    }
+
+    const summary = status === "pass"
+      ? judgeResult.summary
+      : status === "inconclusive"
+        ? `Behavioral verification inconclusive: ${inconclusiveReason ?? "verification could not conclude"}`
+        : "One or more behavioral assertions were not confirmed by verification.";
+
+    return {
+      status,
+      assertions: newAssertionResults,
+      summary,
+      blockedReason: status === "inconclusive" ? (inconclusiveReason ?? "verification inconclusive") : judgeResult.blockedReason,
+    };
+  }
+
+  /**
+   * Resolve the trusted revision (integration SHA) whose disposable checkout the
+   * verification run executes against. The live task worktree is pruned before
+   * the done-transition that triggers validation, so it cannot be used.
+   *
+   * In this unit we read it from the linked task when available; callers that do
+   * not supply a resolvable SHA cause the verification run to resolve to
+   * inconclusive (fail-closed). A richer derivation is owned by a later unit.
+   */
+  private async resolveIntegrationSha(feature: MissionFeature): Promise<string | undefined> {
+    if (!feature.taskId) return undefined;
+    try {
+      const task = await this.taskStore.getTask(feature.taskId);
+      const candidate = (task as { integrationSha?: string; baseCommit?: string } | undefined);
+      return candidate?.integrationSha ?? candidate?.baseCommit ?? undefined;
+    } catch {
+      return undefined;
     }
   }
 
