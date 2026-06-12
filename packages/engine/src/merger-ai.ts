@@ -32,10 +32,10 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { existsSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   buildTaskLineageTrailer,
   getPrimaryPrInfo,
@@ -113,8 +113,29 @@ export function isBenignAbsentWorktreeError(err: unknown): boolean {
   return /is not a working tree|No such file or directory|spawn\s+.*\bENOENT\b/i.test(description);
 }
 
-function getAiMergeTempSearchRoots(): string[] {
-  const roots = [tmpdir()];
+function ensureAiMergeRootIgnored(projectRootDir: string): void {
+  const excludePath = join(projectRootDir, ".git", "info", "exclude");
+  if (!existsSync(excludePath)) return;
+  try {
+    const current = readFileSync(excludePath, "utf-8");
+    if (!/(?:^|\n)\.fusion\/ai-merge\/(?:\n|$)/.test(current)) {
+      appendFileSync(excludePath, `${current.endsWith("\n") ? "" : "\n"}.fusion/ai-merge/\n`);
+    }
+  } catch {
+    // Best effort only: cleanup still removes the root contents, and existing
+    // projects generally ignore .fusion already.
+  }
+}
+
+export function resolveAiMergeRoot(projectRootDir: string, _settings?: Settings): string {
+  const root = resolve(projectRootDir, ".fusion", "ai-merge");
+  mkdirSync(root, { recursive: true });
+  ensureAiMergeRootIgnored(projectRootDir);
+  return root;
+}
+
+function getAiMergeTempSearchRoots(projectRootDir: string, settings?: Settings): string[] {
+  const roots = [resolveAiMergeRoot(projectRootDir, settings), tmpdir()];
   const testWorkerRoot = process.env.FUSION_TEST_WORKER_ROOT;
   if (testWorkerRoot) {
     try {
@@ -133,11 +154,13 @@ export async function pruneExistingAiMergeWorktrees(
   projectRootDir: string,
   audit: RunAuditor,
   log: (message: string) => Promise<void>,
+  settings?: Settings,
 ): Promise<number> {
   const prefix = `fusion-ai-merge-${taskId.toLowerCase()}-`;
-  const tempRoots = getAiMergeTempSearchRoots();
+  const tempRoots = getAiMergeTempSearchRoots(projectRootDir, settings);
 
   let pruned = 0;
+  let cleanupAttempted = false;
   for (const tempRoot of tempRoots) {
     let entries: string[];
     try {
@@ -150,62 +173,72 @@ export async function pruneExistingAiMergeWorktrees(
 
     for (const entry of entries) {
       const candidatePath = join(tempRoot, entry);
-    let canonicalPath = candidatePath;
-    try {
-      canonicalPath = realpathSync(candidatePath);
-    } catch {
-      canonicalPath = candidatePath;
-    }
+      let canonicalPath = candidatePath;
+      try {
+        canonicalPath = realpathSync(candidatePath);
+      } catch {
+        canonicalPath = candidatePath;
+      }
 
-    if (activeSessionRegistry.isPathActive(canonicalPath) || activeSessionRegistry.isPathActive(candidatePath)) {
-      await log(`AI merge pre-merge prune: skipping active worktree ${canonicalPath}`);
-      continue;
-    }
-
-    try {
-      const stat = statSync(canonicalPath);
-      const ageMs = Date.now() - stat.mtimeMs;
-      if (ageMs < MIN_TEMP_WORKTREE_REAP_AGE_MS) {
-        await log(`AI merge pre-merge prune: skipping too-new worktree ${canonicalPath} (age ${Math.max(0, Math.round(ageMs))}ms)`);
+      if (activeSessionRegistry.isPathActive(canonicalPath) || activeSessionRegistry.isPathActive(candidatePath)) {
+        await log(`AI merge pre-merge prune: skipping active worktree ${canonicalPath}`);
         continue;
       }
-    } catch (err: unknown) {
-      await log(`AI merge pre-merge prune: failed to stat ${canonicalPath}: ${getErrorMessage(err)} — skipping candidate`);
-      continue;
-    }
 
-    let alreadyAbsent = false;
-    try {
-      await execFileAsync("git", ["worktree", "remove", "--force", canonicalPath], {
-        cwd: projectRootDir,
-        timeout: 30_000,
-      });
-    } catch (err: unknown) {
-      if (isBenignAbsentWorktreeError(err)) {
-        alreadyAbsent = true;
-        await log(`AI merge pre-merge prune: worktree ${canonicalPath} was already absent/de-registered; treating cleanup as idempotent`);
-      } else {
-        await log(`AI merge pre-merge prune: git worktree remove failed for ${canonicalPath}: ${describeCleanupError(err)} — falling back to filesystem removal`);
+      try {
+        const stat = statSync(canonicalPath);
+        const ageMs = Date.now() - stat.mtimeMs;
+        if (ageMs < MIN_TEMP_WORKTREE_REAP_AGE_MS) {
+          await log(`AI merge pre-merge prune: skipping too-new worktree ${canonicalPath} (age ${Math.max(0, Math.round(ageMs))}ms)`);
+          continue;
+        }
+      } catch (err: unknown) {
+        await log(`AI merge pre-merge prune: failed to stat ${canonicalPath}: ${getErrorMessage(err)} — skipping candidate`);
+        continue;
       }
-    }
 
-    try {
-      rmSync(canonicalPath, { recursive: true, force: true });
-      await audit.git({ type: "merge:ai-worktree-cleanup", target: canonicalPath, metadata: { taskId, mergeRoot: canonicalPath, phase: "pre-merge-prune", success: true, ...(alreadyAbsent ? { alreadyAbsent: true, idempotent: true } : {}) } });
-      pruned++;
-    } catch (err: unknown) {
-      if (isBenignAbsentWorktreeError(err)) {
-        await log(`AI merge pre-merge prune: worktree ${canonicalPath} was already absent during filesystem cleanup; treating cleanup as idempotent`);
-        await audit.git({ type: "merge:ai-worktree-cleanup", target: canonicalPath, metadata: { taskId, mergeRoot: canonicalPath, phase: "pre-merge-prune", success: true, alreadyAbsent: true, idempotent: true } });
+      let alreadyAbsent = false;
+      try {
+        cleanupAttempted = true;
+        await execFileAsync("git", ["worktree", "remove", "--force", canonicalPath], {
+          cwd: projectRootDir,
+          timeout: 30_000,
+        });
+      } catch (err: unknown) {
+        if (isBenignAbsentWorktreeError(err)) {
+          alreadyAbsent = true;
+          await log(`AI merge pre-merge prune: worktree ${canonicalPath} was already absent/de-registered; treating cleanup as idempotent`);
+        } else {
+          await log(`AI merge pre-merge prune: git worktree remove failed for ${canonicalPath}: ${describeCleanupError(err)} — falling back to filesystem removal`);
+        }
+      }
+
+      try {
+        cleanupAttempted = true;
+        rmSync(canonicalPath, { recursive: true, force: true });
+        await audit.git({ type: "merge:ai-worktree-cleanup", target: canonicalPath, metadata: { taskId, mergeRoot: canonicalPath, phase: "pre-merge-prune", success: true, ...(alreadyAbsent ? { alreadyAbsent: true, idempotent: true } : {}) } });
         pruned++;
-        continue;
+      } catch (err: unknown) {
+        if (isBenignAbsentWorktreeError(err)) {
+          await log(`AI merge pre-merge prune: worktree ${canonicalPath} was already absent during filesystem cleanup; treating cleanup as idempotent`);
+          await audit.git({ type: "merge:ai-worktree-cleanup", target: canonicalPath, metadata: { taskId, mergeRoot: canonicalPath, phase: "pre-merge-prune", success: true, alreadyAbsent: true, idempotent: true } });
+          pruned++;
+          continue;
+        }
+        const error = getErrorMessage(err);
+        const code = getErrorStringProperty(err, "code");
+        await log(`AI merge pre-merge prune: filesystem rm failed for ${canonicalPath}${code ? ` (${code})` : ""}: ${error}`);
+        await audit.git({ type: "merge:ai-worktree-cleanup", target: canonicalPath, metadata: { taskId, mergeRoot: canonicalPath, phase: "pre-merge-prune", success: false, error, ...(code ? { code } : {}) } });
       }
-      const error = getErrorMessage(err);
-      const code = getErrorStringProperty(err, "code");
-      await log(`AI merge pre-merge prune: filesystem rm failed for ${canonicalPath}${code ? ` (${code})` : ""}: ${error}`);
-      await audit.git({ type: "merge:ai-worktree-cleanup", target: canonicalPath, metadata: { taskId, mergeRoot: canonicalPath, phase: "pre-merge-prune", success: false, error, ...(code ? { code } : {}) } });
     }
   }
+
+  if (cleanupAttempted) {
+    try {
+      await execFileAsync("git", ["worktree", "prune"], { cwd: projectRootDir, timeout: 30_000 });
+    } catch (err: unknown) {
+      await log(`AI merge pre-merge prune: git worktree prune failed: ${describeCleanupError(err)}`);
+    }
   }
 
   return pruned;
@@ -997,7 +1030,7 @@ export async function runAiMerge(
 
   await setStatus("merging");
   try {
-    const pruned = await pruneExistingAiMergeWorktrees(taskId, projectRootDir, audit, log);
+    const pruned = await pruneExistingAiMergeWorktrees(taskId, projectRootDir, audit, log, settings);
     if (pruned > 0) await log(`AI merge: pruned ${pruned} pre-existing worktree(s) for ${taskId}`);
   } catch (err: unknown) {
     await log(`AI merge: pre-merge prune failed: ${getErrorMessage(err)}`);
@@ -1008,7 +1041,7 @@ export async function runAiMerge(
     const tipSha = await git(["rev-parse", "--verify", `refs/heads/${integrationBranch}`], projectRootDir);
 
     // 1. Clean-room worktree at the integration tip.
-    const mergeRoot = await mkdtemp(join(tmpdir(), `fusion-ai-merge-${taskId.toLowerCase()}-`));
+    const mergeRoot = await mkdtemp(join(resolveAiMergeRoot(projectRootDir, settings), `fusion-ai-merge-${taskId.toLowerCase()}-`));
     let worktreeAdded = false;
     const registeredMergePaths = new Set<string>();
     const registerMergeRoot = (pathToRegister: string): void => {
@@ -1016,9 +1049,10 @@ export async function runAiMerge(
       activeSessionRegistry.registerPath(pathToRegister, { taskId, kind: "ai-merge", ownerKey: `ai-merge:${taskId}` });
       registeredMergePaths.add(pathToRegister);
     };
-    // Register the tmpdir path as soon as it exists, before `git worktree add`,
-    // so the self-healing tmpdir sweep cannot reap a just-created clean room in
-    // the small window before canonical registration is available.
+    // Register the repo-local clean-room path as soon as it exists, before
+    // `git worktree add`, so self-healing/pre-merge sweeps cannot reap a
+    // just-created clean room in the small window before canonical registration
+    // is available.
     registerMergeRoot(mergeRoot);
     try {
       await git(["worktree", "add", "--detach", mergeRoot, tipSha], projectRootDir);

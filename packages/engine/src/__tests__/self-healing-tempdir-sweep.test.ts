@@ -94,6 +94,12 @@ function tempMergeDir(name = `fusion-ai-merge-fn-1-${Math.random().toString(36).
   return dir;
 }
 
+function localMergeDir(name = `fusion-ai-merge-fn-1-${Math.random().toString(36).slice(2)}`): string {
+  const dir = join(projectRoot, ".fusion", "ai-merge", name);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 function makeAge(path: string, ageMs: number): void {
   const old = new Date(Date.now() - ageMs);
   utimesSync(path, old, old);
@@ -138,6 +144,34 @@ describe("SelfHealingManager temp-dir AI merge worktree sweep", () => {
     expect(existsSync(stale)).toBe(false);
     expect(sweepAudits(audits)).toEqual(expect.arrayContaining([
       expect.objectContaining({ mutationType: "worktree:tempdir-sweep", metadata: expect.objectContaining({ path: realpathSync(sandboxRoot) + "/" + stale.split("/").pop(), success: true, reason: "stale" }) }),
+    ]));
+  });
+
+  it("removes stale repo-local AI merge directories", async () => {
+    const stale = localMergeDir("fusion-ai-merge-fn-1-localstale");
+    makeStale(stale);
+    const { manager, audits } = makeManager();
+
+    await expect(sweep(manager)).resolves.toBe(1);
+
+    expect(existsSync(stale)).toBe(false);
+    expect(sweepAudits(audits)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ metadata: expect.objectContaining({ path: realpathSync(join(projectRoot, ".fusion", "ai-merge")) + "/fusion-ai-merge-fn-1-localstale", success: true, reason: "stale" }) }),
+    ]));
+  });
+
+  it("defers active repo-local AI merge directories", async () => {
+    const stale = localMergeDir("fusion-ai-merge-fn-1-localactive");
+    makeStale(stale);
+    const canonical = realpathSync(stale);
+    activeSessionRegistry.registerPath(canonical, { taskId: "FN-1", kind: "ai-merge", ownerKey: "ai-merge:FN-1" });
+    const { manager, audits } = makeManager();
+
+    await expect(sweep(manager)).resolves.toBe(0);
+
+    expect(existsSync(stale)).toBe(true);
+    expect(sweepAudits(audits)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ metadata: expect.objectContaining({ path: canonical, success: false, reason: "active-session" }) }),
     ]));
   });
 

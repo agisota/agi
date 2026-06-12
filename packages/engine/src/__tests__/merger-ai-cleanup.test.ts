@@ -4,9 +4,10 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { cleanupAiMergeWorktree, pruneExistingAiMergeWorktrees, runAiMerge } from "../merger-ai.js";
+import { cleanupAiMergeWorktree, pruneExistingAiMergeWorktrees, resolveAiMergeRoot, runAiMerge } from "../merger-ai.js";
 import { activeSessionRegistry } from "../active-session-registry.js";
 import { MIN_TEMP_WORKTREE_REAP_AGE_MS } from "../self-healing.js";
+import { classifyTransientMergeError } from "../transient-merge-error-classifier.js";
 import type { RunAuditor } from "../run-audit.js";
 
 const fsState = vi.hoisted(() => ({ failReaddirPath: "" }));
@@ -113,6 +114,12 @@ function makeStore(taskId = "FN-1") {
 
 function tempAiMergeDir(name: string): string {
   const dir = mkdtempSync(join(tmpdir(), `${name}-`));
+  tracked.add(dir);
+  return dir;
+}
+
+function tempProjectRoot(): string {
+  const dir = mkdtempSync(join(tmpdir(), "fusion-ai-merge-project-"));
   tracked.add(dir);
   return dir;
 }
@@ -257,7 +264,9 @@ describe("AI merge temp worktree cleanup", () => {
     const { audit, events } = makeAudit();
     const logs: string[] = [];
 
-    await expect(pruneExistingAiMergeWorktrees("FN-777", process.cwd(), audit, vi.fn(async (message: string) => { logs.push(message); }))).resolves.toBe(1);
+    const projectRoot = tempProjectRoot();
+
+    await expect(pruneExistingAiMergeWorktrees("FN-777", projectRoot, audit, vi.fn(async (message: string) => { logs.push(message); }))).resolves.toBe(1);
 
     expect(existsSync(stale)).toBe(false);
     expect(events).toEqual(expect.arrayContaining([
@@ -270,7 +279,9 @@ describe("AI merge temp worktree cleanup", () => {
     const { audit, events } = makeAudit();
     const logs: string[] = [];
 
-    await expect(pruneExistingAiMergeWorktrees("FN-777", process.cwd(), audit, vi.fn(async (message: string) => { logs.push(message); }))).resolves.toBe(0);
+    const projectRoot = tempProjectRoot();
+
+    await expect(pruneExistingAiMergeWorktrees("FN-777", projectRoot, audit, vi.fn(async (message: string) => { logs.push(message); }))).resolves.toBe(0);
 
     expect(existsSync(fresh)).toBe(true);
     expect(events).toEqual([]);
@@ -281,7 +292,9 @@ describe("AI merge temp worktree cleanup", () => {
     const other = tempAiMergeDir("fusion-ai-merge-fn-778-stale");
     const { audit, events } = makeAudit();
 
-    await expect(pruneExistingAiMergeWorktrees("FN-777", process.cwd(), audit, vi.fn(async () => undefined))).resolves.toBe(0);
+    const projectRoot = tempProjectRoot();
+
+    await expect(pruneExistingAiMergeWorktrees("FN-777", projectRoot, audit, vi.fn(async () => undefined))).resolves.toBe(0);
 
     expect(existsSync(other)).toBe(true);
     expect(events).toEqual([]);
@@ -304,6 +317,9 @@ describe("AI merge temp worktree cleanup", () => {
     });
 
     expect(observedMergeRoot).toContain("fusion-ai-merge-fn-1-");
+    expect(observedMergeRoot).toContain(join(dir, ".fusion", "ai-merge"));
+    expect(observedMergeRoot.startsWith(join(tmpdir(), "fusion-ai-merge-fn-1-"))).toBe(false);
+    expect(observedMergeRoot.startsWith(resolveAiMergeRoot(dir))).toBe(true);
     expect(activeSessionRegistry.pathsForTask("FN-1")).toEqual([]);
     const cleanupEvents = audits.filter((event) => event.mutationType === "merge:ai-worktree-cleanup");
     expect(cleanupEvents).toEqual(expect.arrayContaining([
@@ -328,6 +344,30 @@ describe("AI merge temp worktree cleanup", () => {
     expect(audits.filter((event) => event.mutationType === "merge:ai-worktree-cleanup")).toEqual(expect.arrayContaining([
       expect.objectContaining({ metadata: expect.objectContaining({ phase: "pre-merge-prune", success: true }) }),
     ]));
+  });
+
+  it("classifies a clean-room deleted mid-merge as transient", async () => {
+    const { dir } = initRepoWithBranch();
+    const { store } = makeStore();
+    let observedMergeRoot = "";
+
+    let thrown: unknown;
+    try {
+      await runAiMerge(store, dir, "FN-1", { manual: true }, {
+        mergeAgent: vi.fn(async (cwd: string) => {
+          observedMergeRoot = cwd;
+          rmSync(cwd, { recursive: true, force: true });
+          throw Object.assign(new Error("spawn git ENOTDIR"), { code: "ENOTDIR" });
+        }),
+        reviewAgent: vi.fn(async () => "REVIEW_VERDICT: approve"),
+      });
+    } catch (err: unknown) {
+      thrown = err;
+    }
+
+    expect(observedMergeRoot).toContain(join(dir, ".fusion", "ai-merge"));
+    expect(String(thrown)).toMatch(/ENOENT|ENOTDIR|not a working tree/i);
+    expect(classifyTransientMergeError(String(thrown))).toBe("process-spawn-failure");
   });
 
   it("pre-merge prune failure does not abort merge", async () => {

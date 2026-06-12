@@ -18,7 +18,7 @@
  * - `pruneWorktrees`: defer to backend prune
  * - `cleanupOrphans`: defer to backend prune/remove semantics
  * - `reapUnregisteredOrphans`: defer to backend prune/remove semantics
- * - `cleanupStaleTempMergeWorktrees`: remains native (temp-dir scope, outside worktrunk layout)
+ * - `cleanupStaleTempMergeWorktrees`: remains native (repo-local AI-merge root + legacy temp-dir scope, outside worktrunk layout)
  * - `enforceWorktreeCap`: defer to backend prune/remove semantics
  * - `reclaimSelfOwnedBranchConflicts`: remains native (branch-level)
  * - `reclaimStaleActiveBranches`: remains native (branch-level)
@@ -99,6 +99,10 @@ const MAX_NO_PROGRESS_RESUME_ATTEMPTS = 2;
 function extractTaskIdFromTempMergeDir(dirname: string): string | null {
   const match = /^fusion-ai-merge-(fn-\d+)-[a-z0-9]+$/i.exec(dirname);
   return match?.[1]?.toUpperCase() ?? null;
+}
+
+function resolveRepoLocalAiMergeRoot(rootDir: string): string {
+  return resolve(rootDir, ".fusion", "ai-merge");
 }
 
 function getErrorMessage(err: unknown): string {
@@ -8922,30 +8926,21 @@ export class SelfHealingManager {
   }
 
   /**
-   * Sweep stale AI merge clean-room worktrees from `tmpdir()`.
+   * Sweep stale AI merge clean-room worktrees from the repo-local clean-room
+   * root plus the legacy `tmpdir()` location used by older engine versions.
    *
    * These worktrees are intentionally outside the project/worktrunk-managed
    * `.worktrees/` layout, so this native sweep proceeds even when worktrunk is
-   * enabled. Safety is bounded by a two-hour age gate plus active-session checks.
+   * enabled. Safety is bounded by age gates plus active-session checks.
    */
   private async cleanupStaleTempMergeWorktrees(): Promise<number> {
     try {
       const settings = await this.store.getSettings();
       if (settings.worktrunk?.enabled === true) {
-        log.log("[self-healing] temp-dir sweep: worktrunk enabled — AI merge temp worktrees are outside worktrunk's managed layout, proceeding with native sweep");
+        log.log("[self-healing] temp-dir sweep: worktrunk enabled — AI merge clean-room worktrees are outside worktrunk's managed layout, proceeding with native sweep");
       }
 
-      const tempRoot = tmpdir();
-      let entries: string[];
-      try {
-        entries = readdirSync(tempRoot).filter((entry) => entry.startsWith("fusion-ai-merge-"));
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        log.warn(`[self-healing] temp-dir sweep: failed to read ${tempRoot}: ${errorMessage}`);
-        return 0;
-      }
-      if (entries.length === 0) return 0;
-
+      const roots = Array.from(new Set([resolveRepoLocalAiMergeRoot(this.options.rootDir), tmpdir()]));
       const auditor = createRunAuditor(this.store, {
         runId: generateSyntheticRunId("self-heal", "tempdir-sweep"),
         agentId: "self-healing",
@@ -8954,78 +8949,105 @@ export class SelfHealingManager {
       const now = Date.now();
       let cleaned = 0;
 
-      for (const entry of entries) {
-        const path = join(tempRoot, entry);
-        let canonicalPath = path;
-        let cleanupReason = "stale";
+      for (const tempRoot of roots) {
+        let entries: string[];
         try {
-          const stat = statSync(path);
-          if (!stat.isDirectory()) {
-            await auditor.git({ type: "worktree:tempdir-sweep", target: path, metadata: { path, success: false, reason: "not-directory" } });
+          entries = readdirSync(tempRoot).filter((entry) => entry.startsWith("fusion-ai-merge-"));
+        } catch (err: unknown) {
+          if (!existsSync(tempRoot)) continue;
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          log.warn(`[self-healing] temp-dir sweep: failed to read ${tempRoot}: ${errorMessage}`);
+          if (tempRoot === tmpdir()) return cleaned;
+          continue;
+        }
+        if (entries.length === 0) continue;
+
+        for (const entry of entries) {
+          const path = join(tempRoot, entry);
+          let canonicalPath = path;
+          let cleanupReason = "stale";
+          try {
+            const stat = statSync(path);
+            if (!stat.isDirectory()) {
+              await auditor.git({ type: "worktree:tempdir-sweep", target: path, metadata: { path, success: false, reason: "not-directory" } });
+              continue;
+            }
+            const ageMs = now - stat.mtimeMs;
+            let ageGateMs = STALE_TEMP_MERGE_WORKTREE_MS;
+            cleanupReason = "stale";
+            const taskId = extractTaskIdFromTempMergeDir(entry);
+            if (taskId) {
+              try {
+                const task = await this.store.getTask(taskId);
+                if (task.column === "done" || task.column === "archived") {
+                  ageGateMs = DONE_TASK_TEMP_WORKTREE_GRACE_MS;
+                  cleanupReason = "done-task-stale";
+                }
+              } catch (err: unknown) {
+                if (isTaskNotFoundError(err)) {
+                  ageGateMs = MIN_TEMP_WORKTREE_REAP_AGE_MS;
+                  cleanupReason = "deleted-task";
+                } else {
+                  const errorMessage = getErrorMessage(err);
+                  cleanupReason = "lookup-error";
+                  log.warn(`[self-healing] temp-dir sweep: task lookup failed for ${taskId}: ${errorMessage}; using conservative age gate`);
+                }
+              }
+            }
+            ageGateMs = Math.max(ageGateMs, MIN_TEMP_WORKTREE_REAP_AGE_MS);
+            if (ageMs < ageGateMs) continue;
+            try {
+              canonicalPath = realpathSync(path);
+            } catch {
+              canonicalPath = path;
+            }
+          } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            log.warn(`[self-healing] temp-dir sweep: failed to stat ${path}: ${errorMessage}`);
+            await auditor.git({ type: "worktree:tempdir-sweep", target: path, metadata: { path, success: false, reason: "stat-failed", error: errorMessage } });
             continue;
           }
-          const ageMs = now - stat.mtimeMs;
-          let ageGateMs = STALE_TEMP_MERGE_WORKTREE_MS;
-          cleanupReason = "stale";
-          const taskId = extractTaskIdFromTempMergeDir(entry);
-          if (taskId) {
-            try {
-              const task = await this.store.getTask(taskId);
-              if (task.column === "done" || task.column === "archived") {
-                ageGateMs = DONE_TASK_TEMP_WORKTREE_GRACE_MS;
-                cleanupReason = "done-task-stale";
-              }
-            } catch (err: unknown) {
-              if (isTaskNotFoundError(err)) {
-                ageGateMs = MIN_TEMP_WORKTREE_REAP_AGE_MS;
-                cleanupReason = "deleted-task";
-              } else {
-                const errorMessage = getErrorMessage(err);
-                cleanupReason = "lookup-error";
-                log.warn(`[self-healing] temp-dir sweep: task lookup failed for ${taskId}: ${errorMessage}; using conservative age gate`);
+
+          if (activeSessionRegistry.isPathActive(canonicalPath) || activeSessionRegistry.isPathActive(path)) {
+            log.log(`[self-healing] temp-dir sweep: deferring ${canonicalPath}: active session present`);
+            await auditor.git({ type: "worktree:tempdir-sweep", target: canonicalPath, metadata: { path: canonicalPath, success: false, reason: "active-session" } });
+            continue;
+          }
+
+          let cleanupAttempted = false;
+          try {
+            cleanupAttempted = true;
+            await execAsync(`git worktree remove --force ${shellQuote(canonicalPath)}`, {
+              cwd: this.options.rootDir,
+              timeout: 120_000,
+            });
+          } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            log.warn(`[self-healing] temp-dir sweep: git worktree remove failed for ${canonicalPath}: ${errorMessage} — falling back to filesystem removal`);
+            await auditor.git({ type: "worktree:tempdir-sweep", target: canonicalPath, metadata: { path: canonicalPath, success: false, reason: "git-remove-failed", error: errorMessage } });
+          }
+
+          try {
+            cleanupAttempted = true;
+            rmSync(canonicalPath, { recursive: true, force: true });
+            log.log(`[self-healing] temp-dir sweep: cleaned stale AI merge worktree ${canonicalPath}`);
+            await auditor.git({ type: "worktree:tempdir-sweep", target: canonicalPath, metadata: { path: canonicalPath, success: true, reason: cleanupReason } });
+            cleaned++;
+          } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            log.warn(`[self-healing] temp-dir sweep: failed to remove ${canonicalPath}: ${errorMessage}`);
+            await auditor.git({ type: "worktree:tempdir-sweep", target: canonicalPath, metadata: { path: canonicalPath, success: false, reason: "fs-rm-failed", error: errorMessage } });
+          } finally {
+            if (cleanupAttempted) {
+              try {
+                await execAsync("git worktree prune", { cwd: this.options.rootDir, timeout: 30_000 });
+              } catch (err: unknown) {
+                const errorMessage = err instanceof Error ? err.message : String(err);
+                log.warn(`[self-healing] temp-dir sweep: git worktree prune failed after cleaning ${canonicalPath}: ${errorMessage}`);
+                await auditor.git({ type: "worktree:tempdir-sweep", target: canonicalPath, metadata: { path: canonicalPath, success: false, reason: "git-prune-failed", error: errorMessage } });
               }
             }
           }
-          ageGateMs = Math.max(ageGateMs, MIN_TEMP_WORKTREE_REAP_AGE_MS);
-          if (ageMs < ageGateMs) continue;
-          try {
-            canonicalPath = realpathSync(path);
-          } catch {
-            canonicalPath = path;
-          }
-        } catch (err: unknown) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          log.warn(`[self-healing] temp-dir sweep: failed to stat ${path}: ${errorMessage}`);
-          await auditor.git({ type: "worktree:tempdir-sweep", target: path, metadata: { path, success: false, reason: "stat-failed", error: errorMessage } });
-          continue;
-        }
-
-        if (activeSessionRegistry.isPathActive(canonicalPath) || activeSessionRegistry.isPathActive(path)) {
-          log.log(`[self-healing] temp-dir sweep: deferring ${canonicalPath}: active session present`);
-          await auditor.git({ type: "worktree:tempdir-sweep", target: canonicalPath, metadata: { path: canonicalPath, success: false, reason: "active-session" } });
-          continue;
-        }
-
-        try {
-          await execAsync(`git worktree remove --force ${shellQuote(canonicalPath)}`, {
-            cwd: this.options.rootDir,
-            timeout: 120_000,
-          });
-        } catch (err: unknown) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          log.warn(`[self-healing] temp-dir sweep: git worktree remove failed for ${canonicalPath}: ${errorMessage} — falling back to filesystem removal`);
-          await auditor.git({ type: "worktree:tempdir-sweep", target: canonicalPath, metadata: { path: canonicalPath, success: false, reason: "git-remove-failed", error: errorMessage } });
-        }
-
-        try {
-          rmSync(canonicalPath, { recursive: true, force: true });
-          log.log(`[self-healing] temp-dir sweep: cleaned stale AI merge worktree ${canonicalPath}`);
-          await auditor.git({ type: "worktree:tempdir-sweep", target: canonicalPath, metadata: { path: canonicalPath, success: true, reason: cleanupReason } });
-          cleaned++;
-        } catch (err: unknown) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          log.warn(`[self-healing] temp-dir sweep: failed to remove ${canonicalPath}: ${errorMessage}`);
-          await auditor.git({ type: "worktree:tempdir-sweep", target: canonicalPath, metadata: { path: canonicalPath, success: false, reason: "fs-rm-failed", error: errorMessage } });
         }
       }
 
