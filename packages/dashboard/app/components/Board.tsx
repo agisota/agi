@@ -8,7 +8,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { fetchWorkflowSteps, fetchBoardWorkflows, promoteTask, type ModelInfo, type BoardWorkflowDefinition, type BoardWorkflowsPayload } from "../api";
 import { useBlockerFanout } from "../hooks/useBlockerFanout";
-import { MOBILE_MEDIA_QUERY } from "../hooks/useViewportMode";
+import { isMobileViewport, MOBILE_MEDIA_QUERY } from "../hooks/useViewportMode";
 import { recordResumeEvent } from "../utils/resumeInstrumentation";
 import { subscribeSse } from "../sse-bus";
 import { getBoardCanDropTaskRejection } from "./boardCanDropTask";
@@ -211,7 +211,7 @@ export function Board({ tasks, projectId, maxConcurrent, onMoveTask, onPauseTask
       const boardEl = boardRef.current;
       if (!boardEl) return;
       void boardEl.offsetWidth;
-      if (mobileQuery.matches) {
+      if (isMobileViewport()) {
         boardEl.scrollLeft = 0;
       }
     };
