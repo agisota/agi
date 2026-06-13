@@ -717,6 +717,68 @@ describe("TaskChatTab", () => {
     expect(metrics.scrollTop).toBe(120);
   });
 
+  it("does not render the jump-to-bottom button for loading or empty transcripts", () => {
+    mockLogs([], true);
+    const loading = render(<TaskChatTab task={makeTask()} active addToast={vi.fn()} />);
+    expect(screen.getByText(/Loading agent output/)).toBeVisible();
+    expect(screen.queryByTestId("task-chat-jump-to-bottom")).not.toBeInTheDocument();
+    loading.unmount();
+
+    mockLogs([]);
+    render(<TaskChatTab task={makeTask()} active addToast={vi.fn()} />);
+    expect(screen.getByText(/No agent output yet/)).toBeVisible();
+    expect(screen.queryByTestId("task-chat-jump-to-bottom")).not.toBeInTheDocument();
+  });
+
+  it("renders the jump-to-bottom button only after a populated transcript is scrolled up", () => {
+    const metrics = mockTranscriptMetrics({ scrollHeight: 1200, clientHeight: 240, initialScrollTop: 0 });
+    mockLogs([makeEntry({ agent: "executor", text: "latest output" })]);
+
+    render(<TaskChatTab task={makeTask()} active addToast={vi.fn()} />);
+    expect(metrics.scrollTop).toBe(1200);
+    expect(screen.queryByTestId("task-chat-jump-to-bottom")).not.toBeInTheDocument();
+
+    metrics.scrollTop = 920;
+    fireEvent.scroll(screen.getByTestId("task-chat-transcript"));
+    expect(screen.queryByTestId("task-chat-jump-to-bottom")).not.toBeInTheDocument();
+
+    metrics.scrollTop = 600;
+    fireEvent.scroll(screen.getByTestId("task-chat-transcript"));
+    const jumpButton = screen.getByTestId("task-chat-jump-to-bottom");
+    expect(jumpButton).toBeVisible();
+    expect(jumpButton).toHaveAccessibleName("Jump to latest message");
+    expect(screen.getByRole("button", { name: "Jump to latest message" })).toBe(jumpButton);
+  });
+
+  it("clicking the jump-to-bottom button snaps to the latest message and removes the control", async () => {
+    const user = userEvent.setup();
+    const metrics = mockTranscriptMetrics({ scrollHeight: 1200, clientHeight: 240, initialScrollTop: 0 });
+    mockLogs([makeEntry({ agent: "executor", text: "latest output" })]);
+
+    render(<TaskChatTab task={makeTask()} active addToast={vi.fn()} />);
+    metrics.scrollTop = 120;
+    fireEvent.scroll(screen.getByTestId("task-chat-transcript"));
+
+    await user.click(screen.getByTestId("task-chat-jump-to-bottom"));
+
+    expect(metrics.scrollTop).toBe(1200);
+    expect(screen.queryByTestId("task-chat-jump-to-bottom")).not.toBeInTheDocument();
+  });
+
+  it("keeps the jump-to-bottom affordance available at the mobile breakpoint", () => {
+    mockMatchMedia(true);
+    mockTranscriptMetrics({ scrollHeight: 1200, clientHeight: 240, initialScrollTop: 0 });
+    mockLogs([makeEntry({ agent: "executor", text: "mobile output" })]);
+
+    render(<TaskChatTab task={makeTask()} active addToast={vi.fn()} />);
+    const transcript = screen.getByTestId("task-chat-transcript");
+    transcript.scrollTop = 120;
+    fireEvent.scroll(transcript);
+
+    expect(screen.getByTestId("task-chat-jump-to-bottom")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Jump to latest message" })).toHaveClass("task-chat-jump-to-bottom");
+  });
+
   it("posts composer text through addSteeringComment and clears on success", async () => {
     const user = userEvent.setup();
     mockedAddSteeringComment.mockResolvedValue(makeTask());
@@ -1223,10 +1285,30 @@ describe("TaskChatTab", () => {
     expect(css).not.toContain("62vh");
   });
 
+  it("keeps tokenized sticky styling for the jump-to-bottom control on desktop and mobile", () => {
+    const css = readFileSync(resolve(__dirname, "../TaskChatTab.css"), "utf8");
+    const jumpRule = getCssRuleBlock(css, ".task-chat-jump-to-bottom");
+    const mobileCss = getCssAfter(css, "@media (max-width: 768px)");
+    const mobileJumpRule = getCssRuleBlock(mobileCss, ".task-chat-jump-to-bottom");
+
+    expect(jumpRule).toContain("position: sticky");
+    expect(jumpRule).toContain("bottom: var(--space-md)");
+    expect(jumpRule).toContain("right: var(--space-md)");
+    expect(jumpRule).toContain("background: var(--surface)");
+    expect(jumpRule).toContain("border: var(--btn-border-width) solid var(--border)");
+    expect(jumpRule).toContain("box-shadow: var(--shadow-md)");
+    expect(jumpRule).toContain("border-radius: var(--radius-md)");
+    expect(mobileJumpRule).toContain("bottom: var(--space-sm)");
+    expect(mobileJumpRule).toContain("right: var(--space-sm)");
+    expect(mobileJumpRule).toContain("min-inline-size");
+    expect(mobileJumpRule).toContain("min-block-size");
+  });
+
   it("keeps mobile breakpoint scaffolding for the transcript, composer, and collapsible groups", () => {
     const css = readFileSync(resolve(__dirname, "../TaskChatTab.css"), "utf8");
     expect(css).toContain("@media (max-width: 768px)");
     expect(css).toContain(".task-chat-transcript");
+    expect(css).toContain(".task-chat-jump-to-bottom");
     expect(css).toContain(".task-chat-composer-row");
     expect(css).toContain(".task-chat-tool-group-summary");
     expect(css).toContain(".task-chat-tool-group-names");

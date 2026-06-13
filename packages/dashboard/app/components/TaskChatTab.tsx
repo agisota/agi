@@ -2,7 +2,7 @@ import type { AgentLogEntry, AgentRole, SteeringComment, Task, TaskDetail } from
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Loader2, Send } from "lucide-react";
+import { ChevronDown, Loader2, Send } from "lucide-react";
 import { addSteeringComment } from "../api";
 import { useAgentLogs } from "../hooks/useAgentLogs";
 import type { ToastType } from "../hooks/useToast";
@@ -49,6 +49,10 @@ const STEERING_BLOCKED_STATUSES = new Set([
 ]);
 const REVIEW_STEERABLE_STATUSES = new Set(["reviewing", "merging", "merging-fix", "fixing"]);
 const BOTTOM_FOLLOW_THRESHOLD = 48;
+
+function isTranscriptNearBottom(container: HTMLElement): boolean {
+  return container.scrollHeight - (container.scrollTop + container.clientHeight) <= BOTTOM_FOLLOW_THRESHOLD;
+}
 
 function getRoleLabel(role: AgentLogRole): string {
   switch (role) {
@@ -408,6 +412,7 @@ export function TaskChatTab({ task, projectId, active, addToast, sessionLive, on
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<UserChatMessage[]>([]);
+  const [isTranscriptAtBottom, setIsTranscriptAtBottom] = useState(true);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const previousEntryCountRef = useRef(0);
   const previousScrollHeightRef = useRef(0);
@@ -462,6 +467,7 @@ export function TaskChatTab({ task, projectId, active, addToast, sessionLive, on
 
       container.scrollTop = container.scrollHeight;
       previousScrollHeightRef.current = container.scrollHeight;
+      setIsTranscriptAtBottom(true);
       if (container.scrollHeight === lastScrollHeight) {
         stableFrames += 1;
       } else {
@@ -513,13 +519,24 @@ export function TaskChatTab({ task, projectId, active, addToast, sessionLive, on
       return;
     }
 
+    if (transcriptItemCount === 0) {
+      previousEntryCountRef.current = transcriptItemCount;
+      previousScrollHeightRef.current = container.scrollHeight;
+      return;
+    }
+
     const previousCount = previousEntryCountRef.current;
     const previousScrollHeight = previousScrollHeightRef.current || container.scrollHeight;
     if (transcriptItemCount > previousCount) {
       const shouldFollow = previousCount === 0 || previousScrollHeight - (container.scrollTop + container.clientHeight) <= BOTTOM_FOLLOW_THRESHOLD;
       if (shouldFollow) {
         container.scrollTop = container.scrollHeight;
+        setIsTranscriptAtBottom(true);
+      } else {
+        setIsTranscriptAtBottom(isTranscriptNearBottom(container));
       }
+    } else {
+      setIsTranscriptAtBottom(isTranscriptNearBottom(container));
     }
 
     previousEntryCountRef.current = transcriptItemCount;
@@ -530,6 +547,15 @@ export function TaskChatTab({ task, projectId, active, addToast, sessionLive, on
     const container = transcriptRef.current;
     if (!container) return;
     previousScrollHeightRef.current = container.scrollHeight;
+    setIsTranscriptAtBottom(isTranscriptNearBottom(container));
+  }, []);
+
+  const scrollTranscriptToBottom = useCallback(() => {
+    const container = transcriptRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+    previousScrollHeightRef.current = container.scrollHeight;
+    setIsTranscriptAtBottom(true);
   }, []);
 
   const handleSubmit = useCallback(async (event?: React.FormEvent) => {
@@ -620,6 +646,18 @@ export function TaskChatTab({ task, projectId, active, addToast, sessionLive, on
             );
           })
         )}
+        {transcriptItemCount > 0 && !isTranscriptAtBottom ? (
+          <button
+            type="button"
+            className="task-chat-jump-to-bottom"
+            onClick={scrollTranscriptToBottom}
+            aria-label="Jump to latest message"
+            data-testid="task-chat-jump-to-bottom"
+          >
+            <ChevronDown aria-hidden="true" />
+            <span>Latest</span>
+          </button>
+        ) : null}
       </div>
 
       <form className="task-chat-composer card" onSubmit={handleSubmit}>
