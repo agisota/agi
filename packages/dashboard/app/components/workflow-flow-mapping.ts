@@ -173,7 +173,6 @@ function isSameKindEditorNodeKind(
 function editorKind(node: WorkflowIr["nodes"][number]): WorkflowEditorNodeKind {
   const seam = node.config?.seam;
   if (seam === "merge") return "merge";
-
   const mapped = GRAPH_ONLY_EDITOR_KIND[node.kind];
   if (mapped) return mapped;
 
@@ -187,6 +186,14 @@ function nodeLabel(node: WorkflowIr["nodes"][number]): string {
   if (typeof name === "string" && name.trim()) return name;
   if (node.config?.seam === "merge") return "Merge boundary";
   return node.id;
+}
+
+function dataIrKind(node: WorkflowIrNode, editorNodeKind: WorkflowEditorNodeKind): Partial<WorkflowFlowNodeData> {
+  return node.kind === editorNodeKind ? {} : { irKind: node.kind };
+}
+
+function preservedIrKind(data: WorkflowFlowNodeData): WorkflowIrNode["kind"] | undefined {
+  return typeof data.irKind === "string" ? (data.irKind as WorkflowIrNode["kind"]) : undefined;
 }
 
 /** Build React Flow swimlane band group nodes from the workflow's columns. */
@@ -314,7 +321,7 @@ export function irToFlow(def: WorkflowDefinition): {
           position: childPos,
           parentId: node.id,
           extent: "parent",
-          data: { kind: innerKind, label: nodeLabel(inner), config: { ...(inner.config ?? {}) } },
+          data: { kind: innerKind, ...dataIrKind(inner, innerKind), label: nodeLabel(inner), config: { ...(inner.config ?? {}) } },
           deletable: true,
           zIndex: WF_STEP_NODE_Z_INDEX,
         });
@@ -330,6 +337,7 @@ export function irToFlow(def: WorkflowDefinition): {
         position: pos ?? { x: 80 + index * 180, y: fallbackY },
         data: {
           kind,
+          ...dataIrKind(node, kind),
           label: nodeLabel(node),
           config: { ...restCfg },
           column,
@@ -347,6 +355,7 @@ export function irToFlow(def: WorkflowDefinition): {
       position: pos ?? { x: 80 + index * 180, y: fallbackY },
       data: {
         kind,
+        ...dataIrKind(node, kind),
         label: nodeLabel(node),
         config: { ...(node.config ?? {}) },
         column,
@@ -419,10 +428,17 @@ export function flowToIr(
   function toIrNode(node: FlowNode<WorkflowFlowNodeData>, localId: string): WorkflowIrNode {
     const data = node.data;
     const config = nodeConfig(node);
+    const originalKind = preservedIrKind(data);
     if (data.kind === "merge") {
+      if (originalKind) {
+        return { id: localId, kind: originalKind, config: config && Object.keys(config).length ? config : undefined };
+      }
       return { id: localId, kind: "prompt", config: { ...(config ?? {}), seam: "merge" } };
     }
     if (data.kind === "foreach" || data.kind === "loop") {
+      if (originalKind && originalKind !== "foreach" && originalKind !== "loop") {
+        return { id: localId, kind: originalKind, config: config && Object.keys(config).length ? config : undefined };
+      }
       // Reassemble the template from this group's children.
       const children = childrenByGroup.get(node.id) ?? [];
       const templateNodes: WorkflowIrNode[] = children.map((c) => {
@@ -437,13 +453,13 @@ export function flowToIr(
       const baseCfg = (config ?? {}) as Record<string, unknown>;
       return {
         id: localId,
-        kind: data.kind,
+        kind: originalKind ?? data.kind,
         config: { ...baseCfg, template: { nodes: templateNodes, edges: templateEdges } },
       };
     }
     return {
       id: localId,
-      kind: data.kind as WorkflowIrNode["kind"],
+      kind: originalKind ?? (data.kind as WorkflowIrNode["kind"]),
       config: config && Object.keys(config).length ? config : undefined,
     };
   }
@@ -989,7 +1005,7 @@ function irNodeToFlowNode(
     id,
     type: kind,
     position,
-    data: { kind, label: nodeLabel(node), config: { ...(node.config ?? {}) } },
+    data: { kind, ...dataIrKind(node, kind), label: nodeLabel(node), config: { ...(node.config ?? {}) } },
     deletable: node.kind !== "start" && node.kind !== "end",
     zIndex: WF_STEP_NODE_Z_INDEX,
   };
@@ -1067,7 +1083,7 @@ export function insertFragment(
           position: childPos,
           parentId: id,
           extent: "parent",
-          data: { kind: innerKind, label: nodeLabel(inner), config: { ...(inner.config ?? {}) } },
+          data: { kind: innerKind, ...dataIrKind(inner, innerKind), label: nodeLabel(inner), config: { ...(inner.config ?? {}) } },
           deletable: true,
           zIndex: WF_STEP_NODE_Z_INDEX,
         });
@@ -1083,6 +1099,7 @@ export function insertFragment(
         position: pos,
         data: {
           kind: groupKind,
+          ...dataIrKind(node, groupKind),
           label: nodeLabel(node),
           config: { ...restCfg },
           templateEmpty: template.nodes.length === 0,

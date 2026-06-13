@@ -198,6 +198,55 @@ describe("workflow-flow-mapping v2 round-trip", () => {
     expect(byId.j1.config?.onBranchFailure).toBe("fail-fast");
   });
 
+
+  it("preserves aliased IR node kinds when round-tripping through editor render kinds", () => {
+    const ir: WorkflowDefinition["ir"] = {
+      version: "v2",
+      name: "merge aliases",
+      columns: [{ id: "in-progress", name: "In progress", traits: [] }],
+      nodes: [
+        { id: "gate", kind: "merge-gate", column: "in-progress", config: { name: "Gate" } },
+        { id: "attempt", kind: "merge-attempt", column: "in-progress" },
+        { id: "hold", kind: "manual-merge-hold", column: "in-progress", config: { release: "manual" } },
+        {
+          id: "retry",
+          kind: "retry-backoff",
+          column: "in-progress",
+          config: {
+            maxIterations: 2,
+            template: {
+              nodes: [{ id: "retry-step", kind: "prompt", config: { prompt: "try again" } }],
+              edges: [{ from: "retry-step", to: "retry-step", condition: "retry", kind: "rework" }],
+            },
+          },
+        },
+      ] as WorkflowDefinition["ir"]["nodes"],
+      edges: [],
+    };
+
+    const { nodes, edges } = irToFlow(v2Def(ir));
+    expect(nodes.find((node) => node.id === "gate")?.type).toBe("merge");
+    expect(nodes.find((node) => node.id === "hold")?.type).toBe("hold");
+    expect(nodes.find((node) => node.id === "retry")?.type).toBe("loop");
+
+    const { ir: out } = flowToIr("merge aliases", nodes, edges, columnsOf(v2Def(ir)));
+    if (out.version !== "v2") throw new Error("expected v2");
+    const byId = Object.fromEntries(out.nodes.map((node) => [node.id, node]));
+    expect(byId.gate.kind).toBe("merge-gate");
+    expect(byId.gate.config?.name).toBe("Gate");
+    expect(byId.attempt.kind).toBe("merge-attempt");
+    expect(byId.hold.kind).toBe("manual-merge-hold");
+    expect(byId.hold.config?.release).toBe("manual");
+    expect(byId.retry.kind).toBe("retry-backoff");
+    expect(byId.retry.config).toEqual({
+      maxIterations: 2,
+      template: {
+        nodes: [{ id: "retry-step", kind: "prompt", config: { prompt: "try again" } }],
+        edges: [{ from: "retry-step", to: "retry-step", condition: "retry", kind: "rework" }],
+      },
+    });
+  });
+
   it("emits swimlane band group nodes that flowToIr strips back out", () => {
     const { nodes } = irToFlow(v2Def(ir));
     const bands = nodes.filter((n) => isColumnBandNode(n.id));
