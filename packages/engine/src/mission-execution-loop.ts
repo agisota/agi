@@ -22,12 +22,7 @@ import type {
   Settings,
   Milestone,
 } from "@fusion/core";
-import {
-  TEST_MODE_RESOLVED,
-  isTestModeActive,
-  resolveTaskValidatorModel,
-  normalizeMissionAssertionType,
-} from "@fusion/core";
+import { normalizeMissionAssertionType } from "@fusion/core";
 import type { VerificationOutcome } from "./mission-verification.js";
 import { createFnAgent, promptWithFallback, type AgentResult } from "./pi.js";
 import { mergeEffectiveSettings } from "./effective-settings.js";

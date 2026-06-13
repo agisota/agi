@@ -10,6 +10,8 @@
  * does NOT feed any verdict path (that is U5). It only launches + tears down.
  *
  * Safety contracts enforced here (R13) — the boundary, not a convention:
+ * (port-4040-allowlist: the "4040" references below document the reserved-port
+ * guard contract; this harness never kills or binds the live dashboard port.)
  * - **Non-reserved port.** The bound port is never a reserved dashboard port:
  *   4040 is always reserved, plus anything in `FUSION_RESERVED_PORTS` / `PORT` /
  *   `FUSION_SERVER_PORT` (mirrors the repo's existing port-4040 guards in
