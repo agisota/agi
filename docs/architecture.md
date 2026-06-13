@@ -1224,6 +1224,7 @@ Task steps use statuses: `pending`, `in-progress`, `done`, `skipped`.
 ### Task pause ownership
 - Only explicit user actions pause ordinary tasks: the dashboard/CLI task pause controls and manual `in-progress → todo` moves. System safety pauses remain reserved for explicit approval waits and bounded guardrails such as token-budget, worktrunk-failure, and dispatch-oscillation protection.
 - Agent pause/sleep and heartbeat recovery never pause assigned tasks. Assigned tasks stay in their current column and retain their existing `paused`/`pausedByAgentId` state so the scheduler can re-dispatch unpaused work and user-paused work remains intentionally parked.
+- Only explicit user unpause actions may clear `task.userPaused`; engine self-healing, heartbeat/agent resume cascades, and approval resume paths must leave user-paused tasks parked.
 
 ### User cancel via move-to-todo
 - `TaskStore.moveTask()` accepts `moveSource: "user" | "engine"` (default `"engine"`) and emits `task:moved` with `source` so listeners can distinguish manual moves from engine rebounds.
