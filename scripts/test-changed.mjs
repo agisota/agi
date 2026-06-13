@@ -213,6 +213,9 @@ async function runWatchedTest(command, commandArgs, { env, budgetMs, label } = {
     command,
     args: commandArgs,
     env: env ?? process.env,
+    // Preserve the original `run`'s fixed working directory; pnpm must execute
+    // from the repo root regardless of where test-changed was invoked.
+    cwd: rootDir,
     budgetMs,
     label: label ?? `${command} ${commandArgs.join(" ")}`,
     log: console.error,

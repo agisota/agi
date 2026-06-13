@@ -166,7 +166,8 @@ test("runWithWatchdog: child error rejects", async () => {
 });
 
 test("runWithWatchdog: removes its process listeners after settling", async () => {
-  const before = process.listenerCount("SIGTERM");
+  const beforeTerm = process.listenerCount("SIGTERM");
+  const beforeExit = process.listenerCount("exit");
   const child = makeFakeChild();
   const p = runWithWatchdog({
     command: "fake",
@@ -179,5 +180,52 @@ test("runWithWatchdog: removes its process listeners after settling", async () =
   });
   child.emit("close", 0, null);
   await p;
-  assert.equal(process.listenerCount("SIGTERM"), before);
+  assert.equal(process.listenerCount("SIGTERM"), beforeTerm);
+  assert.equal(process.listenerCount("exit"), beforeExit);
+});
+
+test("runWithWatchdog: forwarded signal escalates to SIGKILL after grace", async () => {
+  const child = makeFakeChild();
+  const killed = [];
+  const p = runWithWatchdog({
+    command: "pnpm",
+    args: [],
+    budgetMs: 10_000,
+    graceMs: 15,
+    heartbeatMs: 1000,
+    label: "cancel",
+    log: () => {},
+    spawn: fakeSpawn(child),
+    killGroup: (sig) => {
+      killed.push(sig);
+      // The child ignores SIGHUP; only SIGKILL takes it down.
+      if (sig === "SIGKILL") child.emit("close", null, "SIGKILL");
+    },
+  });
+  // Simulate external cancellation (Ctrl-C / CI cancel) reaching the wrapper.
+  process.emit("SIGHUP");
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  await p;
+  assert.deepEqual(killed, ["SIGHUP", "SIGKILL"]);
+});
+
+test("runWithWatchdog: passes cwd through to spawn when provided", async () => {
+  let capturedOpts = null;
+  const child = makeFakeChild();
+  const p = runWithWatchdog({
+    command: "pnpm",
+    args: ["test"],
+    cwd: "/tmp/repo-root",
+    budgetMs: 10_000,
+    label: "cwd",
+    log: () => {},
+    spawn: (_cmd, _args, opts) => {
+      capturedOpts = opts;
+      return child;
+    },
+    killGroup: () => {},
+  });
+  child.emit("close", 0, null);
+  await p;
+  assert.equal(capturedOpts.cwd, "/tmp/repo-root");
 });

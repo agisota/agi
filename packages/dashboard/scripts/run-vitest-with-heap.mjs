@@ -18,8 +18,21 @@ if (vitestArgs.length === 0) {
 const nodeOptions = [`--max-old-space-size=${heapMb}`, process.env.NODE_OPTIONS || ""]
   .join(" ")
   .trim();
-const timeoutMs = Number.parseInt(process.env.FUSION_RUN_VITEST_TIMEOUT_MS || "900000", 10);
-const graceMs = Number.parseInt(process.env.FUSION_RUN_VITEST_KILL_GRACE_MS || "5000", 10);
+// Clamp to the default on a missing/malformed value. A bad env value must never
+// produce NaN — the watchdog only arms when budgetMs is finite and > 0, so a
+// NaN here would silently disable the killer and bring back the very hang this
+// wrapper exists to prevent.
+function positiveIntEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw == null || raw === "") return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  console.error(`[dashboard-vitest] ignoring invalid ${name}=${JSON.stringify(raw)}; using ${fallback}`);
+  return fallback;
+}
+
+const timeoutMs = positiveIntEnv("FUSION_RUN_VITEST_TIMEOUT_MS", 900000);
+const graceMs = positiveIntEnv("FUSION_RUN_VITEST_KILL_GRACE_MS", 5000);
 
 function resolveSpawnCommand() {
   const override = process.env.FUSION_RUN_VITEST_SPAWN_OVERRIDE;

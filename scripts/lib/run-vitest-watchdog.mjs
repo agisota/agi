@@ -139,6 +139,8 @@ export function captureHangDiagnostics({ label, command, args, budgetMs, started
  * @param {string} [opts.label]
  * @param {(msg: string) => void} [opts.log]
  * @param {object} opts.spawn      injected spawn (node:child_process spawn); required for testability
+ * @param {string} [opts.cwd]       working directory for the spawned child (preserves callers that
+ *   ran the test command from a fixed root, e.g. test-changed.mjs's rootDir)
  * @param {() => number} [opts.now] injected clock (defaults to Date.now)
  * @param {(signal: string) => void} [opts.killGroup] injected group-signaller
  *   (defaults to a process-group `process.kill(-pid)` with child.kill fallback);
@@ -148,6 +150,7 @@ export function runWithWatchdog({
   command,
   args,
   env = process.env,
+  cwd = null,
   budgetMs,
   graceMs = DEFAULT_GRACE_MS,
   heartbeatMs = DEFAULT_HEARTBEAT_MS,
@@ -171,7 +174,12 @@ export function runWithWatchdog({
 
     // process-supervisor-allowlist: foreground wrapper signals the whole vitest
     // process group on death/timeout; not a background daemon.
-    const child = spawn(command, args, { detached: true, stdio: "inherit", env });
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: "inherit",
+      env,
+      ...(cwd ? { cwd } : {}),
+    });
 
     const heartbeat = setInterval(() => {
       lastHeartbeatAt = now();
@@ -195,6 +203,20 @@ export function runWithWatchdog({
     }
     const signalGroup = typeof killGroup === "function" ? killGroup : defaultSignalGroup;
 
+    // Arm the SIGTERM→SIGKILL grace ladder once. Used by BOTH the timeout path
+    // and external-cancellation forwarding so a child that ignores SIGTERM can't
+    // keep the wrapper pending until the full budget (the original handlers
+    // suppressed Node's default exit behavior, so Ctrl-C / CI cancellation could
+    // otherwise hang for the whole per-command ceiling).
+    function armForceKill(triggerSignal) {
+      if (forceKillTimer) return;
+      forceKillTimer = setTimeout(() => {
+        log(`[watchdog] grace expired after ${triggerSignal}; SIGKILL: ${label}`);
+        signalGroup("SIGKILL");
+      }, Math.max(1, graceMs));
+      forceKillTimer.unref?.();
+    }
+
     const watchdog =
       Number.isFinite(budgetMs) && budgetMs > 0
         ? setTimeout(() => {
@@ -210,11 +232,7 @@ export function runWithWatchdog({
             });
             log(diagnostics);
             signalGroup("SIGTERM");
-            forceKillTimer = setTimeout(() => {
-              log(`[watchdog] grace expired; SIGKILL: ${label}`);
-              signalGroup("SIGKILL");
-            }, Math.max(1, graceMs));
-            forceKillTimer.unref?.();
+            armForceKill("timeout");
           }, budgetMs)
         : null;
     watchdog?.unref?.();
@@ -225,6 +243,7 @@ export function runWithWatchdog({
       const handler = () => {
         log(`[watchdog] received ${sig}; forwarding to group: ${label}`);
         signalGroup(sig);
+        armForceKill(sig);
       };
       signalHandlers.set(sig, handler);
       process.on(sig, handler);
@@ -232,8 +251,9 @@ export function runWithWatchdog({
 
     function onProcExit() {
       // Best-effort: don't leave an orphaned group if the wrapper itself dies.
+      // Route through signalGroup so the injection contract holds everywhere.
       try {
-        process.kill(-child.pid, "SIGTERM");
+        signalGroup("SIGTERM");
       } catch {
         /* group already gone */
       }

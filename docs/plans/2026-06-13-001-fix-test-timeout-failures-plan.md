@@ -128,7 +128,7 @@ flowchart TD
 
 New/changed shared infrastructure (illustrative — per-unit `Files` lists are authoritative):
 
-```
+```text
 scripts/
   lib/
     run-vitest-watchdog.mjs        # NEW (U1) — shared bounded-invocation runner + process-group killer;
@@ -170,7 +170,7 @@ scripts/lib/test-quarantine.json                # MODIFIED (U3) — rescue/delet
 - `.github/workflows/full-suite.yml` (modify) — add `timeout-minutes` to `test-shards`, `test-slow`, `test-inventory-guard`.
 - `scripts/__tests__/run-vitest-watchdog.test.mjs` (new).
 
-**Approach:** Extract the dashboard killer's process-group lifecycle into the shared async helper, parameterized by command, env, heap flag, and budget. Budget = `max(perClassFloor, min(perClassCeiling, expectedDurationMs × multiplier))` per KTD-2 — the per-class floor/ceiling (shard / changed-file / dashboard-lane) are the safety net; the timings term (aggregated across all packages in a multi-package `plain` command, median fallback when absent, multiplier 3-4×) only tightens within the band, and only when the snapshot is fresh. **Refresh `test-timings.json` before deriving budgets.** CI `timeout-minutes` must exceed the worst-case L2 ceiling so L2 always fires first; document the ordering in a comment. Forwards external signals; cleans up on exit/SIGINT/SIGTERM like the existing runners. Note the two runners import each other and are imported by tests — verify the async conversion doesn't break any synchronous-import caller.
+**Approach:** Extract the dashboard killer's process-group lifecycle into the shared async helper, parameterized by command, env, heap flag, and budget. Budget = `max(perClassFloor, min(perClassCeiling, expectedDurationMs × multiplier))` per KTD-2 — the per-class floor/ceiling (shard / changed-file / dashboard-lane) are the safety net; the timings term (aggregated across all packages in a multi-package `plain` command, multiplier 3-4×) only tightens within the band, and only when the snapshot is fresh; when timings are absent or stale, `deriveBudgetMs` falls back to the per-class **ceiling** (never a median). **Refresh `test-timings.json` before deriving budgets.** CI `timeout-minutes` must exceed the worst-case L2 ceiling so L2 always fires first; document the ordering in a comment. Forwards external signals; cleans up on exit/SIGINT/SIGTERM like the existing runners. Note the two runners import each other and are imported by tests — verify the async conversion doesn't break any synchronous-import caller.
 
 **Execution note:** Start with a failing test for the watchdog contract (spawns a deliberately-hanging child, asserts `SIGTERM`-then-`SIGKILL` and exit 124 within budget) before extracting the helper.
 
