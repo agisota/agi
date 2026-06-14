@@ -170,6 +170,16 @@
       "file": "packages/cli/src/commands/__tests__/plugin.test.ts",
       "reason": "Slow/flaky CLI lane observed during `pnpm test` on 2026-06-14: full `@runfusion/fusion` package run timed out in `writes runPluginInstall metadata to central tables only` and leaked cross-test plugin path state into `includes getRootDir on the plugin loader taskStore mock`. A smaller direct run with agent-import/dashboard/plugin passed immediately afterward (`pnpm --filter @runfusion/fusion exec vitest run src/commands/__tests__/agent-import.test.ts src/commands/__tests__/dashboard.test.ts src/commands/__tests__/plugin.test.ts --silent=passed-only --reporter=dot`, 112/112), indicating suite-load/order sensitivity rather than a confirmed product bug.",
       "quarantinedAt": "2026-06-14"
+    },
+    {
+      "file": "packages/cli/src/__tests__/extension-agent-provisioning.test.ts",
+      "reason": "Slow/flaky CLI lane offender observed during FN-6419 broad `pnpm test` / targeted @runfusion/fusion verification: the extension agent provisioning suite exercises real temp projects and privileged `fn_agent_create`/`fn_agent_delete` extension tools, making it sensitive to package-wide CLI load and temp cleanup races. FN-6421 local cross-check after install found the current quarantined CLI lane green, and the two-offender direct run passed immediately (`pnpm --filter @runfusion/fusion exec vitest run src/__tests__/extension-agent-provisioning.test.ts src/commands/__tests__/serve.test.ts --silent=passed-only --reporter=dot`, 55/55), so this is quarantined from the default lane rather than appeased with broader timeouts.",
+      "quarantinedAt": "2026-06-13"
+    },
+    {
+      "file": "packages/cli/src/commands/__tests__/serve.test.ts",
+      "reason": "Slow/flaky CLI lane offender observed during FN-6419 broad `pnpm test` / targeted @runfusion/fusion verification: the serve command suite is a large multi-project integration harness with mocked constructible engine classes, EventEmitter routing, timers, and temp directories, making it sensitive to package-wide CLI load and cleanup races. FN-6421 local cross-check after install found the current quarantined CLI lane green, and the two-offender direct run passed immediately (`pnpm --filter @runfusion/fusion exec vitest run src/__tests__/extension-agent-provisioning.test.ts src/commands/__tests__/serve.test.ts --silent=passed-only --reporter=dot`, 55/55), so this is quarantined from the default lane rather than appeased with wider test timeouts or loosened assertions.",
+      "quarantinedAt": "2026-06-13"
     }
   ]
 }

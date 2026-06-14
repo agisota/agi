@@ -21,9 +21,14 @@ const quarantinedCliTests = [
   FNXC:CliTests 2026-06-14-01:58:
   mission.test includes a real temp-project end-to-end mission-goal case that exceeds the default 5s CLI timeout even as a standalone targeted run, then passes only when given 30s.
   Quarantine the slow file rather than encoding a longer timeout into the default package lane.
+
+  FNXC:CliTests 2026-06-13-20:05:
+  FN-6421 quarantines the remaining FN-6419 CLI lane offenders after standalone evidence showed the agent-provisioning and serve suites pass directly but are integration-heavy under package-wide load.
+  Keep them on the 14-day deletion clock rather than widening CLI test timeouts or loosening assertions.
   */
   "src/__tests__/bin.test.ts",
   "src/__tests__/extension.test.ts",
+  "src/__tests__/extension-agent-provisioning.test.ts",
   "src/__tests__/extension-experiment-finalize.test.ts",
   "src/__tests__/extension-github-tracking.test.ts",
   "src/__tests__/extension-goal-tools.test.ts",
@@ -44,6 +49,7 @@ const quarantinedCliTests = [
   "src/commands/__tests__/ensure-project-registered.test.ts",
   "src/commands/__tests__/init.test.ts",
   "src/commands/__tests__/plugin.test.ts",
+  "src/commands/__tests__/serve.test.ts",
 ];
 
 export default defineConfig({
