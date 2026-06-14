@@ -48,6 +48,14 @@ html {
 /* === Utility Classes === */
 .visually-hidden {
   position: absolute;
+  /* Pin to the containing block's origin. Without offsets an absolute box
+     renders at its static-flow position; inside a horizontal scroller (e.g.
+     the kanban board) that position is off-screen-right, and because the
+     scroll container isn't a positioned containing block its overflow can't
+     clip the span — so it balloons documentElement.scrollWidth and triggers
+     iOS shrink-to-fit zoom-out + whole-page panning on mobile. */
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   padding: 0;
