@@ -233,9 +233,9 @@ const qualityAppChatOnlyTests = ["app/components/__tests__/ChatView.test.tsx"];
 const qualityAppSettingsOnlyTests = ["app/components/__tests__/SettingsModal.test.tsx"];
 const quarantinedDashboardTests: string[] = [
   /*
-  FNXC:DashboardTests 2026-06-13-18:05:
+  FNXC:Testing 2026-06-13-18:05:
   Full dashboard API quality runs exposed suite-load-sensitive failures in process-group timeout and git branch-commit route tests, while both files passed standalone immediately afterward.
-  Quarantine the files instead of widening waits or weakening assertions, per the flaky-test deletion ratchet.
+  FN-6416 requires the heap wrapper test to stay excluded during the 14-day deletion-ratchet window instead of widening waits or weakening assertions.
 
   FNXC:DashboardTests 2026-06-14-00:43:
   Vitest project entries must apply the same quarantine list as the exported dashboardQualityProjectGlobs inventory.
