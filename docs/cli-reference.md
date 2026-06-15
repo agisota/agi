@@ -1025,6 +1025,7 @@ fn plugin dev <path> [--once] [--ai-scan]
 Subcommands: `list|ls`, `install`, `rescan`, `trust`, `untrust`, `verify`, `uninstall`, `enable`, `disable`, `create`, `new`, `dev`.
 
 Scope semantics:
+- `fn plugin install <path>` accepts a built plugin directory or installed package name, not a packed `.tgz` tarball; extract tarballs before installing.
 - `fn plugin install` / `fn plugin uninstall` are **global** operations
 - `fn plugin enable` / `fn plugin disable` are **project-scoped** operations (`--project` selects the project context)
 - `fn plugin list` shows globally installed plugins plus enabled/disabled state for the current project context
