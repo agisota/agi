@@ -231,40 +231,12 @@ const qualityAppComponentBatchBTests = buildComponentQualityInclude(batchedQuali
 const qualityAppAppOnlyTests = ["app/components/__tests__/App.test.tsx"];
 const qualityAppChatOnlyTests = ["app/components/__tests__/ChatView.test.tsx"];
 const qualityAppSettingsOnlyTests = ["app/components/__tests__/SettingsModal.test.tsx"];
-const quarantinedDashboardTests: string[] = [
-  /*
-  FNXC:Testing 2026-06-13-18:05:
-  Full dashboard API quality runs exposed suite-load-sensitive failures in process-group timeout and git branch-commit route tests, while both files passed standalone immediately afterward. FN-6416 required exclusion during the 14-day deletion-ratchet window instead of widening waits or weakening assertions.
-
-  FNXC:DashboardTests 2026-06-14-00:43:
-  Vitest project entries must apply the same quarantine list as the exported dashboardQualityProjectGlobs inventory. Some projects define their own exclude arrays, so each runnable project includes these entries explicitly instead of relying on top-level inheritance.
-
-  FNXC:DashboardTests 2026-06-14-02:24:
-  FN-6433 rescued the dashboard quarantine batch after unquarantined app-backfill and API-quality runs passed with no assertion or timeout changes. Keep this array empty unless a future dashboard quarantine is mirrored in scripts/lib/test-quarantine.json in the same commit.
-
-  FNXC:DashboardTests 2026-06-14-08:28:
-  FN-6441 removed the dashboard component orphan batch from the curated skip-list so passing rescues run in backfill and still-failing tests are excluded only through the dated quarantine ledger. Keep these one-line excludes mirrored with scripts/lib/test-quarantine.json until each file is rescued or deleted under the deletion ratchet.
-
-  FNXC:DashboardTests 2026-06-14-09:58:
-  FN-6444 applies the same no-silent-orphan invariant to dashboard src route/API tests: rescued files run in backfill, while broad stale mission/planning suites are represented only by the dated quarantine ledger.
-
-  FNXC:DashboardSessionTests 2026-06-14-12:10:
-  FN-6447 rescued session-reconnect by isolating the SSE harness from unrelated route background workers, so it must stay out of this quarantine list and run in dashboard-api-quality-backfill.
-  */
-  "app/components/__tests__/ChatView.regular-composer-no-right-line.test.tsx",
-  "app/components/__tests__/MissionManager.test.tsx",
-  "app/components/__tests__/ModalReentry.test.tsx",
-  "app/components/__tests__/ModelSelectorTab.test.tsx",
-  "app/components/__tests__/NewAgentDialog.test.tsx",
-  "app/components/__tests__/OAuthReloginBanner.test.tsx",
-  "app/components/__tests__/PlanningModeModal.favorites.test.tsx",
-  "app/components/__tests__/PlanningModeModal.questions.test.tsx",
-  "app/components/__tests__/PlanningModeModal.swipe-back.test.tsx",
-  "app/components/__tests__/SkillsView.css.test.ts",
-  "app/components/__tests__/mobile-css.test.tsx",
-  "src/__tests__/mission-e2e.test.ts",
-  "src/__tests__/planning.test.ts",
-];
+/*
+FNXC:DashboardTestQuarantine 2026-06-14-17:01:
+FN-6454 applied the quarantine deletion ratchet to every dashboard test quarantined on 2026-06-14.
+Keep this list empty until a new flaky dashboard test is quarantined with a matching ledger entry.
+*/
+const quarantinedDashboardTests: string[] = [];
 
 const qualityApiTests = [
   // Critical HTTP/server behavior: auth, task/project/settings mutation,
