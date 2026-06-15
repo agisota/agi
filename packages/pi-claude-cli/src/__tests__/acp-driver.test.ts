@@ -281,6 +281,30 @@ describe("connection reuse (item 1) — gated by FUSION_CLAUDE_ACP_REUSE", () =>
     expect(vi.mocked(spawn)).toHaveBeenCalledTimes(2); // turn 1 + the post-death cold restart
   });
 
+  it("does NOT keep the connection warm after a tool-use (break-early) turn — prompt() still pending", async () => {
+    process.env.FUSION_CLAUDE_ACP_REUSE = "1";
+    const reuseOpts = { ...OPTS, sessionId: "conv-tooluse" };
+
+    // Turn 1 (cold) breaks early on a pi-known tool — prompt() never resolves
+    // (the break happens mid-stream), so the connection must be torn down, not
+    // released warm, or turn 2 would launch a concurrent prompt on it.
+    const ctx1 = { messages: [{ role: "user", content: "hi" }, { role: "assistant", content: "hello" }] } as never;
+    scriptedUpdates = [
+      { sessionUpdate: "tool_call", toolCallId: "t1", _meta: { claudeCode: { toolName: "mcp__custom-tools__fn_task_list" } }, rawInput: {} },
+    ];
+    const s1 = streamViaAcp(MODEL, ctx1, reuseOpts) as unknown as { _events: Array<Record<string, unknown>> };
+    await flush();
+    expect(s1._events.find((e) => e.type === "done")!.reason).toBe("toolUse");
+    expect(vi.mocked(spawn)).toHaveBeenCalledTimes(1);
+
+    // Turn 2 must cold-spawn a fresh bridge (no warm reuse after a tool turn).
+    scriptedUpdates = [{ sessionUpdate: "agent_message_chunk", content: { type: "text", text: "after tool" } }];
+    const ctx2 = { messages: [...(ctx1 as unknown as { messages: unknown[] }).messages, { role: "user", content: "again" }] } as never;
+    streamViaAcp(MODEL, ctx2, reuseOpts);
+    await flush();
+    expect(vi.mocked(spawn)).toHaveBeenCalledTimes(2); // fresh spawn → no concurrent prompt on a warm conn
+  });
+
   it("cold-starts (no warm reuse) when the resume delta is empty (P1: no empty-prompt hang)", async () => {
     process.env.FUSION_CLAUDE_ACP_REUSE = "1";
     const reuseOpts = { ...OPTS, sessionId: "conv-empty" };
@@ -324,6 +348,14 @@ describe("buildBridgeEnv — R17 auth opt-in (item 3)", () => {
     authTok: process.env.ANTHROPIC_AUTH_TOKEN,
     key: process.env.ANTHROPIC_API_KEY,
   };
+  // Start each case from a clean slate so an ambient auth var in the runner's
+  // env can't shadow the token a test means to exercise (precedence is global).
+  beforeEach(() => {
+    delete process.env.FUSION_CLAUDE_ACP_FORWARD_AUTH;
+    delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    delete process.env.ANTHROPIC_API_KEY;
+  });
   afterEach(() => {
     for (const [k, v] of [
       ["FUSION_CLAUDE_ACP_FORWARD_AUTH", saved.flag],
@@ -368,6 +400,15 @@ describe("buildBridgeEnv — R17 auth opt-in (item 3)", () => {
     const env = buildBridgeEnv({ HOME: "/h", PATH: "/b" });
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe("auth-tok");
     expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+  });
+
+  it("treats a whitespace-only higher-preference token as absent (no shadowing, no blank forward)", () => {
+    process.env.FUSION_CLAUDE_ACP_FORWARD_AUTH = "1";
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = "   "; // blank → must be skipped
+    process.env.ANTHROPIC_API_KEY = "sk-real";
+    const env = buildBridgeEnv({ HOME: "/h", PATH: "/b" });
+    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+    expect(env.ANTHROPIC_API_KEY).toBe("sk-real"); // real lower-preference token wins
   });
 
   it("reads the auth token from process.env, never a caller-supplied value (no token substitution)", () => {

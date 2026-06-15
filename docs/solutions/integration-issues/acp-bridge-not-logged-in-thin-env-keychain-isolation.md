@@ -64,6 +64,8 @@ function buildBridgeEnv(supplied?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 
 The critical additions over a naive `{HOME, PATH}` env are **`XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `USER`, `SHELL`, `LANG`**. With the full list, auth succeeds immediately.
 
+> The allow-list itself never carries API keys. The one exception is an **explicit operator opt-in**, `FUSION_CLAUDE_ACP_FORWARD_AUTH=1`, which forwards a single Claude auth token (`CLAUDE_CODE_OAUTH_TOKEN` > `ANTHROPIC_AUTH_TOKEN` > `ANTHROPIC_API_KEY`) for headless daemons that can't reach the login Keychain (gate R17). It is **OFF by default**, so the no-secrets posture above is the standing default — the opt-in only widens exposure when the operator deliberately enables it.
+
 **2. The Keychain finding (gate R17).** Claude Code stores its OAuth credentials in the macOS **login Keychain** as a generic-password item (service `"Claude Code-credentials"`), *not* a file (`~/.claude/.credentials.json` is an empty directory). A detached/headless process runs in a **different security session** and cannot read the login Keychain, so it fails regardless of env; a login-session process (interactive terminal, or an `fn` daemon launched from a login shell) can. This is codified as gate **R17**: the provider's runtime must have login-Keychain access. The driver also detects a not-logged-in turn and writes a best-effort cross-process signal (`fusion-acp-bridge-auth.json`) that `GET /providers/claude-cli/status` reads, so the dashboard can raise an auth-failure banner with a "Use `claude -p`" fallback.
 
 ## Why This Works

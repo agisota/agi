@@ -148,7 +148,10 @@ export function buildBridgeEnv(supplied?: NodeJS.ProcessEnv): NodeJS.ProcessEnv 
   if (process.env.FUSION_CLAUDE_ACP_FORWARD_AUTH === "1") {
     for (const key of BRIDGE_AUTH_ENV_KEYS) {
       const v = process.env[key];
-      if (typeof v === "string" && v.length > 0) {
+      // Treat a whitespace-only value as absent, so a blank higher-preference
+      // var doesn't shadow a real lower-preference token (and we never forward
+      // a useless blank token).
+      if (typeof v === "string" && v.trim().length > 0) {
         env[key] = v;
         break; // forward only the highest-preference token that's present
       }
@@ -290,8 +293,14 @@ export function streamViaAcp(
       if (inactivity) { clearTimeout(inactivity); inactivity = undefined; }
       if (onAbort && options.signal) options.signal.removeEventListener("abort", onAbort);
       const entry = cacheEntry;
+      // A tool-use turn breaks early while `conn.prompt()` is still pending (we
+      // never await it on break). Releasing the connection as warm here would
+      // let the next turn launch a SECOND concurrent prompt on the same ACP
+      // session — protocol corruption. So a tool-use turn always tears down,
+      // exactly like the non-reuse path; only a clean `stop` turn (prompt fully
+      // resolved before finish) keeps the connection warm.
       const keepWarm =
-        !destroy && entry !== undefined && reuseKey !== undefined &&
+        !destroy && !sawToolCall && entry !== undefined && reuseKey !== undefined &&
         acpSessionCache.get(reuseKey) === entry;
       if (keepWarm) {
         // Release the warm connection: drop this turn's handlers (so a late
