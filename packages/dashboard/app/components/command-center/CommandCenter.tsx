@@ -8,6 +8,7 @@ import { ActivityArea } from "./areas/ActivityArea";
 import { ProductivityArea } from "./areas/ProductivityArea";
 import { EcosystemArea } from "./areas/EcosystemArea";
 import { SignalsArea } from "./areas/SignalsArea";
+import { MissionControlPanel } from "./MissionControlPanel";
 import "./CommandCenter.css";
 
 type SubViewId =
@@ -171,8 +172,8 @@ export function CommandCenter() {
         return <EcosystemArea range={range} />;
       case "signals":
         return <SignalsArea range={range} />;
-      // Mission Control (U6b) is wired in its own unit; placeholder until then.
       case "mission-control":
+        return <MissionControlPanel />;
       default:
         return <PlaceholderTab tabId={activeTab} />;
     }
