@@ -496,4 +496,96 @@ describe("AgentLogger", () => {
       );
     });
   });
+
+  // ── usage_events emission (U1) ─────────────────────────────────────
+  describe("usage_events emission", () => {
+    function createUsageStore() {
+      return {
+        appendAgentLog: vi.fn().mockResolvedValue(undefined),
+        emitUsageEvent: vi.fn().mockReturnValue(true),
+      } as unknown as TaskStore & { emitUsageEvent: ReturnType<typeof vi.fn> };
+    }
+
+    it("emits a tool_call usage event with model/provider/nodeId on tool start", () => {
+      const store = createUsageStore();
+      const logger = new AgentLogger({ store, taskId: "FN-UE-1", agent: "executor" });
+      logger.setUsageContext({
+        model: "claude-sonnet-4-5",
+        provider: "anthropic",
+        nodeId: "node-x",
+        agentId: "A-1",
+      });
+
+      logger.onToolStart("Read", { path: "secret/credentials.env" });
+
+      expect(store.emitUsageEvent).toHaveBeenCalledTimes(1);
+      const event = store.emitUsageEvent.mock.calls[0][0];
+      expect(event).toMatchObject({
+        kind: "tool_call",
+        taskId: "FN-UE-1",
+        agentId: "A-1",
+        nodeId: "node-x",
+        model: "claude-sonnet-4-5",
+        provider: "anthropic",
+        toolName: "Read",
+        category: "read",
+      });
+      // The tool-argument content (the file path) MUST NOT appear in meta.
+      const meta = (event.meta ?? {}) as Record<string, unknown>;
+      expect(JSON.stringify(meta)).not.toContain("credentials.env");
+    });
+
+    it("does not emit usage events when no usage context is set", () => {
+      const store = createUsageStore();
+      const logger = new AgentLogger({ store, taskId: "FN-UE-2" });
+      logger.onToolStart("Bash", { command: "ls" });
+      expect(store.emitUsageEvent).not.toHaveBeenCalled();
+    });
+
+    it("integration: a session calling 3 tools yields 3 tool_call rows with model/provider/nodeId", () => {
+      const store = createUsageStore();
+      const logger = new AgentLogger({ store, taskId: "FN-UE-3", agent: "executor" });
+      logger.setUsageContext({
+        model: "gpt-5",
+        provider: "openai",
+        nodeId: "local",
+        agentId: "A-3",
+      });
+
+      logger.onToolStart("Read", { path: "a.ts" });
+      logger.onToolStart("Edit", { path: "a.ts" });
+      logger.onToolStart("Bash", { command: "pnpm test" });
+
+      const toolCalls = store.emitUsageEvent.mock.calls
+        .map((c) => c[0])
+        .filter((e) => e.kind === "tool_call");
+      expect(toolCalls).toHaveLength(3);
+      expect(toolCalls.map((e) => e.toolName)).toEqual(["Read", "Edit", "Bash"]);
+      for (const event of toolCalls) {
+        expect(event.model).toBe("gpt-5");
+        expect(event.provider).toBe("openai");
+        expect(event.nodeId).toBe("local");
+        expect(event.agentId).toBe("A-3");
+      }
+    });
+
+    it("emits tool_result with a duration descriptor and no result payload", () => {
+      const store = createUsageStore();
+      const logger = new AgentLogger({ store, taskId: "FN-UE-4" });
+      logger.setUsageContext({ model: "m", provider: "p", nodeId: "n", agentId: "a" });
+
+      logger.onToolStart("Bash", { command: "echo hi" });
+      logger.onToolEnd("Bash", false, "super-secret-output");
+
+      const endEvent = store.emitUsageEvent.mock.calls
+        .map((c) => c[0])
+        .find((e) => e.kind === "tool_result");
+      expect(endEvent).toBeDefined();
+      expect(endEvent.toolName).toBe("Bash");
+      const meta = (endEvent.meta ?? {}) as Record<string, unknown>;
+      expect(meta).toHaveProperty("durationMs");
+      // The tool result payload MUST NOT leak into meta.
+      expect(JSON.stringify(meta)).not.toContain("super-secret-output");
+    });
+  });
 });

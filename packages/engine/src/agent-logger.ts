@@ -1,5 +1,23 @@
 import type { TaskStore, AgentLogEntry, AgentRole } from "@fusion/core";
+import { categorizeToolName } from "@fusion/core";
 import { createLogger } from "./logger.js";
+
+/**
+ * Session-context fields that let the logger emit normalized `usage_events`
+ * telemetry (KTD3/U1) alongside its agent-log writes. Populated by the
+ * executor/session layer where `model`/`provider`/`nodeId` are resolved; when
+ * absent, no usage events are emitted (the agent-log behavior is unchanged).
+ */
+export interface AgentLoggerUsageContext {
+  /** Resolved model id for the running session, when known. */
+  model?: string | null;
+  /** Resolved provider for the running session, when known. */
+  provider?: string | null;
+  /** Workflow/session node the session is routed to, when known. */
+  nodeId?: string | null;
+  /** The agent id producing the activity, when known. */
+  agentId?: string | null;
+}
 
 /** Default byte threshold before an automatic flush. */
 const FLUSH_SIZE_BYTES = 1024;
@@ -68,6 +86,12 @@ export interface AgentLoggerOptions {
   flushSizeBytes?: number;
   /** Timer interval (ms) for periodic flush. Defaults to 500. */
   flushIntervalMs?: number;
+  /**
+   * When provided (with `store` + `taskId`), tool start/end callbacks also emit
+   * normalized `usage_events` telemetry carrying the session's model/provider/
+   * node context. Omit to leave agent-log behavior unchanged.
+   */
+  usageContext?: AgentLoggerUsageContext;
 }
 
 /**
@@ -113,6 +137,9 @@ export class AgentLogger {
   private readonly log = createLogger("agent-logger");
   private readonly persistAgentToolOutput: boolean;
   private readonly persistAgentThinkingLog: boolean;
+  private usageContext?: AgentLoggerUsageContext;
+  /** Tracks tool start times so tool_result/tool_error can record a duration. */
+  private readonly toolStartedAt = new Map<string, number>();
 
   constructor(options: AgentLoggerOptions) {
     this.store = options.store;
@@ -125,12 +152,46 @@ export class AgentLogger {
     this.flushIntervalMs = options.flushIntervalMs ?? FLUSH_INTERVAL_MS;
     this.persistAgentToolOutput = options.persistAgentToolOutput !== false;
     this.persistAgentThinkingLog = options.persistAgentThinkingLog === true;
+    this.usageContext = options.usageContext;
 
     // Bind callbacks so they can be passed directly as function references
     this.onText = this.onText.bind(this);
     this.onToolStart = this.onToolStart.bind(this);
     this.onThinking = this.onThinking.bind(this);
     this.onToolEnd = this.onToolEnd.bind(this);
+  }
+
+  /**
+   * Set (or update) the session context used to emit `usage_events` telemetry.
+   * The executor resolves `model`/`provider`/`nodeId` after the logger is
+   * constructed, so it calls this once those are known.
+   */
+  setUsageContext(context: AgentLoggerUsageContext | undefined): void {
+    this.usageContext = context;
+  }
+
+  /**
+   * Emit a normalized tool `usage_events` row through the task store, if a store,
+   * taskId, and usage context are all available. Fail-soft via store.emitUsageEvent.
+   */
+  private emitToolUsageEvent(
+    kind: "tool_call" | "tool_result" | "tool_error",
+    toolName: string,
+    meta?: Record<string, unknown>,
+  ): void {
+    const ctx = this.usageContext;
+    if (!ctx || !this.store || !this.taskId) return;
+    this.store.emitUsageEvent({
+      kind,
+      taskId: this.taskId,
+      agentId: ctx.agentId ?? null,
+      nodeId: ctx.nodeId ?? null,
+      model: ctx.model ?? null,
+      provider: ctx.provider ?? null,
+      toolName,
+      category: categorizeToolName(toolName),
+      ...(meta !== undefined && { meta }),
+    });
   }
 
   /**
@@ -178,6 +239,10 @@ export class AgentLogger {
     this.flushThinkingBuffer();
     const detail = summarizeToolArgs(name, args);
     this.writeEntry(name, "tool", detail, `Failed to log tool start "${name}" for ${this.taskId}`);
+    // agent-log type "tool" maps to usage_events kind "tool_call". meta carries
+    // only non-sensitive descriptors (category) — never the tool arguments.
+    this.toolStartedAt.set(name, Date.now());
+    this.emitToolUsageEvent("tool_call", name);
   }
 
   /**
@@ -196,6 +261,18 @@ export class AgentLogger {
       detail = typeof result === "string" ? result : JSON.stringify(result);
     }
     this.writeEntry(name, type, detail, `Failed to log tool end "${name}" (${type}) for ${this.taskId}`);
+    // Record completion as tool_result/tool_error with a duration descriptor.
+    // meta NEVER includes the tool result payload — only non-sensitive metrics.
+    const startedAt = this.toolStartedAt.get(name);
+    if (startedAt !== undefined) this.toolStartedAt.delete(name);
+    const meta: Record<string, unknown> = {};
+    if (startedAt !== undefined) meta.durationMs = Date.now() - startedAt;
+    if (isError) meta.isError = true;
+    this.emitToolUsageEvent(
+      isError ? "tool_error" : "tool_result",
+      name,
+      Object.keys(meta).length > 0 ? meta : undefined,
+    );
   }
 
   /**

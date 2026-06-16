@@ -518,6 +518,19 @@ export { RetryStormError, serializeRetryStormError } from "./retry-storm-error.j
 export { aggregateAgentTokenUsage } from "./agent-token-usage.js";
 export type { AgentTokenUsageSummary, AgentTokenUsageWindowSummary } from "./agent-token-usage.js";
 export {
+  emitUsageEvent,
+  queryUsageEvents,
+  countUsageEventsBy,
+  categorizeToolName,
+  USAGE_EVENT_META_MAX_BYTES,
+} from "./usage-events.js";
+export type {
+  UsageEvent,
+  UsageEventInput,
+  UsageEventKind,
+  UsageEventRangeQuery,
+} from "./usage-events.js";
+export {
   STALLED_REVIEW_REENQUEUE_THRESHOLD,
   STALLED_REVIEW_INVALID_TRANSITION_THRESHOLD,
   STALLED_REVIEW_WINDOW_MS,

@@ -162,7 +162,7 @@ export function isFts5CorruptionError(error: unknown): boolean {
 
 // ── Schema Definition ────────────────────────────────────────────────
 
-const SCHEMA_VERSION = 117;
+const SCHEMA_VERSION = 118;
 
 const TASKS_FTS_AUTOMERGE = 8;
 const TASKS_FTS_CRISISMERGE = 16;
@@ -1207,6 +1207,29 @@ CREATE TABLE IF NOT EXISTS todo_items (
 CREATE INDEX IF NOT EXISTS idxTodoListsProjectId ON todo_lists(projectId);
 CREATE INDEX IF NOT EXISTS idxTodoItemsListId ON todo_items(listId);
 CREATE INDEX IF NOT EXISTS idxTodoItemsSortOrder ON todo_items(listId, sortOrder);
+
+-- Normalized, queryable telemetry of agent activity (tool calls, messages,
+-- session lifecycle). Fed by emitUsageEvent from the executor/session layer so
+-- analytics never has to parse per-task JSONL agent logs at query time.
+-- The meta column carries only non-sensitive descriptors (error code,
+-- category, duration) -- never tool arguments/content/credentials -- and is
+-- capped at write (see usage-events.ts).
+CREATE TABLE IF NOT EXISTS usage_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  taskId TEXT,
+  agentId TEXT,
+  nodeId TEXT,
+  model TEXT,
+  provider TEXT,
+  toolName TEXT,
+  category TEXT,
+  meta TEXT
+);
+CREATE INDEX IF NOT EXISTS idxUsageEventsTs ON usage_events(ts);
+CREATE INDEX IF NOT EXISTS idxUsageEventsTaskId ON usage_events(taskId);
+CREATE INDEX IF NOT EXISTS idxUsageEventsAgentId ON usage_events(agentId);
 `;
 
 const TABLE_LEVEL_CONSTRAINT_PREFIXES = new Set([
@@ -4715,6 +4738,38 @@ export class Database {
     if (version < 117) {
       this.applyMigration(117, () => {
         this.addColumnIfMissing("tasks", "autoMergeProvenance", "TEXT");
+      });
+    }
+
+    // Migration 118: Queryable usage_events telemetry table (tool calls,
+    // messages, session lifecycle). Mirrors the SCHEMA_SQL definition above so
+    // a fresh-from-SCHEMA_SQL DB and a migrated DB converge on the same table.
+    if (version < 118) {
+      this.applyMigration(118, () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS usage_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            taskId TEXT,
+            agentId TEXT,
+            nodeId TEXT,
+            model TEXT,
+            provider TEXT,
+            toolName TEXT,
+            category TEXT,
+            meta TEXT
+          )
+        `);
+        this.db.exec(`
+          CREATE INDEX IF NOT EXISTS idxUsageEventsTs ON usage_events(ts)
+        `);
+        this.db.exec(`
+          CREATE INDEX IF NOT EXISTS idxUsageEventsTaskId ON usage_events(taskId)
+        `);
+        this.db.exec(`
+          CREATE INDEX IF NOT EXISTS idxUsageEventsAgentId ON usage_events(agentId)
+        `);
       });
     }
 
