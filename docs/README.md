@@ -37,6 +37,7 @@ For a full walkthrough (installation, onboarding, first task, and daily workflow
 | [Research View UX Spec](./research-view-ux-spec.md) | Canonical layout and capability-state messaging spec for the Research dashboard view (FN-4138, informs FN-4134/FN-4135) |
 | [Workflow Steps](./workflow-steps.md) | Workflow overview, built-in workflow catalog, per-task selection, runtime semantics, reusable quality gates, templates, phases, and execution results |
 | [Workflow Editor](./workflow-editor.md) | Visual workflow editor guide for opening, viewing, authoring, validating, importing/exporting, custom fields/columns/settings, and tuning workflows |
+| [Custom Workflow Reliability Acceptance Map](./custom-workflow-reliability-acceptance-map.md) | End-to-end reliability acceptance criteria for custom workflow authoring, selection, execution, recovery, restart durability, and deferred journeys |
 | [Custom Non-Coding Workflows MVP Spec](./custom-workflows-mvp-spec.md) | MVP framing for user-authored non-coding workflows, lifecycle mapping, metrics, and risk checklist |
 | [Task Evaluations](./evals.md) | Eval scoring contract, evidence persistence, score categories, and evaluation pipeline |
 | [Multi-Project](./multi-project.md) | Central registry architecture, project management, isolation modes, and migration paths |
