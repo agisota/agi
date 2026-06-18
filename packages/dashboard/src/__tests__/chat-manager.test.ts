@@ -420,6 +420,84 @@ describe("ChatManager.sendMessage", () => {
     }
   });
 
+  it("exposes fn_task_document_* tools to the chat agent when a task store is present", async () => {
+    let capturedTools: Array<{ name: string; execute?: (...args: any[]) => Promise<any> }> = [];
+    __setCreateFnAgent(async (options: any) => {
+      capturedTools = options.customTools ?? [];
+      return {
+        session: {
+          prompt: vi.fn().mockResolvedValue(undefined),
+          dispose: vi.fn(),
+          state: { messages: [{ role: "assistant", content: "ok" }] },
+        },
+      };
+    });
+
+    const taskStore = {
+      upsertTaskDocument: vi.fn().mockResolvedValue({
+        id: "doc-1",
+        taskId: "FN-6635",
+        key: "docs",
+        content: "Saved from chat",
+        revision: 1,
+        author: "chat-agent",
+        createdAt: "2026-06-18T06:51:00.000Z",
+        updatedAt: "2026-06-18T06:51:00.000Z",
+      }),
+    } as any;
+    const chatManager = new ChatManager(
+      mockChatStore as any,
+      "/tmp/test",
+      mockAgentStore as any,
+      undefined,
+      undefined,
+      undefined,
+      taskStore,
+    );
+
+    await chatManager.sendMessage("chat-001", "Save this as task docs");
+
+    const names = capturedTools.map((tool) => tool.name);
+    expect(names).toContain("fn_task_document_write");
+    expect(names).toContain("fn_task_document_read");
+
+    const writeTool = capturedTools.find((tool) => tool.name === "fn_task_document_write");
+    const writeResult = await writeTool?.execute?.("call-doc-write", {
+      task_id: "FN-6635",
+      key: "docs",
+      content: "Saved from chat",
+      author: "chat-agent",
+    });
+
+    expect(taskStore.upsertTaskDocument).toHaveBeenCalledWith("FN-6635", {
+      key: "docs",
+      content: "Saved from chat",
+      author: "chat-agent",
+    });
+    expect(writeResult?.content?.[0]?.text).toContain("Saved document \"docs\"");
+  });
+
+  it("does not expose fn_task_document_* tools when no task store is present", async () => {
+    let capturedTools: Array<{ name: string }> = [];
+    __setCreateFnAgent(async (options: any) => {
+      capturedTools = options.customTools ?? [];
+      return {
+        session: {
+          prompt: vi.fn().mockResolvedValue(undefined),
+          dispose: vi.fn(),
+          state: { messages: [{ role: "assistant", content: "ok" }] },
+        },
+      };
+    });
+
+    const chatManager = createChatManager();
+    await chatManager.sendMessage("chat-001", "Try saving docs");
+
+    const names = capturedTools.map((tool) => tool.name);
+    expect(names).not.toContain("fn_task_document_write");
+    expect(names).not.toContain("fn_task_document_read");
+  });
+
   it("persists and clears durable in-flight generation snapshots during streaming", async () => {
     let onTextCb: ((delta: string) => void) | undefined;
 

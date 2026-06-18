@@ -71,6 +71,22 @@ export const taskDocumentReadParams = Type.Object({
   ),
 });
 
+export const chatTaskDocumentWriteParams = Type.Object({
+  task_id: Type.String({ description: "Task ID to write the document to (e.g. 'FN-001')." }),
+  key: Type.String({
+    description: "Document key (e.g., 'plan', 'notes', 'research'). Alphanumeric, hyphens, underscores, 1-64 chars.",
+  }),
+  content: Type.String({ description: "Document content to store" }),
+  author: Type.Optional(Type.String({ description: "Who is writing (default: 'agent')" })),
+});
+
+export const chatTaskDocumentReadParams = Type.Object({
+  task_id: Type.String({ description: "Task ID to read documents from (e.g. 'FN-001')." }),
+  key: Type.Optional(
+    Type.String({ description: "Document key to read. Omit to list all documents for this task." }),
+  ),
+});
+
 export const workflowListParams = Type.Object({});
 
 export const workflowGetParams = Type.Object({
@@ -1046,58 +1062,115 @@ export function createTaskDocumentReadTool(store: TaskStore, taskId: string): To
     description:
       "Read a named document for this task, or list all documents when no key is provided.",
     parameters: taskDocumentReadParams,
-    execute: async (_id: string, params: Static<typeof taskDocumentReadParams>) => {
-      try {
-        if (params.key) {
-          const document: TaskDocument | null = await store.getTaskDocument(taskId, params.key);
-          if (!document) {
-            return {
-              content: [{ type: "text" as const, text: `Document "${params.key}" not found.` }],
-              details: {},
-            };
-          }
+    execute: async (_id: string, params: Static<typeof taskDocumentReadParams>) => readTaskDocuments(store, taskId, params.key),
+  };
+}
 
+/**
+ * FNXC:ChatAgentTools 2026-06-18-06:51:
+ * Chat sessions do not have an ambient task, but users expect the same `fn_task_document_write` and `fn_task_document_read` names that task-bound lanes expose.
+ * Require an explicit `task_id` here, mirroring no-ambient workflow authoring tools, so FN-6635 chat agents can persist task documents without guessing a target task.
+ */
+export function createChatTaskDocumentTools(store: TaskStore): ToolDefinition[] {
+  return [
+    {
+      name: "fn_task_document_write",
+      label: "Write Document",
+      description:
+        "Save a named document for a task (for example plan, notes, or research). " +
+        "Each write creates a new revision so you can update documents over time. Requires task_id.",
+      parameters: chatTaskDocumentWriteParams,
+      execute: async (_id: string, params: Static<typeof chatTaskDocumentWriteParams>) => {
+        const input: TaskDocumentCreateInput = {
+          key: params.key,
+          content: params.content,
+          author: params.author || "agent",
+        };
+
+        try {
+          const document: TaskDocument = await store.upsertTaskDocument(params.task_id, input);
           return {
             content: [{
               type: "text" as const,
-              text:
-                `Document: ${document.key}\n` +
-                `Revision: ${document.revision}\n` +
-                `Updated: ${document.updatedAt}\n\n` +
-                document.content,
+              text: `Saved document "${document.key}" (revision ${document.revision}).`,
+            }],
+            details: {},
+          };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: `ERROR: Failed to save document "${params.key}" for task ${params.task_id}: ${err.message}`,
             }],
             details: {},
           };
         }
+      },
+    },
+    {
+      name: "fn_task_document_read",
+      label: "Read Document",
+      description:
+        "Read a named document for a task, or list all documents when no key is provided. Requires task_id.",
+      parameters: chatTaskDocumentReadParams,
+      execute: async (_id: string, params: Static<typeof chatTaskDocumentReadParams>) => (
+        readTaskDocuments(store, params.task_id, params.key)
+      ),
+    },
+  ];
+}
 
-        const documents: TaskDocument[] = await store.getTaskDocuments(taskId);
-        if (documents.length === 0) {
-          return {
-            content: [{ type: "text" as const, text: "No documents found for this task." }],
-            details: {},
-          };
-        }
-
-        const lines = documents.map((doc) => `- ${doc.key} (revision ${doc.revision}, updated ${doc.updatedAt})`);
+async function readTaskDocuments(store: TaskStore, taskId: string, key?: string) {
+  try {
+    if (key) {
+      const document: TaskDocument | null = await store.getTaskDocument(taskId, key);
+      if (!document) {
         return {
-          content: [{
-            type: "text" as const,
-            text: `Task documents:\n${lines.join("\n")}`,
-          }],
-          details: {},
-        };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
-        return {
-          content: [{
-            type: "text" as const,
-            text: `ERROR: Failed to read task documents: ${err.message}`,
-          }],
+          content: [{ type: "text" as const, text: `Document "${key}" not found.` }],
           details: {},
         };
       }
-    },
-  };
+
+      return {
+        content: [{
+          type: "text" as const,
+          text:
+            `Document: ${document.key}\n` +
+            `Revision: ${document.revision}\n` +
+            `Updated: ${document.updatedAt}\n\n` +
+            document.content,
+        }],
+        details: {},
+      };
+    }
+
+    const documents: TaskDocument[] = await store.getTaskDocuments(taskId);
+    if (documents.length === 0) {
+      return {
+        content: [{ type: "text" as const, text: "No documents found for this task." }],
+        details: {},
+      };
+    }
+
+    const lines = documents.map((doc) => `- ${doc.key} (revision ${doc.revision}, updated ${doc.updatedAt})`);
+    return {
+      content: [{
+        type: "text" as const,
+        text: `Task documents:\n${lines.join("\n")}`,
+      }],
+      details: {},
+    };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (err: any) {
+    return {
+      content: [{
+        type: "text" as const,
+        text: `ERROR: Failed to read task documents for task ${taskId}: ${err.message}`,
+      }],
+      details: {},
+    };
+  }
 }
 
 /**

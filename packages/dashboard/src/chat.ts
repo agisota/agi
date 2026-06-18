@@ -45,6 +45,7 @@ import {
   createSendMessageTool,
   createReadMessagesTool,
   createAskQuestionTool,
+  createChatTaskDocumentTools,
   createWorkflowAuthoringTools,
 } from "@fusion/engine";
 import * as engineModule from "@fusion/engine";
@@ -827,8 +828,8 @@ export class ChatManager {
     > | undefined,
     private messageStore?: MessageStore,
     // Scoped task store for the chat's project — enables workflow-authoring
-    // tools (fn_workflow_*). Optional so existing test/construction sites that
-    // don't author workflows keep working.
+    // tools (fn_workflow_*) and explicit-task document tools. Optional so
+    // existing test/construction sites that don't author workflows keep working.
     private taskStore?: TaskStore,
   ) {}
 
@@ -1812,7 +1813,15 @@ export class ChatManager {
         ? createWorkflowAuthoringTools(this.taskStore, "", { stripApprovalFlags: true })
         : [];
 
-      const customTools = [createAskQuestionTool(), ...messagingTools, ...workflowTools];
+      /*
+      FNXC:ChatAgentTools 2026-06-18-06:51:
+      The dashboard chat lane has no ambient task, so task-document tools must require explicit `task_id` while keeping the canonical `fn_task_document_write` and `fn_task_document_read` names available to chat agents.
+      */
+      const documentTools = this.taskStore
+        ? createChatTaskDocumentTools(this.taskStore)
+        : [];
+
+      const customTools = [createAskQuestionTool(), ...messagingTools, ...workflowTools, ...documentTools];
 
       const sessionOptions = {
         cwd: this.rootDir,
