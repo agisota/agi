@@ -23,13 +23,11 @@ FNXC:CompoundEngineeringTests 2026-06-17-16:20:
 FN-6593 deletes orchestrator-flow.test.ts and skill-wiring.test.ts under the ratchet because the broad-workflow-only 5000ms timeout could not be tied to a narrow non-appeasement root cause.
 Keep the ledger entries and excludes removed together; git history remains the archive for this dropped CE orchestrator/skill-wiring coverage.
 
-FNXC:CompoundEngineeringTests 2026-06-17-17:18:
-The CE broad package lane still times out in sync/work-bridge hooks under project concurrency while both files pass in isolation. Quarantine the files under the deletion ratchet instead of raising hook timeouts or serializing the whole plugin lane.
+FNXC:CompoundEngineeringTests 2026-06-17-19:56:
+FN-6606 re-ran the loaded CE node/package lane with sync.test.ts and work-bridge.test.ts temporarily unexcluded and could not reproduce either the 5000ms test timeout or the later 10000ms hook timeout.
+The current HEAD's shared test-isolation fixes now keep the broad lane stable, so restore both files to active coverage and clear the stale quarantine in lockstep with scripts/lib/test-quarantine.json.
 */
-const quarantinedCompoundEngineeringTests = [
-  "src/__tests__/sync.test.ts",
-  "src/__tests__/work-bridge.test.ts",
-];
+const quarantinedCompoundEngineeringTests = [];
 const nodeOnlyDashboardTests = [
   "src/dashboard/__tests__/theme-tokens.test.ts",
 ];
