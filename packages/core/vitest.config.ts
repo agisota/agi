@@ -5,7 +5,6 @@ import { computeMaxWorkers } from "./src/__test-utils__/vitest-workers";
 const maxWorkers = computeMaxWorkers();
 
 const quarantinedCoreTests = [
-  "src/__tests__/task-list-format.test.ts",
   /*
   FNXC:CoreTests 2026-06-13-17:43:
   The full workspace suite must not fail on suite-load-sensitive tests that pass standalone or only fail after excessive wall time. Quarantine observed core offenders after package-lane hook timeouts instead of appeasing them with wider hook timeouts.
@@ -21,6 +20,9 @@ const quarantinedCoreTests = [
 
   FNXC:CoreTests 2026-06-17-17:21:
   FN-6596 verification observed task-list-format and test-project timing out only in the broad changed-package core lane after the merge gate had passed; both files passed immediate isolated reruns. Quarantine the suite-load flakes without widening timeouts or weakening assertions.
+
+  FNXC:CoreTests 2026-06-17-17:55:
+  FN-6592 rescued mission-integration by closing every reopened TaskStore handle and strengthening restart-fidelity assertions across mission hierarchy read paths. Keep the quarantine absent in both this exclude list and scripts/lib/test-quarantine.json unless a future observed flake is mirrored in both files.
   */
   "src/__tests__/task-list-format.test.ts",
   "src/__tests__/test-project.test.ts",
