@@ -550,6 +550,8 @@ export type {
   TokenAnalyticsQuery,
   TokenGroupBy,
   TokenGroupSummary,
+  TokenTimeGranularity,
+  TokenTimePoint,
   TokenTotals,
 } from "./token-analytics.js";
 export { aggregateToolAnalytics, countInterventions } from "./tool-analytics.js";

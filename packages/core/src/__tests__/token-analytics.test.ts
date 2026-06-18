@@ -154,4 +154,80 @@ describe("token-analytics", () => {
     const result = aggregateTokenAnalytics(db, {});
     expect(result.totals.totalTokens).toBe(36);
   });
+
+  it("omits series unless granularity is requested while preserving totals", () => {
+    insertTask(db, { id: "t1", inputTokens: 10, totalTokens: 10, lastUsedAt: "2026-03-01T00:00:00.000Z", modelId: "model-A" });
+
+    const result = aggregateTokenAnalytics(db, {});
+
+    expect(result.totals.totalTokens).toBe(10);
+    expect(result).not.toHaveProperty("series");
+  });
+
+  it("buckets token usage by UTC day in ascending order with inclusive bounds", () => {
+    insertTask(db, { id: "before", inputTokens: 1, totalTokens: 1, lastUsedAt: "2026-02-29T23:59:59.999Z", modelId: "model-A" });
+    insertTask(db, { id: "from", inputTokens: 100, outputTokens: 10, totalTokens: 110, lastUsedAt: "2026-03-01T00:00:00.000Z", modelId: "model-A" });
+    insertTask(db, { id: "same-day", inputTokens: 200, outputTokens: 20, totalTokens: 220, lastUsedAt: "2026-03-01T12:00:00.000Z", modelId: "model-A" });
+    insertTask(db, { id: "to", inputTokens: 300, outputTokens: 30, totalTokens: 330, lastUsedAt: "2026-03-02T00:00:00.000Z", modelId: "model-A" });
+    insertTask(db, { id: "after", inputTokens: 1, totalTokens: 1, lastUsedAt: "2026-03-02T00:00:00.001Z", modelId: "model-A" });
+
+    const result = aggregateTokenAnalytics(db, {
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-02T00:00:00.000Z",
+      granularity: "day",
+    });
+
+    expect(result.series?.map((p) => p.bucket)).toEqual(["2026-03-01", "2026-03-02"]);
+    expect(result.series?.map((p) => p.totalTokens)).toEqual([330, 330]);
+    expect(result.totals.totalTokens).toBe(660);
+  });
+
+  it("buckets token usage by UTC hour", () => {
+    insertTask(db, { id: "h1a", inputTokens: 10, totalTokens: 10, lastUsedAt: "2026-03-01T01:05:00.000Z", modelId: "model-A" });
+    insertTask(db, { id: "h1b", inputTokens: 20, totalTokens: 20, lastUsedAt: "2026-03-01T01:59:00.000Z", modelId: "model-A" });
+    insertTask(db, { id: "h2", inputTokens: 30, totalTokens: 30, lastUsedAt: "2026-03-01T02:00:00.000Z", modelId: "model-A" });
+
+    const result = aggregateTokenAnalytics(db, { granularity: "hour" });
+
+    expect(result.series?.map((p) => [p.bucket, p.totalTokens])).toEqual([
+      ["2026-03-01T01", 30],
+      ["2026-03-01T02", 30],
+    ]);
+  });
+
+  it("buckets token usage by ISO week across year boundaries", () => {
+    insertTask(db, { id: "w1", inputTokens: 10, totalTokens: 10, lastUsedAt: "2026-12-31T12:00:00.000Z", modelId: "model-A" });
+    insertTask(db, { id: "w1b", inputTokens: 20, totalTokens: 20, lastUsedAt: "2027-01-01T12:00:00.000Z", modelId: "model-A" });
+    insertTask(db, { id: "w2", inputTokens: 30, totalTokens: 30, lastUsedAt: "2027-01-04T00:00:00.000Z", modelId: "model-A" });
+
+    const result = aggregateTokenAnalytics(db, { granularity: "week" });
+
+    expect(result.series?.map((p) => [p.bucket, p.totalTokens])).toEqual([
+      ["2026-W53", 30],
+      ["2027-W01", 30],
+    ]);
+  });
+
+  it("computes per-bucket cost with priced and unavailable models", () => {
+    insertTask(db, { id: "priced", inputTokens: 1_000_000, outputTokens: 1_000_000, cachedTokens: 0, cacheWriteTokens: 0, totalTokens: 2_000_000, lastUsedAt: "2026-03-01T00:00:00.000Z", modelProvider: "openai", modelId: "gpt-4o" });
+    insertTask(db, { id: "unknown", inputTokens: 100, totalTokens: 100, lastUsedAt: "2026-03-01T10:00:00.000Z", modelProvider: "unknown", modelId: "mystery" });
+
+    const result = aggregateTokenAnalytics(db, { granularity: "day" });
+
+    expect(result.series).toHaveLength(1);
+    expect(result.series?.[0].cost).toEqual({ usd: 12.5, unavailable: true, stale: false });
+  });
+
+  it("returns an empty series for an empty requested range", () => {
+    insertTask(db, { id: "t1", inputTokens: 100, totalTokens: 100, lastUsedAt: "2026-03-01T00:00:00.000Z", modelId: "model-A" });
+
+    const result = aggregateTokenAnalytics(db, {
+      from: "2027-01-01T00:00:00.000Z",
+      to: "2027-12-31T00:00:00.000Z",
+      granularity: "day",
+    });
+
+    expect(result.series).toEqual([]);
+    expect(result.totals.totalTokens).toBe(0);
+  });
 });

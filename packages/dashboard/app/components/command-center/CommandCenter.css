@@ -166,7 +166,7 @@ The Command Center must remain scrollable on mobile inside the overflow-hidden .
 
 .cc-live-strip-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-2, 0.5rem);
 }
 
@@ -186,6 +186,25 @@ The Command Center must remain scrollable on mobile inside the overflow-hidden .
   font-size: var(--font-size-lg, 1.1rem);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/*
+FNXC:CommandCenterTokens 2026-06-18-15:14:
+Overview token totals now live-poll and should visibly count up on change in both the stat card and live strip. The animation is decorative and must be disabled for reduced-motion users.
+*/
+.cc-token-count-live {
+  animation: cc-token-count-pop var(--duration-normal) ease-out both;
+}
+
+@keyframes cc-token-count-pop {
+  from {
+    transform: translateY(var(--space-1));
+    opacity: 0.7;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .cc-live-metric-label,
@@ -233,7 +252,8 @@ The Command Center must remain scrollable on mobile inside the overflow-hidden .
 @media (prefers-reduced-motion: reduce) {
   .cc-live-strip::before,
   .cc-live-metric,
-  .cc-live-trend .cc-sparkline-bar {
+  .cc-live-trend .cc-sparkline-bar,
+  .cc-token-count-live {
     animation: none;
   }
 }

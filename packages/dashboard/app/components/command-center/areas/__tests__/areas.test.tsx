@@ -3,7 +3,7 @@ FNXC:CommandCenter 2026-06-16-09:42:
 Command Center area component tests (PR #1683). Pin loading/error/unavailable-vs-zero rendering for each analytics area against mocked fixtures so the "—" sentinel and cost-unavailable contracts can't regress.
 */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within, act, renderHook } from "@testing-library/react";
 
 // Mock the api() helper so the areas fetch deterministic fixtures.
 const apiMock = vi.fn();
@@ -16,6 +16,7 @@ import { ToolsArea } from "../ToolsArea";
 import { ProductivityArea } from "../ProductivityArea";
 import { SignalsArea } from "../SignalsArea";
 import { ActivityArea } from "../ActivityArea";
+import { useAnalyticsArea } from "../useAnalyticsArea";
 import type { DateRange } from "../DateRangePicker";
 
 const range7d: DateRange = { from: "2026-06-08", to: null, preset: "7d" };
@@ -35,6 +36,28 @@ function tokenFixture() {
       nTasks: 5,
     },
     cost: { usd: 12.5, unavailable: false, stale: false },
+    series: [
+      {
+        bucket: "2026-06-08",
+        inputTokens: 400,
+        outputTokens: 200,
+        cachedTokens: 0,
+        cacheWriteTokens: 0,
+        totalTokens: 600,
+        nTasks: 2,
+        cost: { usd: 4.5, unavailable: false, stale: false },
+      },
+      {
+        bucket: "2026-06-09",
+        inputTokens: 600,
+        outputTokens: 300,
+        cachedTokens: 0,
+        cacheWriteTokens: 0,
+        totalTokens: 900,
+        nTasks: 3,
+        cost: { usd: 8, unavailable: false, stale: false },
+      },
+    ],
     groups: [
       {
         key: "gpt-4o",
@@ -99,6 +122,71 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("useAnalyticsArea", () => {
+  it("polls only when pollMs is provided and clears the interval on unmount", async () => {
+    vi.useFakeTimers();
+    apiMock.mockResolvedValue({ ok: true });
+
+    const { unmount } = renderHook(() =>
+      useAnalyticsArea<{ ok: boolean }>("/command-center/tokens", range7d, { pollMs: 1_000 }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(apiMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+    expect(apiMock).toHaveBeenCalledTimes(2);
+
+    unmount();
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+    expect(apiMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not poll by default", async () => {
+    vi.useFakeTimers();
+    apiMock.mockResolvedValue({ ok: true });
+
+    renderHook(() => useAnalyticsArea<{ ok: boolean }>("/command-center/tools", range7d));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(apiMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(5_000);
+      await Promise.resolve();
+    });
+    expect(apiMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fetch or schedule polling for inverted custom ranges", async () => {
+    vi.useFakeTimers();
+
+    renderHook(() =>
+      useAnalyticsArea<{ ok: boolean }>(
+        "/command-center/tokens",
+        customRange("2026-06-10", "2026-06-01"),
+        { pollMs: 1_000 },
+      ),
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(2_000);
+      await Promise.resolve();
+    });
+    expect(apiMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("ActivityArea", () => {
@@ -184,8 +272,45 @@ describe("TokensArea", () => {
     await screen.findByTestId("cc-area-tokens");
     expect(screen.getByTestId("cc-tokens-total").textContent).toContain("1,500");
     expect(screen.getByTestId("cc-tokens-cost").textContent).toContain("$12.50");
+    expect(screen.getByTestId("cc-token-series-chart")).toBeTruthy();
+    expect(screen.getByLabelText("2026-06-09: 900")).toBeTruthy();
     expect(screen.getByTestId("cc-tokens-row-gpt-4o")).toBeTruthy();
     expect(screen.getByTestId("cc-tokens-row-claude-sonnet")).toBeTruthy();
+  });
+
+  it("changes the requested endpoint when granularity changes", async () => {
+    apiMock.mockResolvedValue(tokenFixture());
+    render(<TokensArea range={range7d} />);
+    await screen.findByTestId("cc-area-tokens");
+    expect(apiMock.mock.calls.at(-1)?.[0]).toContain("granularity=day");
+
+    fireEvent.click(screen.getByTestId("cc-token-granularity-hour"));
+    await waitFor(() => expect(apiMock.mock.calls.at(-1)?.[0]).toContain("granularity=hour"));
+  });
+
+  it("polls the live token value while preserving rendered content", async () => {
+    vi.useFakeTimers();
+    apiMock
+      .mockResolvedValueOnce(tokenFixture())
+      .mockResolvedValueOnce({
+        ...tokenFixture(),
+        totals: { ...tokenFixture().totals, totalTokens: 1700 },
+      });
+
+    render(<TokensArea range={range7d} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("cc-tokens-total").textContent).toContain("1,500");
+
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("cc-tokens-total").textContent).toContain("1,700");
+    expect(screen.getByTestId("cc-token-series-chart")).toBeTruthy();
   });
 
   it("refetches when the date range changes", async () => {
@@ -208,6 +333,7 @@ describe("TokensArea", () => {
       totals: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0, totalTokens: 0, nTasks: 0 },
       cost: { usd: null, unavailable: true, stale: false },
       groups: [],
+      series: [],
     });
     render(<TokensArea range={range7d} />);
     await screen.findByTestId("cc-area-tokens-empty");

@@ -2,8 +2,8 @@
 FNXC:CommandCenter 2026-06-17-00:00:
 Command Center Overview must consume the same analytics endpoints as the detail tabs. These tests reproduce the prior always-empty landing page, then pin loading-before-empty, range re-derivation, and best-effort Signals behavior so Overview cannot regress into shell placeholders again.
 */
-import { beforeEach, describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, within, waitFor, act } from "@testing-library/react";
 import { CommandCenter } from "../CommandCenter";
 
 const apiMock = vi.fn();
@@ -171,6 +171,10 @@ beforeEach(() => {
   mockEmptyOverviewApi();
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("CommandCenter shell", () => {
   it("renders with the Overview tab active by default", () => {
     render(<CommandCenter />);
@@ -207,6 +211,7 @@ describe("CommandCenter shell", () => {
     expect(screen.getByTestId("command-center-live-snapshot")).toBeTruthy();
     await waitFor(() => expect(liveMetricValue()).toBe("3"));
     expect(screen.getByTestId("command-center-live-agents-working").textContent).toContain("2");
+    expect(screen.getByTestId("command-center-live-tokens").textContent).toContain("1,500");
     expect(screen.getByTestId("command-center-live-open-signals").textContent).toContain("2");
     expect(screen.getByTestId("command-center-throughput-trend")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Recent activity throughput trend" })).toBeTruthy();
@@ -217,6 +222,36 @@ describe("CommandCenter shell", () => {
     expect(within(screen.getByTestId("command-center-overview-chart-tokens")).getByText("gpt-4o")).toBeTruthy();
     expect(within(screen.getByTestId("command-center-overview-chart-tools")).getByText("read")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Daily activity trend" })).toBeTruthy();
+  });
+
+  it("live-polls token totals for the Overview card and live strip", async () => {
+    vi.useFakeTimers();
+    let tokenTotal = 1_500;
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith("/command-center/tokens")) return Promise.resolve(tokenFixture(tokenTotal));
+      if (path.startsWith("/command-center/tools")) return Promise.resolve(toolsFixture());
+      if (path.startsWith("/command-center/activity")) return Promise.resolve(activityFixture());
+      if (path.startsWith("/command-center/signals")) return Promise.resolve(signalsFixture(2));
+      if (path === "/command-center/live") return Promise.resolve(liveFixture([{ column: "in-progress", count: 3 }]));
+      return Promise.reject(new Error(`Unhandled api path: ${path}`));
+    });
+
+    render(<CommandCenter />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(statValue("command-center-stat-tokens")).toBe("1,500");
+
+    tokenTotal = 1_700;
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(statValue("command-center-stat-tokens")).toBe("1,700");
+    expect(screen.getByTestId("command-center-live-tokens").textContent).toContain("1,700");
   });
 
   it("sources live tasks in progress from current column counts instead of funnel entered", async () => {

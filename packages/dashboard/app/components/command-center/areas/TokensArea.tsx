@@ -8,14 +8,19 @@ import type {
   CostResult,
   TokenAnalytics,
   TokenGroupSummary,
+  TokenTimeGranularity,
 } from "@fusion/core";
 import type { DateRange } from "../DateRangePicker";
 import { Bar } from "../charts/Bar";
+import { TokenSeriesChart } from "../charts/TokenSeriesChart";
 import { AreaShell } from "./AreaShell";
 import { useAnalyticsArea } from "./useAnalyticsArea";
 import { formatCost, formatCount } from "./areaShared";
 
 type SortKey = "key" | "totalTokens" | "cost";
+
+const TOKENS_LIVE_REFRESH_MS = 15_000;
+const GRANULARITIES: TokenTimeGranularity[] = ["hour", "day", "week"];
 
 function costSortValue(cost: CostResult): number {
   return cost.unavailable || cost.usd === null ? -1 : cost.usd;
@@ -46,12 +51,14 @@ function sortGroups(groups: TokenGroupSummary[], key: SortKey, dir: 1 | -1): Tok
  */
 export function TokensArea({ range }: { range: DateRange }) {
   const { t } = useTranslation("app");
-  const { data, isLoading, error } = useAnalyticsArea<TokenAnalytics>(
-    "/command-center/tokens?groupBy=model",
-    range,
-  );
+  const [granularity, setGranularity] = useState<TokenTimeGranularity>("day");
+  const endpoint = `/command-center/tokens?groupBy=model&granularity=${granularity}`;
+  const { data, isLoading, error } = useAnalyticsArea<TokenAnalytics>(endpoint, range, {
+    pollMs: TOKENS_LIVE_REFRESH_MS,
+  });
 
   const groups = useMemo(() => data?.groups ?? [], [data?.groups]);
+  const series = useMemo(() => data?.series ?? [], [data?.series]);
 
   const [sortKey, setSortKey] = useState<SortKey>("totalTokens");
   const [sortDir, setSortDir] = useState<1 | -1>(-1);
@@ -104,7 +111,9 @@ export function TokensArea({ range }: { range: DateRange }) {
   }
 
   const totals = data?.totals;
-  const isEmpty = !data || (totals?.totalTokens ?? 0) === 0;
+  const seriesBucketsSig = useMemo(() => series.map((point) => point.bucket).join(" "), [series]);
+  const totalTokenValue = totals?.totalTokens ?? 0;
+  const isEmpty = !data || totalTokenValue === 0;
 
   return (
     <AreaShell testId="tokens" isLoading={isLoading} error={error} isEmpty={isEmpty}>
@@ -113,7 +122,7 @@ export function TokensArea({ range }: { range: DateRange }) {
         <div className="cc-stat-grid">
           <div className="card cc-stat-card" data-testid="cc-tokens-total">
             <div className="cc-stat-label">{t("commandCenter.tokens.totalTokens", "Total tokens")}</div>
-            <div className="cc-stat-value">{formatCount(totals?.totalTokens ?? 0)}</div>
+            <div key={totalTokenValue} className="cc-stat-value cc-token-count-live">{formatCount(totalTokenValue)}</div>
           </div>
           <div className="card cc-stat-card" data-testid="cc-tokens-cost">
             <div className="cc-stat-label">{t("commandCenter.tokens.cost", "Estimated cost")}</div>
@@ -129,6 +138,31 @@ export function TokensArea({ range }: { range: DateRange }) {
             <div className="cc-stat-value">{formatCount(totals?.nTasks ?? 0)}</div>
           </div>
         </div>
+      </div>
+
+      <div className="cc-area-section">
+        <div className="cc-area-section-header">
+          <h3 className="cc-area-section-title">{t("commandCenter.tokens.overTimeChart", "Tokens over time")}</h3>
+          <div className="cc-token-granularity" role="group" aria-label={t("commandCenter.tokens.granularity", "Token chart granularity")}>
+            {GRANULARITIES.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`btn ${option === granularity ? "active" : ""}`}
+                aria-pressed={option === granularity}
+                data-testid={`cc-token-granularity-${option}`}
+                onClick={() => setGranularity(option)}
+              >
+                {t(`commandCenter.tokens.granularity.${option}`, option)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <TokenSeriesChart
+          key={seriesBucketsSig}
+          points={series}
+          ariaLabel={t("commandCenter.tokens.overTimeChart", "Tokens over time")}
+        />
       </div>
 
       <div className="cc-area-section">

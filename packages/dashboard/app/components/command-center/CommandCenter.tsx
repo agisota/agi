@@ -59,9 +59,13 @@ interface OverviewStatCard {
 FNXC:CommandCenter 2026-06-17-00:00:
 Overview is the Command Center landing surface, so it must reflect real analytics instead of shell placeholders. Show loading while core analytics have not settled, show the empty state only after settled zero data, and treat Signals as best-effort because that endpoint can be absent without invalidating tokens/tools/activity metrics.
 */
+const OVERVIEW_TOKEN_REFRESH_MS = 15_000;
+
 function OverviewTab({ range }: { range: DateRange }) {
   const { t } = useTranslation("app");
-  const tokens = useAnalyticsArea<TokenAnalytics>("/command-center/tokens?groupBy=model", range);
+  const tokens = useAnalyticsArea<TokenAnalytics>("/command-center/tokens?groupBy=model", range, {
+    pollMs: OVERVIEW_TOKEN_REFRESH_MS,
+  });
   const tools = useAnalyticsArea<ToolAnalytics>("/command-center/tools", range);
   const activity = useAnalyticsArea<ActivityAnalytics>("/command-center/activity", range);
   const [signals, setSignals] = useState<SignalsAnalytics | null>(null);
@@ -257,7 +261,7 @@ function OverviewTab({ range }: { range: DateRange }) {
         {cards.map((card) => (
           <div key={card.id} className="card cc-stat-card" data-testid={`command-center-stat-${card.id}`}>
             <div className="cc-stat-label">{card.label}</div>
-            <div className="cc-stat-value">{card.value}</div>
+            <div key={card.value} className={`cc-stat-value ${card.id === "tokens" ? "cc-token-count-live" : ""}`}>{card.value}</div>
             {card.subLabel ? <span className="cc-stat-sub">{card.subLabel}</span> : null}
           </div>
         ))}
@@ -282,6 +286,10 @@ function OverviewTab({ range }: { range: DateRange }) {
           <span className="cc-live-metric" data-testid="command-center-live-agents-working">
             <span className="cc-live-metric-value">{formatCount(activeAgents)}</span>
             <span className="cc-live-metric-label">{t("commandCenter.overview.agentsWorking", "agents working")}</span>
+          </span>
+          <span className="cc-live-metric" data-testid="command-center-live-tokens">
+            <span key={tokenTotal} className="cc-live-metric-value cc-token-count-live">{formatCount(tokenTotal)}</span>
+            <span className="cc-live-metric-label">{t("commandCenter.overview.liveTokens", "tokens")}</span>
           </span>
           <span className="cc-live-metric" data-testid="command-center-live-open-signals">
             <span className="cc-live-metric-value">{signalsLoading ? "—" : signals ? formatCount(signals.open ?? 0) : "—"}</span>

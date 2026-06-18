@@ -16,6 +16,7 @@ import {
   registerCommandCenterRoutes,
   resolveRange,
   resolveGroupBy,
+  resolveTokenGranularity,
   DEFAULT_WINDOW_DAYS,
 } from "../routes/register-command-center-routes.js";
 import type { ApiRoutesContext } from "../routes/types.js";
@@ -132,8 +133,35 @@ describe("register-command-center-routes", () => {
     expect(body).toHaveProperty("totals");
     expect(body).toHaveProperty("cost");
     expect(body).toHaveProperty("groups");
+    expect(body).not.toHaveProperty("series");
     expect(body.groupBy).toBe("model");
     expect((body.totals as { totalTokens: number }).totalTokens).toBe(200);
+  });
+
+  it("returns token time-series buckets when granularity is requested", async () => {
+    const res = await request(
+      app,
+      "GET",
+      "/api/command-center/tokens?from=2026-02-01T00:00:00.000Z&to=2026-04-01T00:00:00.000Z&groupBy=model&granularity=day&projectId=proj-a",
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as { series?: { bucket: string; totalTokens: number; cost: unknown }[] };
+    expect(body.series).toEqual([
+      expect.objectContaining({ bucket: "2026-03-01", totalTokens: 200 }),
+    ]);
+    expect(body.series?.[0]).toHaveProperty("cost");
+  });
+
+  it("ignores invalid token granularity rather than erroring", async () => {
+    const res = await request(
+      app,
+      "GET",
+      "/api/command-center/tokens?from=2026-02-01T00:00:00.000Z&to=2026-04-01T00:00:00.000Z&granularity=minute&projectId=proj-a",
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body as Record<string, unknown>).not.toHaveProperty("series");
   });
 
   it("returns the tools / activity / productivity aggregator shapes", async () => {
@@ -317,7 +345,7 @@ describe("register-command-center-routes", () => {
   });
 });
 
-describe("resolveRange / resolveGroupBy (param parsing)", () => {
+describe("resolveRange / resolveGroupBy / resolveTokenGranularity (param parsing)", () => {
   const NOW = Date.parse("2026-06-15T00:00:00.000Z");
 
   it("uses valid, ordered ISO bounds as-is", () => {
@@ -357,6 +385,14 @@ describe("resolveRange / resolveGroupBy (param parsing)", () => {
     expect(resolveGroupBy({ groupBy: "provider" })).toBe("provider");
     expect(resolveGroupBy({ groupBy: "bogus" })).toBeUndefined();
     expect(resolveGroupBy({})).toBeUndefined();
+  });
+
+  it("accepts known token granularities and ignores unknown ones", () => {
+    expect(resolveTokenGranularity({ granularity: "hour" })).toBe("hour");
+    expect(resolveTokenGranularity({ granularity: "day" })).toBe("day");
+    expect(resolveTokenGranularity({ granularity: "week" })).toBe("week");
+    expect(resolveTokenGranularity({ granularity: "minute" })).toBeUndefined();
+    expect(resolveTokenGranularity({})).toBeUndefined();
   });
 });
 

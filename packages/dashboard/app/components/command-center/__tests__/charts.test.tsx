@@ -8,6 +8,7 @@ import { Sparkline } from "../charts/Sparkline";
 import { Funnel } from "../charts/Funnel";
 import { RadialGauge } from "../charts/RadialGauge";
 import { LineChart } from "../charts/LineChart";
+import { TokenSeriesChart } from "../charts/TokenSeriesChart";
 
 function widthOf(el: HTMLElement): string {
   return el.style.width;
@@ -98,6 +99,49 @@ describe("Sparkline", () => {
     const bars = screen.getByRole("img", { name: "empty" }).querySelectorAll<HTMLElement>(".cc-sparkline-bar");
     expect(heightOf(bars[0])).toBe("0%");
     expect(heightOf(bars[1])).toBe("0%");
+  });
+});
+
+describe("TokenSeriesChart", () => {
+  it("renders proportional token buckets with an accessible label", () => {
+    render(
+      <TokenSeriesChart
+        ariaLabel="tokens over time"
+        points={[
+          { bucket: "2026-06-08", inputTokens: 50, outputTokens: 50, cachedTokens: 0, cacheWriteTokens: 0, totalTokens: 100, nTasks: 1, cost: { usd: null, unavailable: true, stale: false } },
+          { bucket: "2026-06-09", inputTokens: 25, outputTokens: 25, cachedTokens: 0, cacheWriteTokens: 0, totalTokens: 50, nTasks: 1, cost: { usd: null, unavailable: true, stale: false } },
+        ]}
+      />,
+    );
+
+    const chart = screen.getByRole("img", { name: "tokens over time" });
+    const bars = chart.querySelectorAll<HTMLElement>(".cc-token-series-bar");
+    expect(bars).toHaveLength(2);
+    expect(heightOf(bars[0])).toBe("100%");
+    expect(heightOf(bars[1])).toBe("50%");
+  });
+
+  it("renders an empty zero state without NaN geometry", () => {
+    render(<TokenSeriesChart ariaLabel="empty tokens" points={[]} />);
+
+    const chart = screen.getByRole("img", { name: "empty tokens" });
+    expect(screen.getByTestId("cc-token-series-empty")).toBeTruthy();
+    expect(chart.innerHTML).not.toMatch(/NaN|Infinity/);
+  });
+
+  it("renders all-zero buckets as zero-height bars", () => {
+    render(
+      <TokenSeriesChart
+        ariaLabel="zero tokens"
+        points={[
+          { bucket: "2026-06-08", inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0, totalTokens: 0, nTasks: 0, cost: { usd: null, unavailable: false, stale: false } },
+        ]}
+      />,
+    );
+
+    const bar = screen.getByRole("img", { name: "zero tokens" }).querySelector<HTMLElement>(".cc-token-series-bar");
+    expect(bar?.style.height).toBe("0%");
+    expect(bar?.outerHTML).not.toMatch(/NaN|Infinity/);
   });
 });
 

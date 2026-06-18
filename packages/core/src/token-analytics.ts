@@ -17,6 +17,9 @@ import { costFor, type CostResult } from "./model-pricing.js";
 /** Dimension to group token totals by. */
 export type TokenGroupBy = "model" | "provider" | "node" | "agent";
 
+/** Bucket size for optional token-usage time-series analytics. */
+export type TokenTimeGranularity = "hour" | "day" | "week";
+
 /** Summed token counts for a group (or the grand total). */
 export interface TokenTotals {
   inputTokens: number;
@@ -41,6 +44,14 @@ export interface TokenGroupSummary extends TokenTotals {
   cost: CostResult;
 }
 
+/** One time bucket in the optional token-usage series. */
+export interface TokenTimePoint extends TokenTotals {
+  /** UTC bucket key (`YYYY-MM-DDTHH`, `YYYY-MM-DD`, or ISO week `YYYY-Www`). */
+  bucket: string;
+  /** Derived USD cost for this bucket, summed per contributing task. */
+  cost: CostResult;
+}
+
 /** Result of {@link aggregateTokenAnalytics}. */
 export interface TokenAnalytics {
   from: string | null;
@@ -56,6 +67,8 @@ export interface TokenAnalytics {
   cost: CostResult;
   /** Per-group totals; empty array when no `groupBy` requested. */
   groups: TokenGroupSummary[];
+  /** Optional token-usage totals over time, present only when requested. */
+  series?: TokenTimePoint[];
 }
 
 export interface TokenAnalyticsQuery {
@@ -64,6 +77,8 @@ export interface TokenAnalyticsQuery {
   /** ISO-8601 upper bound (inclusive) on `tokenUsageLastUsedAt`. */
   to?: string;
   groupBy?: TokenGroupBy;
+  /** Optional UTC bucket size for a token-usage time series. */
+  granularity?: TokenTimeGranularity;
   /**
    * Epoch ms "now" used only for pricing-staleness (U3). When omitted, derived
    * cost is never marked stale. Pure: the module never reads the clock itself.
@@ -92,6 +107,7 @@ interface TaskTokenRow {
   modelId: string | null;
   checkoutNodeId: string | null;
   assignedAgentId: string | null;
+  tokenUsageLastUsedAt: string;
 }
 
 function groupKeyFor(row: TaskTokenRow, groupBy: TokenGroupBy): string | null {
@@ -170,12 +186,36 @@ function addRow(totals: TokenTotals, row: TaskTokenRow): void {
   totals.nTasks += 1;
 }
 
+function isoWeekBucket(isoTimestamp: string): string {
+  const date = new Date(isoTimestamp);
+  if (!Number.isFinite(date.getTime())) return isoTimestamp.slice(0, 10);
+  const day = date.getUTCDay() || 7;
+  const thursday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 4 - day));
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((thursday.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${thursday.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function bucketFor(row: TaskTokenRow, granularity: TokenTimeGranularity): string {
+  switch (granularity) {
+    case "hour":
+      return row.tokenUsageLastUsedAt.slice(0, 13);
+    case "day":
+      return row.tokenUsageLastUsedAt.slice(0, 10);
+    case "week":
+      return isoWeekBucket(row.tokenUsageLastUsedAt);
+  }
+}
+
 /**
  * Aggregate per-task token usage over a date range, optionally grouped.
  *
  * Tasks are matched by `tokenUsageLastUsedAt` within `[from, to]` (inclusive).
  * Tasks with no token usage (`tokenUsageLastUsedAt IS NULL`) are excluded. An
  * empty range yields zeroed `totals` and an empty `groups` array — never nulls.
+ *
+ * FNXC:CommandCenter 2026-06-18-00:00:
+ * The Command Center token view needs a live, scalable, animated token-over-time chart without changing existing CSV/OTel consumers. Keep `series` opt-in via `granularity`, bucket ISO timestamps in UTC (substring for hour/day, ISO-week in JS), and reuse per-task cost accumulation so each bucket prices mixed known/unknown models correctly.
  */
 export function aggregateTokenAnalytics(
   db: Database,
@@ -204,7 +244,8 @@ export function aggregateTokenAnalytics(
          modelProvider,
          modelId,
          checkoutNodeId,
-         assignedAgentId
+         assignedAgentId,
+         tokenUsageLastUsedAt
        FROM tasks ${where}`,
     )
     .all(...params) as TaskTokenRow[];
@@ -213,7 +254,10 @@ export function aggregateTokenAnalytics(
   const totalCost = emptyCostAccumulator();
   const groupMap = new Map<string | null, TokenGroupSummary>();
   const groupCostMap = new Map<string | null, CostAccumulator>();
+  const seriesMap = new Map<string, TokenTimePoint>();
+  const seriesCostMap = new Map<string, CostAccumulator>();
   const groupBy = query.groupBy;
+  const granularity = query.granularity;
   const now = query.now;
 
   for (const row of rows) {
@@ -230,6 +274,17 @@ export function aggregateTokenAnalytics(
       addRow(group, row);
       addRowCost(groupCostMap.get(key)!, row, now);
     }
+    if (granularity) {
+      const bucket = bucketFor(row, granularity);
+      let point = seriesMap.get(bucket);
+      if (!point) {
+        point = { bucket, ...emptyTotals(), cost: { usd: null, unavailable: false, stale: false } };
+        seriesMap.set(bucket, point);
+        seriesCostMap.set(bucket, emptyCostAccumulator());
+      }
+      addRow(point, row);
+      addRowCost(seriesCostMap.get(bucket)!, row, now);
+    }
   }
 
   // Finalize per-group cost from each group's accumulator.
@@ -241,6 +296,13 @@ export function aggregateTokenAnalytics(
     (a, b) => b.totalTokens - a.totalTokens,
   );
 
+  for (const [bucket, point] of seriesMap) {
+    point.cost = finalizeCost(seriesCostMap.get(bucket)!);
+  }
+  const series = granularity
+    ? [...seriesMap.values()].sort((a, b) => a.bucket.localeCompare(b.bucket))
+    : undefined;
+
   return {
     from: query.from ?? null,
     to: query.to ?? null,
@@ -248,5 +310,6 @@ export function aggregateTokenAnalytics(
     totals,
     cost: finalizeCost(totalCost),
     groups,
+    ...(granularity ? { series } : {}),
   };
 }

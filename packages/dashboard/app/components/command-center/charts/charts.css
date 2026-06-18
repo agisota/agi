@@ -118,6 +118,82 @@ Chart labels and legends must use --text-muted so command-center CSS stays align
   transition: height var(--transition-normal);
 }
 
+/* ---- TokenSeriesChart ---- */
+/*
+FNXC:CommandCenterStyling 2026-06-18-15:14:
+The token-over-time chart is live-updated and animated, but the motion is decorative. Use tokenized dimensions/colors and disable height animation for reduced-motion users while keeping empty and all-zero data readable.
+*/
+.cc-token-series {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.cc-token-series-plot {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+  block-size: clamp(var(--space-16), 24vw, calc(var(--space-20) * 2));
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent), var(--surface-1);
+  overflow: hidden;
+}
+
+.cc-token-series-bar {
+  flex: 1 1 0;
+  min-inline-size: var(--space-1);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: linear-gradient(180deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 45%, var(--surface-2)));
+  box-shadow: 0 0 var(--space-2) color-mix(in srgb, var(--color-accent) 24%, transparent);
+  transition: height var(--transition-normal);
+  animation: cc-token-series-rise var(--duration-normal) ease-out both;
+}
+
+.cc-token-series-empty {
+  inline-size: 100%;
+  block-size: var(--border-width-thick);
+  align-self: flex-end;
+  border-radius: var(--radius-pill);
+  background: var(--border-subtle);
+}
+
+.cc-token-series-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes cc-token-series-rise {
+  from {
+    transform: scaleY(0.82);
+    opacity: 0.72;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-token-series-bar {
+    transition: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .cc-token-series-plot {
+    block-size: clamp(var(--space-14), 38vw, calc(var(--space-20) + var(--space-12)));
+    padding: var(--space-2);
+  }
+}
+
 /* ---- LineChart ---- */
 /*
 FNXC:CommandCenterStyling 2026-06-18-14:29:

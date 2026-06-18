@@ -5,6 +5,7 @@ import {
   aggregateProductivityAnalytics,
   composeLiveSnapshot,
   type TokenGroupBy,
+  type TokenTimeGranularity,
 } from "@fusion/core";
 import type { Request, Response } from "express";
 import { ApiError } from "../api-error.js";
@@ -55,6 +56,12 @@ const VALID_GROUP_BY: ReadonlySet<string> = new Set<TokenGroupBy>([
   "agent",
 ]);
 
+const VALID_TOKEN_GRANULARITY: ReadonlySet<string> = new Set<TokenTimeGranularity>([
+  "hour",
+  "day",
+  "week",
+]);
+
 /** A resolved, always-valid `[from, to]` ISO range. */
 export interface ResolvedRange {
   from: string;
@@ -103,6 +110,12 @@ export function resolveGroupBy(query: Request["query"]): TokenGroupBy | undefine
   return raw !== undefined && VALID_GROUP_BY.has(raw) ? (raw as TokenGroupBy) : undefined;
 }
 
+/** Resolve the token-series `granularity` query param, ignoring unknown values. */
+export function resolveTokenGranularity(query: Request["query"]): TokenTimeGranularity | undefined {
+  const raw = typeof query.granularity === "string" ? query.granularity : undefined;
+  return raw !== undefined && VALID_TOKEN_GRANULARITY.has(raw) ? (raw as TokenTimeGranularity) : undefined;
+}
+
 /** True when the caller asked for CSV via `?format=csv` (case-insensitive). */
 export function wantsCsv(query: Request["query"]): boolean {
   const raw = typeof query.format === "string" ? query.format : undefined;
@@ -133,10 +146,12 @@ export const registerCommandCenterRoutes: ApiRouteRegistrar = (ctx) => {
       const store = await getScopedStore(req);
       const range = resolveRange(req.query);
       const groupBy = resolveGroupBy(req.query);
+      const granularity = resolveTokenGranularity(req.query);
       const result = aggregateTokenAnalytics(store.getDatabase(), {
         from: range.from,
         to: range.to,
         groupBy,
+        granularity,
         now: Date.now(),
       });
       if (wantsCsv(req.query)) {
