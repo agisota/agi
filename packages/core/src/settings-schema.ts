@@ -342,9 +342,12 @@ export const DEFAULT_PROJECT_SETTINGS = {
   // planOnlyScopeLeakEnforcement, workflowRevisionForkOnScopeMismatch,
   // strictScopeEnforcement, buildRetryCount, verificationFixRetries,
   // requirePlanApproval) MOVED to workflow settings (U4) — see
-  // MOVED_SETTINGS_KEYS. `buildTimeoutMs` is NOT moved (no engine reader) and
-  // stays a plain project setting:
+  // MOVED_SETTINGS_KEYS. `buildTimeoutMs` and `verificationCommandTimeoutMs`
+  // are NOT moved and stay plain project settings. Keep verificationCommandTimeoutMs
+  // undefined so fn_run_verification preserves legacy per-scope defaults until a
+  // project opts into a single default budget.
   buildTimeoutMs: 300_000,
+  verificationCommandTimeoutMs: undefined,
   ephemeralAgentsEnabled: true,
   agentProvisioning: {},
   sandboxProvisioning: {},

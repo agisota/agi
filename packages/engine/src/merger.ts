@@ -1414,6 +1414,8 @@ async function runDeterministicVerification(
   signal?: AbortSignal,
 ): Promise<VerificationResult> {
   const result: VerificationResult = { allPassed: true };
+  const settings = await store.getSettings();
+  const verificationCommandTimeoutMs = settings.verificationCommandTimeoutMs;
 
   // Nothing to verify
   if (!testCommand && !buildCommand) {
@@ -1540,7 +1542,7 @@ async function runDeterministicVerification(
     failedCommandLabel: "testCommand" | "buildCommand",
   ): Promise<VerificationCommandResult> => {
     const firstAttempt = await runVerificationCommand(
-      store, rootDir, taskId, command, type, signal,
+      store, rootDir, taskId, command, type, signal, verificationCommandTimeoutMs,
     );
     if (firstAttempt.success) {
       return firstAttempt;
@@ -1574,7 +1576,7 @@ async function runDeterministicVerification(
     }
 
     const retryAttempt = await runVerificationCommand(
-      store, rootDir, taskId, command, type, signal,
+      store, rootDir, taskId, command, type, signal, verificationCommandTimeoutMs,
     );
     if (retryAttempt.success) {
       result.environmentFault = {
@@ -1687,9 +1689,10 @@ async function runVerificationCommand(
   command: string,
   type: "test" | "build",
   signal?: AbortSignal,
+  timeoutMsOverride?: number,
 ): Promise<VerificationCommandResult> {
   throwIfAborted(signal, taskId);
-  return runVerificationCommandShared(store, rootDir, taskId, command, type, signal, mergerLog, "merger", VERIFICATION_EXTRA_ENV);
+  return runVerificationCommandShared(store, rootDir, taskId, command, type, signal, mergerLog, "merger", VERIFICATION_EXTRA_ENV, timeoutMsOverride);
 }
 
 /**

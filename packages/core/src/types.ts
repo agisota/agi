@@ -3744,6 +3744,12 @@ export interface ProjectSettings {
   verificationFixRetries?: number;
   /** Timeout in milliseconds for build commands during merge. Default: 300000 (5 min). */
   buildTimeoutMs?: number;
+  /**
+   * FNXC:Verification 2026-06-17-14:20:
+   * Engine verification commands need a durable project-level budget so marathon test runs abort cleanly instead of tripping the stuck detector and requeueing forever.
+   * When set, this millisecond value overrides both fn_run_verification scope defaults (package 300s, workspace 900s); when unset, the legacy per-scope defaults still apply.
+   */
+  verificationCommandTimeoutMs?: number;
   /** When enabled, AI-generated task specifications require manual approval
    *  before the task can move from triage to todo. Tasks with approved specs
    *  remain in triage with status "awaiting-approval" until a user approves
