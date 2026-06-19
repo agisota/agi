@@ -517,8 +517,22 @@ type RebindOutcome =
   | {
     taskId: string;
     result: "skipped";
-    reason: "binding-intact" | "no-live-branch" | "ambiguous-candidates" | "no-unique-work";
+    reason:
+      | "binding-intact"
+      | "no-live-branch"
+      | "ambiguous-candidates"
+      | "no-unique-work"
+      | "unsafe-to-auto-mutate:user-paused"
+      | "unsafe-to-auto-mutate:checked-out";
     candidates?: Array<{ branch: string; aheadCount: number }>;
+  };
+
+type AutoRebindSafetyResult =
+  | { safe: true }
+  | {
+    safe: false;
+    reason: "unsafe-to-auto-mutate:user-paused" | "unsafe-to-auto-mutate:checked-out";
+    detail: string;
   };
 
 export type RebindResult = { repaired: number; outcomes: RebindOutcome[] };
@@ -3561,6 +3575,29 @@ export class SelfHealingManager {
     }
   }
 
+  private assertSafeToAutoRebind(task: Task): AutoRebindSafetyResult {
+    /*
+    FNXC:SelfHealingRebind 2026-06-19-12:00:
+    In-review branch rebind is metadata repair only, but it is still an engine-owned mutation.
+    Block instead of warn when authoritative user intent or a live checkout is present so recovery never overrides a user pause or rewrites task metadata underneath an active agent lease.
+    */
+    if (task.userPaused === true) {
+      return {
+        safe: false,
+        reason: "unsafe-to-auto-mutate:user-paused",
+        detail: "task is user-paused; authoritative user intent blocks automatic branch rebind",
+      };
+    }
+    if (task.checkedOutBy) {
+      return {
+        safe: false,
+        reason: "unsafe-to-auto-mutate:checked-out",
+        detail: `task is checked out by ${task.checkedOutBy}; automatic branch rebind would mutate metadata under a live lease`,
+      };
+    }
+    return { safe: true };
+  }
+
   private async emitBranchRebindAuditEvent(input: {
     taskId: string;
     mutationType: "task:auto-rebind-applied" | "task:auto-rebind-skipped";
@@ -3703,13 +3740,24 @@ export class SelfHealingManager {
               patch.baseCommitSha = derivedBaseCommit;
             }
           }
-          // TODO(FN-5066): tighten composition once helper API is final.
-          try {
-            const maybeAsserting = this as unknown as { assertSafeToAutoMutate?: (opts: unknown) => Promise<void> };
-            await maybeAsserting.assertSafeToAutoMutate?.({ taskId: task.id, reason: "in-review-branch-rebind" });
-          } catch (assertErr: unknown) {
-            const message = assertErr instanceof Error ? assertErr.message : String(assertErr);
-            log.warn(`[self-healing] assertSafeToAutoMutate warning for ${task.id}: ${message}; continuing rebind`);
+          const safety = this.assertSafeToAutoRebind(task);
+          if (!safety.safe) {
+            await this.emitBranchRebindAuditEvent({
+              taskId: task.id,
+              mutationType: "task:auto-rebind-skipped",
+              metadata: {
+                taskId: task.id,
+                reason: safety.reason,
+                detail: safety.detail,
+                branch: selected.branch,
+                aheadCount: selected.aheadCount,
+                integrationBase,
+                source: "auto-rebind-in-review",
+                previousBranch: task.branch ?? null,
+              },
+            });
+            result.outcomes.push({ taskId: task.id, result: "skipped", reason: safety.reason });
+            continue;
           }
           await this.store.updateTask(task.id, patch);
           await this.emitBranchRebindAuditEvent({
