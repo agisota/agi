@@ -40,6 +40,9 @@ pnpm verify:workspace  # deep opt-in verification: lint -> test:full -> build (N
 
 `pnpm test:full` runs each package's default test script with capped worker fanout (`FUSION_TEST_TOTAL_WORKERS=4 FUSION_TEST_CONCURRENCY=2 pnpm -r --workspace-concurrency=2 test`). Do not casually raise worker counts; dashboard/jsdom and integration-heavy packages destabilize when oversubscribed. Use `VITEST_MAX_WORKERS=<n>` only for targeted package-level investigation.
 
+<!-- FNXC:CustomWorkflowReliability 2026-06-19-00:00: FN-6694 adds an executable custom-workflow reliability release-check lane for QA signoff, but it must stay out of the merge gate so reliability evidence does not inflate every PR's wall-time. -->
+Custom workflow reliability release signoff has a dedicated on-demand lane: `pnpm test:workflow-release-check` runs the manifest-listed targeted seams from `scripts/lib/workflow-reliability-release-check.json`, while `--dry-run` validates the manifest and prints planned commands and `--json` emits machine-readable item/seam evidence. This lane is **not** part of the merge gate and should not be added to `test:gate` or the `engine-core` allow-list.
+
 <!-- FNXC:iOSAcceptance 2026-06-18-17:25: Terminal acceptance gates that depend on real mobile Safari must use the credential-driven real-iOS surface runbook instead of treating desktop WebKit or jsdom as evidence. -->
 Terminal acceptance tasks that require real mobile Safari should use [`docs/ios-acceptance.md`](./ios-acceptance.md) for the `--check` run-vs-NO-OP probe, credential wiring, and physical/cloud real-iOS evidence workflow.
 

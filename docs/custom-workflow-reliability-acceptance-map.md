@@ -116,10 +116,27 @@ The following journeys are intentionally out of scope for the MVP reliability ba
 
 ## Release-check checklist
 
-Before claiming the custom workflow system is reliable for goal **G-MPW67VQR-0001-97S3**, QA or engineering should be able to demonstrate:
+<!--
+FNXC:CustomWorkflowReliability 2026-06-19-00:00:
+FN-6694 made this release checklist executable. QA/release signoff should now cite the harness output and manifest-backed seam mapping rather than relying on prose-only spot checks.
+-->
 
-- A custom workflow can be authored/imported, rejected on invalid IR, saved, discovered, selected, and reloaded.
-- A task can execute the selected workflow through runtime primitives, and explicit missing custom workflow IDs fail closed.
-- Gate/advisory/readonly/`REVISE`/required-artifact behavior is observable in task state, workflow results, task documents, and logs.
-- `autoMerge:false`, hard-cancel, file-scope, and recovery invariants are preserved under custom workflow execution.
-- Engine/scheduler restart preserves workflow selection and progress, and any recovery emits typed run-audit evidence instead of silent lifecycle mutation.
+Before claiming the custom workflow system is reliable for goal **G-MPW67VQR-0001-97S3**, QA or engineering should run the executable release-check harness:
+
+```bash
+pnpm test:workflow-release-check          # run the targeted manifest-listed seams and emit text PASS/FAIL evidence
+pnpm test:workflow-release-check --json   # emit the same item/seam evidence as machine-readable JSON
+pnpm test:workflow-release-check --dry-run # validate the manifest and print planned commands without running Vitest
+```
+
+The source of truth for the checklist-to-seam mapping is [`scripts/lib/workflow-reliability-release-check.json`](../scripts/lib/workflow-reliability-release-check.json). The runner validates that every referenced file exists, groups the seams into targeted package-scoped Vitest commands, and exits non-zero if the manifest is invalid or any required item fails. It is intentionally an on-demand QA/release lane, not a merge-gate expansion.
+
+| Release-check item | Manifest ID | Automated evidence seams |
+|---|---|---|
+| A custom workflow can be authored/imported, rejected on invalid IR, saved, discovered, selected, and reloaded. | `author-import-save-discover-reload` | `packages/core/src/__tests__/workflow-definition-store.test.ts`; `packages/dashboard/src/routes/__tests__/workflow-import-export.test.ts`; `packages/dashboard/src/routes/__tests__/workflow-design-route.test.ts`; `packages/core/src/__tests__/workflow-selection-store.test.ts` |
+| A task can execute the selected workflow through runtime primitives, and explicit missing custom workflow IDs fail closed. | `selected-workflow-execution-fail-closed` | `packages/core/src/__tests__/workflow-selection-store.test.ts`; `packages/engine/src/__tests__/workflow-task-runtime.test.ts` |
+| Gate/advisory/readonly/`REVISE`/required-artifact behavior is observable in task state, workflow results, task documents, and logs. | `gate-advisory-readonly-revise-required-artifact` | `packages/engine/src/__tests__/workflow-malformed-verdict-gate.test.ts`; `packages/engine/src/__tests__/workflow-required-artifact-gate.test.ts`; `packages/engine/src/__tests__/workflow-step-readonly-allowlist.test.ts`; `packages/engine/src/__tests__/executor-workflow-revision-scope.test.ts` |
+| `autoMerge:false`, hard-cancel, file-scope, and recovery invariants are preserved under custom workflow execution. | `automerge-hard-cancel-file-scope-recovery` | `packages/engine/src/__tests__/reliability-interactions/workflow-and-file-scope.test.ts`; `packages/engine/src/__tests__/reliability-interactions/workflow-interpreter-cutover.test.ts`; `packages/engine/src/__tests__/self-healing-custom-workflow-recovery.test.ts` |
+| Engine/scheduler restart preserves workflow selection and progress, and any recovery emits typed run-audit evidence instead of silent lifecycle mutation. | `restart-selection-progress-run-audit` | `packages/core/src/__tests__/workflow-restart-durability.test.ts`; `packages/engine/src/__tests__/self-healing-custom-workflow-recovery.test.ts` |
+
+Manual-only checks: **none currently deferred**. If a future release-check item cannot be automated, add it to the manifest's `manual` array with a non-empty `automationDeferredReason`, label it here, and file/link a focused follow-up after confirming there is no duplicate task.
