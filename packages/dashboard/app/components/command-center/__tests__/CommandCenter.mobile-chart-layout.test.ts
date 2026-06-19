@@ -64,6 +64,12 @@ describe("CommandCenter.mobile-chart-layout.css", () => {
     expect(mobileCss).toMatch(/\.cc-system-chart-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
   });
 
+  it("keeps recharts ResponsiveContainer parents sized without becoming scroll owners", () => {
+    expect(cssContent).toMatch(/\.cc-overview-chart-card \.cc-recharts-chart,[\s\S]*\.cc-overview-chart-card \.cc-recharts-empty\s*\{[\s\S]*inline-size:\s*100%;[\s\S]*block-size:\s*calc\(var\(--space-20\)\s*\*\s*3\);[\s\S]*min-inline-size:\s*0/);
+    expect(cssContent).toMatch(/\.cc-area \.cc-recharts-chart,[\s\S]*\.cc-area \.cc-recharts-empty\s*\{[\s\S]*inline-size:\s*100%;[\s\S]*block-size:\s*calc\(var\(--space-20\)\s*\*\s*3\);[\s\S]*min-inline-size:\s*0/);
+    expect(cssContent).not.toMatch(/\.cc-recharts-(?:chart|empty)[^{]*\{[^}]*overflow-y:\s*(?:auto|scroll)/);
+  });
+
   it("normalizes chart/card/table border rhythm with design tokens only", () => {
     expect(cssContent).toMatch(/\.cc-stat-card\s*\{[^}]*padding:\s*var\(--space-3\);[^}]*border:\s*var\(--border-width\)\s+solid\s+var\(--border-subtle\);[^}]*border-radius:\s*var\(--radius-md\);[^}]*background:\s*var\(--surface-1\)/);
     expect(cssContent).toMatch(/\.cc-table-wrap\s*\{[^}]*border:\s*var\(--border-width\)\s+solid\s+var\(--border-subtle\);[^}]*border-radius:\s*var\(--radius-md\);[^}]*background:\s*var\(--surface-1\);[^}]*overflow-x:\s*auto;[^}]*overflow-y:\s*hidden/);
