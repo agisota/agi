@@ -568,6 +568,53 @@
   position: relative;
 }
 
+/*
+FNXC:WorkflowEditorTheme 2026-06-19-05:22:
+React Flow ships white default controls and mini-map chrome, but the workflow editor must inherit Fusion theme tokens in both dark and light modes. Scope overrides to the canvas so other React Flow consumers keep their local contracts.
+*/
+.wf-editor-canvas .react-flow__controls {
+  background: var(--surface);
+  border: var(--btn-border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.wf-editor-canvas .react-flow__controls-button {
+  background: var(--surface);
+  border: 0;
+  border-bottom: var(--btn-border-width) solid var(--border);
+  color: var(--text);
+  fill: currentColor;
+}
+
+.wf-editor-canvas .react-flow__controls-button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.wf-editor-canvas .react-flow__controls-button svg {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.wf-editor-canvas .react-flow__minimap {
+  background: var(--surface);
+  border: var(--btn-border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.wf-editor-canvas .react-flow__minimap-node {
+  fill: var(--bg-secondary);
+  stroke: var(--border);
+}
+
+.wf-editor-canvas .react-flow__minimap-mask {
+  fill: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
 .wf-mobile-shell {
   display: none;
 }
@@ -1481,6 +1528,14 @@
   gap: 2px;
   font-size: 0.7rem;
   color: var(--text-muted);
+}
+
+/*
+FNXC:WorkflowEditorTheme 2026-06-19-05:22:
+Column trait toggles are left-sidebar workflow controls; keep their enabled and disabled checkbox chrome on the workflow accent token instead of React/browser defaults.
+*/
+.wf-column-trait input[type="checkbox"] {
+  accent-color: var(--todo);
 }
 
 .wf-column-traits-label,

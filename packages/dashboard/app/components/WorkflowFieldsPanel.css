@@ -124,6 +124,14 @@
   color: var(--text-muted);
 }
 
+/*
+FNXC:WorkflowEditorTheme 2026-06-19-05:22:
+Field-list checkboxes share the editor sidebar surface and must stay theme-accented across editable and built-in read-only workflow states.
+*/
+.wf-field--checkbox input[type="checkbox"] {
+  accent-color: var(--todo);
+}
+
 .wf-field-required {
   flex: 0 0 auto;
   white-space: nowrap;
