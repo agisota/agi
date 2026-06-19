@@ -162,7 +162,7 @@ export function isFts5CorruptionError(error: unknown): boolean {
 
 // ── Schema Definition ────────────────────────────────────────────────
 
-const SCHEMA_VERSION = 121;
+const SCHEMA_VERSION = 122;
 
 const TASKS_FTS_AUTOMERGE = 8;
 const TASKS_FTS_CRISISMERGE = 16;
@@ -316,6 +316,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   sourceIssueExternalIssueId TEXT,
   sourceIssueNumber INTEGER,
   sourceIssueUrl TEXT,
+  sourceIssueClosedAt TEXT,
   mergeDetails TEXT,
   breakIntoSubtasks INTEGER DEFAULT 0,
   noCommitsExpected INTEGER DEFAULT 0,
@@ -4952,6 +4953,15 @@ export class Database {
       this.applyMigration(121, () => {
         this.addColumnIfMissing("tasks", "tokenUsageModelProvider", "TEXT");
         this.addColumnIfMissing("tasks", "tokenUsageModelId", "TEXT");
+      });
+    }
+
+    // Migration 122: source-issue closure timestamp for exact Fixed by Fusion analytics.
+    // Additive and nullable with no historical backfill; legacy rows deserialize with
+    // TaskSourceIssue.closedAt undefined until the GitHub reconciler observes a real close time.
+    if (version < 122) {
+      this.applyMigration(122, () => {
+        this.addColumnIfMissing("tasks", "sourceIssueClosedAt", "TEXT");
       });
     }
 

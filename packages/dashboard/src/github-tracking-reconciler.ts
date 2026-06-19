@@ -1,4 +1,4 @@
-import type { GlobalSettings, ProjectSettings, TaskStore } from "@fusion/core";
+import type { GlobalSettings, ProjectSettings, TaskSourceIssue, TaskStore } from "@fusion/core";
 import { resolveGithubTrackingAuth } from "./github-auth.js";
 import { GitHubClient } from "./github.js";
 
@@ -93,7 +93,7 @@ export class GitHubTrackingReconciler {
       const repository = sourceIssue?.repository ?? "";
       const [owner, repo] = repository.split("/");
       const issueNumber = sourceIssue?.issueNumber;
-      if (!owner || !repo || !Number.isInteger(issueNumber)) {
+      if (!sourceIssue || !owner || !repo || !Number.isInteger(issueNumber)) {
         skipped += 1;
         return;
       }
@@ -101,13 +101,23 @@ export class GitHubTrackingReconciler {
       const issueNumberValue = issueNumber as number;
       try {
         const linkedIssue = await client.getIssue(owner, repo, issueNumberValue);
-        if (!linkedIssue || linkedIssue.state === "closed") {
+        if (!linkedIssue) {
+          skipped += 1;
+          return;
+        }
+        if (linkedIssue.state === "closed") {
+          if (!sourceIssue.closedAt && linkedIssue.closedAt) {
+            await persistSourceIssueClosedAt(store, task.id, sourceIssue, linkedIssue.closedAt);
+          }
           skipped += 1;
           return;
         }
 
         const stateReason = task.column === "archived" && !task.executionCompletedAt ? "not_planned" : "completed";
         await client.setIssueState(owner, repo, issueNumberValue, "closed", stateReason);
+        if (!sourceIssue.closedAt) {
+          await persistSourceIssueClosedAt(store, task.id, sourceIssue, new Date().toISOString());
+        }
         closed += 1;
       } catch (error) {
         errors += 1;
@@ -184,6 +194,27 @@ export class GitHubTrackingReconciler {
     });
 
     return { scanned: tasks.length, closed, skipped, errors, hasMore };
+  }
+}
+
+/**
+ * FNXC:GithubSourceIssueAnalytics 2026-06-18-18:19:
+ * Source-issue reconciliation is the authenticated path that can know real GitHub closure times; persist that exact timestamp idempotently and treat write failures as best-effort worker log entries instead of fabricating or overwriting analytics data.
+ */
+async function persistSourceIssueClosedAt(
+  store: TaskStore,
+  taskId: string,
+  sourceIssue: TaskSourceIssue,
+  closedAt: string,
+): Promise<void> {
+  try {
+    await store.updateTask(taskId, { sourceIssue: { ...sourceIssue, closedAt } });
+  } catch (error) {
+    await store.logEntry(
+      taskId,
+      "Failed to persist GitHub source issue closed timestamp",
+      error instanceof Error ? error.message : String(error),
+    );
   }
 }
 

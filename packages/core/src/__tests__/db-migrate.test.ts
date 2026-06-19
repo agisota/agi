@@ -596,6 +596,7 @@ describe("migrateFromLegacy", () => {
           externalIssueId: "I_kgDOExample",
           issueNumber: 10,
           url: "https://github.com/test/issues/1",
+          closedAt: "2026-06-18T12:00:00.000Z",
         },
         breakIntoSubtasks: true,
         enabledWorkflowSteps: ["WS-001", "WS-002"],
@@ -645,6 +646,7 @@ describe("migrateFromLegacy", () => {
       expect(row.sourceIssueExternalIssueId).toBe("I_kgDOExample");
       expect(row.sourceIssueNumber).toBe(10);
       expect(row.sourceIssueUrl).toBe("https://github.com/test/issues/1");
+      expect(row.sourceIssueClosedAt).toBe("2026-06-18T12:00:00.000Z");
       expect(row.breakIntoSubtasks).toBe(1);
       expect(JSON.parse(row.enabledWorkflowSteps)).toEqual(["WS-001", "WS-002"]);
     });
@@ -719,7 +721,69 @@ describe("schema migration", () => {
 
     const row = db.prepare("SELECT deletedAt FROM tasks WHERE id = 'FN-legacy'").get() as { deletedAt: string | null };
     expect(row.deletedAt).toBeNull();
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
+
+    db.close();
+  });
+
+  it("adds sourceIssueClosedAt when migrating from schema version 121 without data loss", () => {
+    const db = new Database(fusionDir);
+    db.exec("CREATE TABLE IF NOT EXISTS __meta (key TEXT PRIMARY KEY, value TEXT)");
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        description TEXT NOT NULL,
+        "column" TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        sourceIssueProvider TEXT,
+        sourceIssueRepository TEXT,
+        sourceIssueExternalIssueId TEXT,
+        sourceIssueNumber INTEGER,
+        sourceIssueUrl TEXT,
+        tokenUsageModelProvider TEXT,
+        tokenUsageModelId TEXT
+      )
+    `);
+    db.exec("INSERT INTO __meta (key, value) VALUES ('schemaVersion', '121')");
+    db.exec("INSERT INTO __meta (key, value) VALUES ('lastModified', '1000')");
+    db.exec(`
+      INSERT INTO tasks (
+        id, description, "column", createdAt, updatedAt,
+        sourceIssueProvider, sourceIssueRepository, sourceIssueExternalIssueId,
+        sourceIssueNumber, sourceIssueUrl
+      ) VALUES (
+        'FN-source', 'legacy source issue', 'done', '2025-01-01T00:00:00.000Z', '2025-01-02T00:00:00.000Z',
+        'github', 'runfusion/fusion', 'I_kgDOExample', 10, 'https://github.com/runfusion/fusion/issues/10'
+      )
+    `);
+
+    db.init();
+
+    const columns = db.prepare("PRAGMA table_info(tasks)").all() as Array<{ name: string }>;
+    expect(columns.map((column) => column.name)).toContain("sourceIssueClosedAt");
+
+    const row = db.prepare(`
+      SELECT sourceIssueProvider, sourceIssueRepository, sourceIssueExternalIssueId,
+             sourceIssueNumber, sourceIssueUrl, sourceIssueClosedAt
+      FROM tasks WHERE id = 'FN-source'
+    `).get() as {
+      sourceIssueProvider: string;
+      sourceIssueRepository: string;
+      sourceIssueExternalIssueId: string;
+      sourceIssueNumber: number;
+      sourceIssueUrl: string;
+      sourceIssueClosedAt: string | null;
+    };
+    expect(row).toEqual({
+      sourceIssueProvider: "github",
+      sourceIssueRepository: "runfusion/fusion",
+      sourceIssueExternalIssueId: "I_kgDOExample",
+      sourceIssueNumber: 10,
+      sourceIssueUrl: "https://github.com/runfusion/fusion/issues/10",
+      sourceIssueClosedAt: null,
+    });
+    expect(db.getSchemaVersion()).toBe(122);
 
     db.close();
   });
@@ -752,7 +816,7 @@ describe("schema migration", () => {
       { id: "WS-001", mode: "prompt", gateMode: "advisory" },
       { id: "WS-002", mode: "script", gateMode: "advisory" },
     ]);
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
 
     db.close();
   });
@@ -802,7 +866,7 @@ describe("schema migration", () => {
       reviewerContextRetryCount: 0,
       reviewerFallbackRetryCount: 0,
     });
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
 
     db.close();
   });
@@ -831,7 +895,7 @@ describe("schema migration", () => {
 
     const columns = db.prepare("PRAGMA table_info(milestones)").all() as Array<{ name: string }>;
     expect(columns.map((column) => column.name)).toContain("acceptanceCriteria");
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
 
     db.close();
   });
@@ -872,7 +936,7 @@ describe("schema migration", () => {
     const missionColumns = db.prepare("PRAGMA table_info(missions)").all() as Array<{ name: string }>;
     expect(missionColumns.map((column) => column.name)).toContain("autoMerge");
 
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
     db.close();
   });
 
@@ -906,7 +970,7 @@ describe("schema migration", () => {
       { id: "WS-002", mode: "script", enabled: 1, gateMode: "advisory" },
       { id: "WS-003", mode: "prompt", enabled: 0, gateMode: "advisory" },
     ]);
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
 
     db.close();
   });
@@ -943,7 +1007,7 @@ describe("schema migration", () => {
 
     const indexes = db.prepare("PRAGMA index_list(mission_goals)").all() as Array<{ name: string }>;
     expect(indexes.some((index) => index.name === "idxMissionGoalsGoalId")).toBe(true);
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
 
     db.close();
   });
@@ -1004,7 +1068,7 @@ describe("schema migration", () => {
     expect(customFieldsColumn).toBeDefined();
     expect(customFieldsColumn?.dflt_value).toBe("'{}'");
 
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
     db.close();
   });
 
@@ -1042,7 +1106,7 @@ describe("schema migration", () => {
     const indexes = db.prepare("PRAGMA index_list(workflow_settings)").all() as Array<{ name: string }>;
     expect(indexes.some((index) => index.name === "idx_workflow_settings_project")).toBe(true);
 
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
     db.close();
   });
 
@@ -1124,7 +1188,7 @@ describe("schema migration", () => {
     expect(indexNames).toContain("idx_cli_sessions_chatSessionId");
     expect(indexNames).toContain("idx_cli_sessions_project_state");
 
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
     db.close();
   });
 
@@ -1156,7 +1220,7 @@ describe("schema migration", () => {
       .all() as Array<{ name: string }>;
     expect(columns.map((column) => column.name)).toContain("cliExecutorAdapterId");
 
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
     db.close();
   });
 
@@ -1166,7 +1230,7 @@ describe("schema migration", () => {
 
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>;
     expect(tables.map((row) => row.name)).toContain("cli_sessions");
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
     db.close();
   });
 
@@ -1223,20 +1287,20 @@ describe("schema migration", () => {
       .get() as { migrated_fragment_id: string | null };
     expect(stepRow.migrated_fragment_id).toBeNull();
 
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
     db.close();
   });
 
   it("migration 109 is idempotent on re-init", () => {
     const db = new Database(fusionDir);
     db.init();
-    expect(db.getSchemaVersion()).toBe(120);
+    expect(db.getSchemaVersion()).toBe(122);
     db.close();
 
     // Re-open the same on-disk DB: already at 109, the 109 block must be a no-op.
     const reopened = new Database(fusionDir);
     reopened.init();
-    expect(reopened.getSchemaVersion()).toBe(120);
+    expect(reopened.getSchemaVersion()).toBe(122);
     const workflowColumns = reopened.prepare("PRAGMA table_info(workflows)").all() as Array<{ name: string }>;
     expect(workflowColumns.filter((c) => c.name === "kind")).toHaveLength(1);
     const stepColumns = reopened.prepare("PRAGMA table_info(workflow_steps)").all() as Array<{ name: string }>;

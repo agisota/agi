@@ -34,6 +34,7 @@ function insertSourceIssueTask(
     repository: string;
     column: string;
     updatedAt: string;
+    closedAt?: string | null;
     issueNumber?: number;
   },
 ): void {
@@ -41,8 +42,8 @@ function insertSourceIssueTask(
     `INSERT INTO tasks (
        id, description, "column", createdAt, updatedAt,
        sourceIssueProvider, sourceIssueRepository, sourceIssueExternalIssueId,
-       sourceIssueNumber, sourceIssueUrl
-     ) VALUES (?, 'desc', ?, ?, ?, ?, ?, ?, ?, ?)`,
+       sourceIssueNumber, sourceIssueUrl, sourceIssueClosedAt
+     ) VALUES (?, 'desc', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     opts.column,
@@ -53,6 +54,7 @@ function insertSourceIssueTask(
     String(opts.issueNumber ?? 1),
     opts.issueNumber ?? 1,
     `https://example.test/${id}`,
+    opts.closedAt ?? null,
   );
 }
 
@@ -174,6 +176,47 @@ describe("github-issue-analytics", () => {
     expect(result.daily).toEqual([
       { date: "2026-04-01", filed: 1, fixed: 0 },
       { date: "2026-04-03", filed: 0, fixed: 1 },
+    ]);
+  });
+
+  it("prefers source issue closedAt over updatedAt for fixed range and daily buckets", () => {
+    insertSourceIssueTask(db, "closed-in-range-updated-outside", {
+      provider: "github",
+      repository: "acme/alpha",
+      column: "done",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+      closedAt: "2026-04-02T10:00:00.000Z",
+      issueNumber: 31,
+    });
+    insertSourceIssueTask(db, "closed-outside-updated-in-range", {
+      provider: "github",
+      repository: "acme/alpha",
+      column: "done",
+      updatedAt: "2026-04-03T10:00:00.000Z",
+      closedAt: "2026-03-31T23:59:59.999Z",
+      issueNumber: 32,
+    });
+    insertSourceIssueTask(db, "no-closedAt-falls-back", {
+      provider: "github",
+      repository: "acme/beta",
+      column: "done",
+      updatedAt: "2026-04-03T10:00:00.000Z",
+      issueNumber: 33,
+    });
+
+    const result = aggregateGithubIssueAnalytics(db, {
+      from: "2026-04-01T00:00:00.000Z",
+      to: "2026-04-03T23:59:59.999Z",
+    });
+
+    expect(result.fixed).toBe(2);
+    expect(result.daily).toEqual([
+      { date: "2026-04-02", filed: 0, fixed: 1 },
+      { date: "2026-04-03", filed: 0, fixed: 1 },
+    ]);
+    expect(result.byRepo).toEqual([
+      { repo: "acme/alpha", filed: 0, fixed: 1 },
+      { repo: "acme/beta", filed: 0, fixed: 1 },
     ]);
   });
 

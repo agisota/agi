@@ -2,7 +2,7 @@ import type { Database } from "./db.js";
 
 /**
  * FNXC:CommandCenterGithub 2026-06-18-00:00:
- * Command Center GitHub issue analytics must derive filed/fixed counts only from the project-scoped local task store. "Filed" means a task has `githubTracking.issue`; "fixed" means an imported GitHub source issue task is currently in the `done` column. Fusion does not persist a source issue closed timestamp, so fixed trends use `updatedAt` as the documented completion approximation and never fabricate a close date.
+ * Command Center GitHub issue analytics must derive filed/fixed counts only from the project-scoped local task store. "Filed" means a task has `githubTracking.issue`; "fixed" means an imported GitHub source issue task is currently in the `done` column. Fixed trends use the exact persisted `sourceIssueClosedAt` when available, fall back to the `updatedAt` completion approximation only when it is absent, and never fabricate a close date.
  */
 
 export interface GithubIssueAnalyticsQuery {
@@ -33,7 +33,7 @@ export interface GithubIssueAnalytics {
   to: string | null;
   /** Fusion-created GitHub issues in range. Undated tracked issues are included because no date can be honestly inferred. */
   filed: number;
-  /** Imported GitHub issue tasks currently in `done`, filtered by `updatedAt` as the completion approximation. */
+  /** Imported GitHub issue tasks currently in `done`, filtered by exact `sourceIssueClosedAt` when present with `updatedAt` fallback. */
   fixed: number;
   /** Filed minus fixed. */
   net: number;
@@ -49,6 +49,7 @@ interface GithubTrackingRow {
 
 interface FixedIssueRow {
   sourceIssueRepository: string | null;
+  sourceIssueClosedAt: string | null;
   updatedAt: string | null;
 }
 
@@ -150,31 +151,22 @@ export function aggregateGithubIssueAnalytics(
     }
   }
 
-  const fixedClauses = ["sourceIssueProvider = 'github'", "\"column\" = 'done'"];
-  const fixedParams: string[] = [];
-  if (query.from !== undefined) {
-    fixedClauses.push("updatedAt >= ?");
-    fixedParams.push(query.from);
-  }
-  if (query.to !== undefined) {
-    fixedClauses.push("updatedAt <= ?");
-    fixedParams.push(query.to);
-  }
   const fixedRows = db
     .prepare(
-      `SELECT sourceIssueRepository, updatedAt FROM tasks WHERE ${fixedClauses.join(" AND ")}`,
+      `SELECT sourceIssueRepository, sourceIssueClosedAt, updatedAt FROM tasks WHERE sourceIssueProvider = 'github' AND "column" = 'done'`,
     )
-    .all(...fixedParams) as FixedIssueRow[];
+    .all() as FixedIssueRow[];
 
   let fixed = 0;
   for (const row of fixedRows) {
+    const fixedDate = row.sourceIssueClosedAt ?? row.updatedAt;
+    if (fixedDate === null || !isInRange(fixedDate, query)) continue;
+
     fixed += 1;
     const repo = row.sourceIssueRepository?.trim() || "(unknown)";
     addRepo(byRepo, repo, "fixed");
-    if (row.updatedAt) {
-      const day = dayKey(row.updatedAt);
-      if (day !== null) addDaily(daily, day, "fixed");
-    }
+    const day = dayKey(fixedDate);
+    if (day !== null) addDaily(daily, day, "fixed");
   }
 
   return {

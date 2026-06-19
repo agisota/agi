@@ -1179,6 +1179,12 @@ export interface TaskSourceIssue {
   issueNumber: number;
   /** Optional canonical URL to the source issue. */
   url?: string;
+  /**
+   * FNXC:GithubSourceIssueAnalytics 2026-06-18-17:56:
+   * Command Center "Fixed by Fusion" analytics need the real source-issue closure time when Fusion closed or observed the issue, replacing the prior `updatedAt` completion approximation when exact data is available.
+   * ISO-8601 timestamp for when the source issue was closed; absent when the issue has never been observed closed.
+   */
+  closedAt?: string;
 }
 
 export interface BatchStatusRequest {
