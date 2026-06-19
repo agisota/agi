@@ -66,6 +66,7 @@ const ENDPOINTS = [
   "/api/command-center/productivity",
   "/api/command-center/team",
   "/api/command-center/github",
+  "/api/command-center/signals",
   "/api/command-center/live",
 ];
 

@@ -5,6 +5,7 @@ import {
   aggregateProductivityAnalytics,
   aggregateTeamAnalytics,
   aggregateGithubIssueAnalytics,
+  aggregateSignalsAnalytics,
   composeLiveSnapshot,
   type TokenGroupBy,
   type TokenTimeGranularity,
@@ -284,6 +285,28 @@ export const registerCommandCenterRoutes: ApiRouteRegistrar = (ctx) => {
     } catch (err: unknown) {
       if (err instanceof ApiError) throw err;
       rethrowAsApiError(err, "Failed to aggregate GitHub issue analytics");
+    }
+  });
+
+  /**
+   * GET /api/command-center/signals
+   * External Signals metrics backed by locally recorded incidents.
+   *
+   * FNXC:CommandCenter 2026-06-19-00:00:
+   * The Signals surface must not be a phantom endpoint. Mirror sibling Command Center routes by resolving getScopedStore(req) before reading incidents, so project-A callers only see project-A signal volume and MTTR stays the honest unavailable sentinel when no incidents are resolved.
+   */
+  router.get("/command-center/signals", async (req, res) => {
+    try {
+      const store = await getScopedStore(req);
+      const range = resolveRange(req.query);
+      const result = aggregateSignalsAnalytics(store.getDatabase(), {
+        from: range.from,
+        to: range.to,
+      });
+      res.json(result);
+    } catch (err: unknown) {
+      if (err instanceof ApiError) throw err;
+      rethrowAsApiError(err, "Failed to aggregate signal analytics");
     }
   });
 

@@ -22,6 +22,9 @@ ProductivityAnalytics exposes a categorical language distribution but no per-day
  * FNXC:CommandCenter 2026-06-16-09:42:
  * Productivity area of the Command Center (PR #1683). Volume proxies (files/LOC) must read as distinct
  * from outcome counters (PRs/commits), and missing LOC must render "—", never 0, to avoid implying zero work.
+ *
+ * FNXC:CommandCenter 2026-06-19-00:00:
+ * FN-6704 owns real commit diff-stat capture for LOC. Keep this sentinel honest until a persisted additions/deletions source exists; do not backfill with modified-file counts or any other proxy.
  */
 export function ProductivityArea({ range }: { range: DateRange }) {
   const { t } = useTranslation("app");

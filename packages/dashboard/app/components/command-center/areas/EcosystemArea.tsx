@@ -13,9 +13,12 @@ import { formatCount } from "./areaShared";
  * model (per KTD/plan: "reuses the tokens endpoint grouped by model where
  * possible"). Shows the unique-active-model count and a per-model activity bar
  * (tasks per model as the activity proxy — token rows carry `nTasks`, not a
- * session count). Plugin activation count and a distinct-models/day sparkline
- * have no current endpoint, so they render their unavailable sentinel rather
- * than a misleading 0. Empty state when no models have been used.
+ * session count). Plugin activation count has no current event source, so it
+ * renders its unavailable sentinel rather than a misleading 0. Empty state when
+ * no models have been used.
+ *
+ * FNXC:CommandCenter 2026-06-19-00:00:
+ * FN-6705 owns real plugin activation recording. Keep the Plugin activations card at `—` until activation events are persisted and aggregated; model/task token trends are real but are not a plugin proxy.
  */
 export function EcosystemArea({ range }: { range: DateRange }) {
   const { t } = useTranslation("app");

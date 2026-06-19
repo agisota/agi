@@ -590,6 +590,14 @@ export type {
   GithubIssueDailyPoint,
   GithubIssueRepoBreakdown,
 } from "./github-issue-analytics.js";
+export { aggregateSignalsAnalytics } from "./signals-analytics.js";
+export type {
+  SignalsAnalytics,
+  SignalsAnalyticsQuery,
+  SignalsBreakdown,
+  SignalsSeverityBreakdown,
+  SignalsStatusBreakdown,
+} from "./signals-analytics.js";
 export { composeLiveSnapshot } from "./command-center-live.js";
 export type {
   LiveSnapshot,

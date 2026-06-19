@@ -83,6 +83,28 @@ function seedTeamMetrics(db: Database, opts: { agentId: string; name: string; to
   );
 }
 
+function seedSignalMetrics(db: Database, opts: { prefix: string; source: string; open: number; resolved: number }): void {
+  let seq = 0;
+  for (let i = 0; i < opts.open; i += 1) {
+    db.prepare(
+      `INSERT INTO incidents
+         (incidentId, groupingKey, title, severity, status, source, openedAt, resolvedAt, createdAt, updatedAt)
+       VALUES (?, ?, ?, 'critical', 'open', ?, '2026-03-04T00:00:00.000Z', NULL,
+               '2026-03-04T00:00:00.000Z', '2026-03-04T00:00:00.000Z')`,
+    ).run(`${opts.prefix}-open-${seq}`, `${opts.prefix}-group-${seq}`, `Signal ${seq}`, opts.source);
+    seq += 1;
+  }
+  for (let i = 0; i < opts.resolved; i += 1) {
+    db.prepare(
+      `INSERT INTO incidents
+         (incidentId, groupingKey, title, severity, status, source, openedAt, resolvedAt, createdAt, updatedAt)
+       VALUES (?, ?, ?, 'warning', 'resolved', ?, '2026-03-05T00:00:00.000Z', '2026-03-05T00:30:00.000Z',
+               '2026-03-05T00:00:00.000Z', '2026-03-05T00:30:00.000Z')`,
+    ).run(`${opts.prefix}-resolved-${seq}`, `${opts.prefix}-group-${seq}`, `Signal ${seq}`, opts.source);
+    seq += 1;
+  }
+}
+
 function seedGithubIssueMetrics(db: Database, opts: { prefix: string; repo: string; filed: number; fixed: number }): void {
   for (let i = 0; i < opts.filed; i += 1) {
     db.prepare(
@@ -289,6 +311,14 @@ describe("register-command-center-routes", () => {
     expect(github.body).toMatchObject({ filed: 2, fixed: 1, net: 1 });
     expect(github.body).toHaveProperty("daily");
     expect(github.body).toHaveProperty("byRepo");
+
+    seedSignalMetrics(dbA, { prefix: "SIG-A", source: "sentry", open: 1, resolved: 1 });
+    const signals = await request(app, "GET", `/api/command-center/signals?${range}&projectId=proj-a`);
+    expect(signals.status).toBe(200);
+    expect(signals.body).toMatchObject({ totalSignals: 2, open: 1, resolved: 1 });
+    expect(signals.body).toHaveProperty("mttr");
+    expect(signals.body).toHaveProperty("bySource");
+    expect(signals.body).toHaveProperty("bySeverity");
   });
 
   it("returns the live snapshot shape", async () => {
@@ -351,6 +381,29 @@ describe("register-command-center-routes", () => {
     expect(aAgents.some((agent) => agent.agentId === "agent-b-only" || agent.agentName === "Project B Agent")).toBe(false);
     expect(bAgents.some((agent) => agent.agentId === "agent-b-only" && agent.tokens.totalTokens === 1998)).toBe(true);
     expect(bAgents.some((agent) => agent.agentId === "agent-a-only" || agent.agentName === "Project A Agent")).toBe(false);
+  });
+
+  it("signals endpoint defaults invalid ranges and stays project scoped", async () => {
+    seedSignalMetrics(dbA, { prefix: "SIG-A", source: "sentry", open: 1, resolved: 1 });
+    seedSignalMetrics(dbB, { prefix: "SIG-B", source: "pagerduty", open: 3, resolved: 2 });
+
+    const invalid = await request(
+      app,
+      "GET",
+      "/api/command-center/signals?from=bad&to=range&projectId=proj-a",
+    );
+    expect(invalid.status).toBe(200);
+    expect(invalid.body).toHaveProperty("totalSignals");
+    expect(invalid.body).toHaveProperty("mttr");
+    expect(invalid.body).toHaveProperty("bySource");
+
+    const range = "from=2026-02-01T00:00:00.000Z&to=2026-04-01T00:00:00.000Z";
+    const a = await request(app, "GET", `/api/command-center/signals?${range}&projectId=proj-a`);
+    const b = await request(app, "GET", `/api/command-center/signals?${range}&projectId=proj-b`);
+    expect(a.body).toMatchObject({ totalSignals: 2, open: 1, resolved: 1 });
+    expect(b.body).toMatchObject({ totalSignals: 5, open: 3, resolved: 2 });
+    expect((a.body as { bySource: Array<{ source: string }> }).bySource).toContainEqual(expect.objectContaining({ source: "sentry" }));
+    expect((a.body as { bySource: Array<{ source: string }> }).bySource).not.toContainEqual(expect.objectContaining({ source: "pagerduty" }));
   });
 
   it("github endpoint defaults invalid ranges and stays project scoped", async () => {
@@ -554,6 +607,7 @@ describe("vite /api proxy negative-lookahead (proxy verification)", () => {
     expect(PROXY_RE.test("/api/command-center/team")).toBe(true);
     expect(PROXY_RE.test("/api/command-center/live")).toBe(true);
     expect(PROXY_RE.test("/api/command-center/github")).toBe(true);
+    expect(PROXY_RE.test("/api/command-center/signals")).toBe(true);
     expect(PROXY_RE.test("/api/command-center/activity?from=x&to=y")).toBe(true);
   });
 

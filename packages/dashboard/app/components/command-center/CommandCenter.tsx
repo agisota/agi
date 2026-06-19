@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, Gauge } from "lucide-react";
-import type { ActivityAnalytics, LiveSnapshot, TokenAnalytics, ToolAnalytics } from "@fusion/core";
+import type { ActivityAnalytics, LiveSnapshot, SignalsAnalytics, TokenAnalytics, ToolAnalytics } from "@fusion/core";
 import { api } from "../../api/legacy";
 import { DateRangePicker, defaultPresets, rangeFromPreset, type DateRange } from "./DateRangePicker";
 import { TokensArea } from "./areas/TokensArea";
@@ -20,8 +20,7 @@ import { Bar, type BarDatum } from "./charts/Bar";
 import { Sparkline } from "./charts/Sparkline";
 import { LineChart as RechartsLineChart, PieChart } from "./charts/recharts";
 import { useAnalyticsArea } from "./areas/useAnalyticsArea";
-import { formatCost, formatCount, isInvalidRange, rangeQuery } from "./areas/areaShared";
-import type { SignalsAnalytics } from "./areas/SignalsArea";
+import { formatCost, formatCount } from "./areas/areaShared";
 import "./CommandCenter.css";
 
 type SubViewId =
@@ -77,7 +76,10 @@ interface OverviewStatCard {
 
 /*
 FNXC:CommandCenter 2026-06-17-00:00:
-Overview is the Command Center landing surface, so it must reflect real analytics instead of shell placeholders. Show loading while core analytics have not settled, show the empty state only after settled zero data, include the agent-runs card as a first-class activity signal, and treat Signals as best-effort because that endpoint can be absent without invalidating tokens/tools/activity metrics.
+Overview is the Command Center landing surface, so it must reflect real analytics instead of shell placeholders. Show loading while core analytics have not settled, show the empty state only after settled zero data, include the agent-runs card as a first-class activity signal, and read Signals from the project-scoped incidents-backed endpoint without fabricating a value during loading/errors.
+
+FNXC:CommandCenter 2026-06-19-00:00:
+The Open signals card must be real project data, not a swallowed missing-route blank. It calls the scoped `/command-center/signals` endpoint backed by incidents and renders `—` only while unavailable/loading.
 
 FNXC:CommandCenter 2026-06-18-23:45:
 FN-6683 adds real Overview pie and line charts by reusing the already-fetched tokens and activity analytics. Keep the existing overview bars, sparkline, live strip, funnel, and loading/error/empty branches intact; no new endpoint is allowed for these additive affordances.
@@ -91,42 +93,9 @@ function OverviewTab({ range }: { range: DateRange }) {
   });
   const tools = useAnalyticsArea<ToolAnalytics>("/command-center/tools", range);
   const activity = useAnalyticsArea<ActivityAnalytics>("/command-center/activity", range);
-  const [signals, setSignals] = useState<SignalsAnalytics | null>(null);
-  const [signalsLoading, setSignalsLoading] = useState(true);
+  const signals = useAnalyticsArea<SignalsAnalytics>("/command-center/signals", range);
   const [liveSnapshot, setLiveSnapshot] = useState<LiveSnapshot | null>(null);
   const [liveSnapshotLoading, setLiveSnapshotLoading] = useState(true);
-
-  const signalsQuery = rangeQuery(range);
-  const invalidRange = isInvalidRange(range);
-
-  useEffect(() => {
-    if (invalidRange) {
-      setSignalsLoading(false);
-      setSignals(null);
-      return;
-    }
-    let cancelled = false;
-    setSignalsLoading(true);
-    void (async () => {
-      try {
-        const result = await api<SignalsAnalytics>(`/command-center/signals${signalsQuery}`);
-        if (!cancelled) {
-          setSignals(result);
-        }
-      } catch {
-        if (!cancelled) {
-          setSignals(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setSignalsLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [signalsQuery, invalidRange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -244,7 +213,7 @@ function OverviewTab({ range }: { range: DateRange }) {
     {
       id: "signals",
       label: t("commandCenter.overview.openSignals", "Open signals"),
-      value: signalsLoading ? "—" : signals ? formatCount(signals.open ?? 0) : "—",
+      value: signals.isLoading ? "—" : signals.data ? formatCount(signals.data.open ?? 0) : "—",
     },
   ];
 
@@ -330,7 +299,7 @@ function OverviewTab({ range }: { range: DateRange }) {
             <span className="cc-live-metric-label">{t("commandCenter.overview.liveTokens", "tokens")}</span>
           </span>
           <span className="cc-live-metric" data-testid="command-center-live-open-signals">
-            <span className="cc-live-metric-value">{signalsLoading ? "—" : signals ? formatCount(signals.open ?? 0) : "—"}</span>
+            <span className="cc-live-metric-value">{signals.isLoading ? "—" : signals.data ? formatCount(signals.data.open ?? 0) : "—"}</span>
             <span className="cc-live-metric-label">{t("commandCenter.overview.openSignals", "open signals")}</span>
           </span>
         </div>
