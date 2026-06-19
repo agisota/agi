@@ -505,6 +505,8 @@ export type DatabaseMutationType =
   /** Metadata: { taskId, branch, worktree, checkedOutBy, executionStartedAt, executionAgeMs, graceMs, liveWorktreeBoundBranch, reason } */
   | "task:auto-recover-in-progress-limbo-no-action"
   | "task:resume-limbo-escalated"
+  /** Metadata: { taskId, executionAgeMs, graceMs, staleBindingAgeFloorMs, checkedOutBy, agentPresent, lastActivityMs, hasRecentRunAudit, worktree, branch, worktreeExists, signalReason } */
+  | "task:reclaim-phantom-executor-binding"
   /** Metadata: { taskId, branch, worktree, checkedOutBy, executionStartedAt, executionAgeMs, graceMs, liveWorktreeBoundBranch, reason } */
   | "task:reclaim-self-owned-branch-conflict-no-action"
   | "task:orphan-detected-no-action"

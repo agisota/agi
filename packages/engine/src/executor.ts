@@ -1997,6 +1997,41 @@ export class TaskExecutor {
     );
   }
 
+  /**
+   * FNXC:ExecutorBinding 2026-06-19-00:00:
+   * FN-6736 gives self-healing a narrow escape hatch for phantom in-memory executor bindings after the liveness gate proves the owner is dead. Never use this as a general task stopper: it refuses to detach observable live session surfaces, then clears only stale bookkeeping (`executing`, resume/recovery sets, process-wide graph routing, activeWorktrees, activeSessionRegistry paths, and executingTaskLock) so the scheduler can re-dispatch the preserved worktree.
+   */
+  clearPhantomExecutorBinding(taskId: string): boolean {
+    const hasLiveSessionSurface = this.activeSessions.has(taskId)
+      || this.activeStepExecutors.has(taskId)
+      || this.activeWorkflowStepSessions.has(taskId)
+      || this.activeCliTaskSessions.has(taskId);
+    if (hasLiveSessionSurface) {
+      executorLog.warn(`${taskId}: refusing to clear phantom executor binding because a live session surface is still registered`);
+      return false;
+    }
+
+    const worktreePath = this.activeWorktrees.get(taskId);
+    this.activeWorktrees.delete(taskId);
+    this.executing.delete(taskId);
+    this.recoveringCompleted.delete(taskId);
+    this.resumingUnpaused.delete(taskId);
+    TaskExecutor.processWideGraphRouting.delete(taskId);
+    executingTaskLock.release(taskId);
+    this.effectiveColumnAgentByTask.delete(taskId);
+
+    const registeredPaths = new Set(activeSessionRegistry.pathsForTask(taskId));
+    if (worktreePath) {
+      registeredPaths.add(worktreePath);
+    }
+    for (const path of registeredPaths) {
+      activeSessionRegistry.unregisterPath(path);
+    }
+
+    executorLog.warn(`${taskId}: cleared phantom executor binding for self-healing re-dispatch`);
+    return true;
+  }
+
   isEphemeralDeletionPending(agentId: string): boolean {
     return this.pendingEphemeralDeletions.has(agentId);
   }

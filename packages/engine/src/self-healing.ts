@@ -92,6 +92,7 @@ const ARCHIVE_FTS_MAINTENANCE_OPTIMIZE_CADENCE_TICKS = 24;
 const ARCHIVE_FTS_REBUILD_THRESHOLD_BYTES = 64 * 1024 * 1024;
 const ARCHIVE_FTS_REBUILD_BYTES_PER_TASK = 512 * 1024;
 export const STALE_ACTIVE_BRANCH_EXECUTION_GRACE_MS = 10 * 60_000;
+const PHANTOM_EXECUTOR_BINDING_AGE_MULTIPLIER = 3;
 export const COMPLETION_HANDOFF_LIMBO_GRACE_MS = 5 * 60_000;
 export const MAX_COMPLETION_HANDOFF_LIMBO_RECOVERIES = 3;
 export const MAX_POST_DONE_NONCONTINUABLE_WEDGE_RECOVERIES = 3;
@@ -241,6 +242,8 @@ export interface SelfHealingOptions {
   rootDir: string;
   /** Optional callback to release TaskExecutor in-memory worktree ownership for a task. */
   releaseExecutorWorktreeOwnership?: (taskId: string) => void;
+  /** Optional callback to clear a demonstrably-stale executor binding without touching live sessions. */
+  clearPhantomExecutorBinding?: (taskId: string) => void;
   /** Optional AgentStore for agent-level self-healing checks. */
   agentStore?: AgentStore;
   /** Canonical stale-lease recovery manager. */
@@ -894,6 +897,70 @@ export class SelfHealingManager {
     }
 
     return activeTaskIds;
+  }
+
+  private async getRecentRunAuditActivityAgeMs(task: Task, nowMs: number): Promise<number | null> {
+    const getRunAuditEvents = (this.store as unknown as {
+      getRunAuditEvents?: (filter: { taskId?: string; startTime?: string; limit?: number }) => Array<{ timestamp?: string }>;
+    }).getRunAuditEvents;
+    if (typeof getRunAuditEvents !== "function") {
+      return null;
+    }
+
+    try {
+      const since = new Date(nowMs - RUNNING_ON_INACTIVE_TASK_STALE_RUN_MS).toISOString();
+      const events = getRunAuditEvents.call(this.store, { taskId: task.id, startTime: since, limit: 1 });
+      const newest = events.find((event) => typeof event.timestamp === "string");
+      if (!newest?.timestamp) return null;
+      const timestampMs = Date.parse(newest.timestamp);
+      return Number.isFinite(timestampMs) ? Math.max(0, nowMs - timestampMs) : null;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      log.warn(`[self-healing] unable to inspect recent run-audit activity for ${task.id}: ${message}`);
+      return null;
+    }
+  }
+
+  /**
+   * FNXC:SelfHealingReclaim 2026-06-19-00:00:
+   * FN-6736 requires self-healing to stop treating an in-memory `executor-active` binding as live when the owner is demonstrably dead. Preserve FN-4811 by requiring every live-owner signal to be absent, leave the FN-5219 missing-worktree path untouched, and avoid FN-5704 resume-limbo counters because this path only clears a stale binding and requeues once with progress/worktree preserved.
+   */
+  private isPhantomExecutorBinding(task: Task, options: {
+    executionAgeMs: number | null;
+    graceMs: number;
+    activeHeartbeatTaskIds: Set<string>;
+    lastActivityMs: number | null;
+  }): { phantom: boolean; metadata: Record<string, unknown> } {
+    const normalizedId = task.id.toUpperCase();
+    const agentPresent = options.activeHeartbeatTaskIds.has(normalizedId);
+    const checkedOutBy = typeof task.checkedOutBy === "string" && task.checkedOutBy.trim().length > 0 ? task.checkedOutBy : null;
+    const worktreeExists = Boolean(task.worktree && existsSync(task.worktree));
+    const hasRecentRunAudit = options.lastActivityMs !== null && options.lastActivityMs <= RUNNING_ON_INACTIVE_TASK_STALE_RUN_MS;
+    const safeAgeMs = options.graceMs * PHANTOM_EXECUTOR_BINDING_AGE_MULTIPLIER;
+    const metadata = {
+      taskId: task.id,
+      executionAgeMs: options.executionAgeMs,
+      graceMs: options.graceMs,
+      staleBindingAgeFloorMs: safeAgeMs,
+      checkedOutBy,
+      agentPresent,
+      lastActivityMs: options.lastActivityMs,
+      hasRecentRunAudit,
+      worktree: task.worktree ?? null,
+      branch: task.branch ?? null,
+      worktreeExists,
+    };
+
+    return {
+      phantom: task.column === "in-progress"
+        && worktreeExists
+        && options.executionAgeMs !== null
+        && options.executionAgeMs > safeAgeMs
+        && !checkedOutBy
+        && !agentPresent
+        && !hasRecentRunAudit,
+      metadata,
+    };
   }
 
   private getFalsePositiveRequeueSignal(task: Task, options: {
@@ -2659,6 +2726,51 @@ export class SelfHealingManager {
           includeCheckedOutLease: true,
         });
         if (liveExecutionSignal) {
+          const canEvaluatePhantomBinding = task.column === "in-progress"
+            && (liveExecutionSignal.reason === "executor-active" || liveExecutionSignal.reason === "live-worktree-and-branch");
+          if (canEvaluatePhantomBinding) {
+            const nowMs = Date.now();
+            const executionStartedAtMs = task.executionStartedAt ? Date.parse(task.executionStartedAt) : Number.NaN;
+            const executionAgeMs = Number.isFinite(executionStartedAtMs) ? Math.max(0, nowMs - executionStartedAtMs) : null;
+            const lastActivityMs = await this.getRecentRunAuditActivityAgeMs(task, nowMs);
+            const phantomBinding = this.isPhantomExecutorBinding(task, {
+              executionAgeMs,
+              graceMs: STALE_ACTIVE_BRANCH_EXECUTION_GRACE_MS,
+              activeHeartbeatTaskIds: activeTaskIds,
+              lastActivityMs,
+            });
+
+            /*
+            FNXC:SelfHealingReclaim 2026-06-19-00:00:
+            FN-6736 makes the executor-active veto conditional for in-progress tasks whose worktree still exists: if age is far beyond grace and checkout, heartbeat, and run-audit liveness are all absent, clear only the stale in-memory binding and requeue with worktree/progress intact instead of emitting the permanent no-action wedge. Live FN-4811 owners still reach the normal no-action veto, missing worktrees remain FN-5219, and resume-limbo escalation remains FN-5704-owned.
+            */
+            if (phantomBinding.phantom) {
+              this.options.clearPhantomExecutorBinding?.(task.id);
+              await createRunAuditor(this.store, {
+                runId: generateSyntheticRunId("self-healing-phantom-executor-binding", task.id),
+                agentId: "self-healing",
+                taskId: task.id,
+                taskLineageId: task.lineageId,
+                phase: "reclaim-self-owned-branch-conflict",
+              }).database({
+                type: "task:reclaim-phantom-executor-binding",
+                target: task.id,
+                metadata: {
+                  ...phantomBinding.metadata,
+                  signalReason: liveExecutionSignal.reason,
+                },
+              });
+              await this.store.moveTask(task.id, "todo", {
+                moveSource: "engine",
+                recoveryRehome: true,
+                preserveProgress: true,
+                preserveWorktree: true,
+              });
+              recovered++;
+              continue;
+            }
+          }
+
           await this.emitFalsePositiveRequeueNoAction(
             task,
             "reclaim-self-owned-branch-conflict",
