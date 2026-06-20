@@ -561,4 +561,17 @@ describe("ResearchView", () => {
     expect(css).toMatch(/@media[^{]*\(max-width:\s*768px\)[^{]*\{[\s\S]*?\.research-view__layout\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*overflow:\s*visible;[^}]*\}/);
     expect(css).toMatch(/@media[^{]*\(max-width:\s*768px\)[^{]*\{[\s\S]*?\.research-view__history\s*\{[^}]*overflow:\s*visible;[^}]*\}/);
   });
+
+  it("FN-6764: adds a tablet full-width reflow without regressing desktop or mobile tiers", () => {
+    const baseCss = loadAllAppCssBaseOnly();
+    const css = loadAllAppCss();
+
+    expect(baseCss).toMatch(/\.research-view__layout\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(0,\s*2fr\);[^}]*overflow:\s*hidden;[^}]*\}/);
+    expect(css).toMatch(/@media[^{]*\(max-width:\s*768px\)[^{]*\{[\s\S]*?\.research-view__layout\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);[^}]*overflow:\s*visible;[^}]*\}/);
+
+    expect(css).toMatch(/@media[^{]*\(min-width:\s*769px\)\s*and\s*\(max-width:\s*1024px\)[^{]*\{[\s\S]*?\.research-view\s*\{[^}]*inline-size:\s*100%;[^}]*min-inline-size:\s*0;[^}]*overflow:\s*hidden;[^}]*\}/);
+    expect(css).toMatch(/@media[^{]*\(min-width:\s*769px\)\s*and\s*\(max-width:\s*1024px\)[^{]*\{[\s\S]*?\.research-view__layout\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);[^}]*min-width:\s*0;[^}]*min-inline-size:\s*0;[^}]*overflow:\s*hidden;[^}]*\}/);
+    expect(css).toMatch(/@media[^{]*\(min-width:\s*769px\)\s*and\s*\(max-width:\s*1024px\)[^{]*\{[\s\S]*?\.research-view__reader\s*\{[^}]*flex:\s*1\s+1\s+0;[^}]*overflow:\s*auto;[^}]*\}/);
+    expect(css).toMatch(/@media[^{]*\(min-width:\s*769px\)\s*and\s*\(max-width:\s*1024px\)[^{]*\{[\s\S]*?\.research-view__history\s*\{[^}]*overflow:\s*auto;[^}]*\}/);
+  });
 });
