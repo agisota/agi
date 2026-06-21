@@ -33,6 +33,9 @@ const autoClaimSnapshotLog = createLogger("auto-claim-snapshot");
 /*
 FNXC:AutoClaim 2026-06-21-10:35:
 Auto-claim runnability must have one source of truth so the snapshot rebuild and canonical freshness gate exclude the same stale, assigned, checked-out, deleted, paused, and dependency-blocked tasks.
+
+FNXC:AutoClaim 2026-06-21-16:09:
+FN-6873 pins `column === "todo"` as the candidate gate after FN-6872 appeared in a heartbeat prompt while archived from a stale cache. Archived, done, triage, in-progress, in-review, soft-deleted, paused, assigned, checked-out, and dependency-blocked rows can satisfy dependencies where allowed, but must never be surfaced or claimed as auto-claim candidates.
 */
 export function isRunnableAutoClaimCandidate(task: Task, tasksById: ReadonlyMap<string, Task>): boolean {
   return task.column === "todo"
@@ -68,6 +71,9 @@ export function toAutoClaimCandidate(task: Task, now: number): AutoClaimCandidat
 FNXC:AutoClaim 2026-06-21-10:35:
 FN-6850 requires a canonical re-resolution gate before cached candidates are displayed or claimed, because FN-6812 showed a superseded triage task could remain in the 30s cache with an old runnable title.
 Use one fresh slim task list for the bounded candidate subset and rebuild survivors from current rows instead of fanning out per-candidate getTask calls.
+
+FNXC:AutoClaim 2026-06-21-16:09:
+The fresh slim list intentionally includes archived rows by default so the shared predicate, not storage filtering, proves archived-while-cached rows are dropped before heartbeat prompt rendering or winner selection.
 */
 export async function resolveFreshAutoClaimCandidates(
   taskStore: Pick<TaskStore, "listTasks">,

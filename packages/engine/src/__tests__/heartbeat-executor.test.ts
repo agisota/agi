@@ -1277,6 +1277,69 @@ describe("executeHeartbeat", () => {
       expect(executionPrompt).toContain("- FN-RENAMED: Updated canonical backlog title");
     });
 
+    it.each([
+      { name: "executor display", role: "executor" as const, soul: "Re-ratchet line-count baseline specialist", runtimeConfig: undefined, expectedStatus: "auto-claim relevant tasks: enabled" },
+      { name: "engineer role fallback", role: "engineer" as const, soul: "Re-ratchet line-count baseline specialist", runtimeConfig: { engineerBacklogAutoClaim: false }, expectedStatus: "auto-claim relevant tasks: enabled (compatible backlog blocked; engineerBacklogAutoClaim disabled)" },
+    ])("drops archived-while-cached candidates from heartbeat prompt and claim path for $name", async (scenario) => {
+      const archivedCachedTask = makeAutoClaimTask({
+        id: "FN-6872",
+        title: "Re-ratchet line-count baseline archived cached title",
+        description: "Re-ratchet line-count baseline work that matched this agent before archive",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      const siblingCachedTask = makeAutoClaimTask({
+        id: "FN-TODO",
+        title: "Old neutral queue title",
+        description: "neutral queue work",
+        createdAt: "2026-01-02T00:00:00.000Z",
+      });
+      const archivedCanonicalTask = makeAutoClaimTask({
+        id: "FN-6872",
+        title: "Re-ratchet line-count baseline archived canonical title",
+        description: "archived within the snapshot TTL",
+        column: "archived",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      const siblingCanonicalTask = makeAutoClaimTask({
+        id: "FN-TODO",
+        title: "Canonical neutral queue title",
+        description: "canonical neutral work",
+        createdAt: "2026-01-02T00:00:00.000Z",
+      });
+      const listTasks = vi.fn()
+        .mockResolvedValueOnce([archivedCachedTask, siblingCachedTask])
+        .mockResolvedValue([archivedCanonicalTask, siblingCanonicalTask]);
+      const store = createStoreWithAgentForExec({
+        taskId: undefined,
+        role: scenario.role,
+        soul: scenario.soul,
+        runtimeConfig: scenario.runtimeConfig,
+      });
+      const mockSession = createMockAgentSession();
+      mockedCreateFnAgent.mockResolvedValue({ session: mockSession as any });
+      mockTaskStore = createMockTaskStore({
+        listTasks,
+        getTask: vi.fn().mockResolvedValue(siblingCanonicalTask),
+      });
+
+      const monitor = new HeartbeatMonitor({ store, taskStore: mockTaskStore, rootDir: "/tmp" });
+      await monitor.executeHeartbeat({ agentId: "agent-001", source: "timer" });
+
+      expect(store.claimTaskForAgent).not.toHaveBeenCalledWith("agent-001", "FN-6872", expect.anything());
+      if (scenario.role === "executor") {
+        expect(store.claimTaskForAgent).toHaveBeenCalledWith("agent-001", "FN-TODO", expect.anything());
+      } else {
+        expect(store.claimTaskForAgent).not.toHaveBeenCalled();
+      }
+      const executionPrompt = mockSession.prompt.mock.calls.at(-1)?.[0] as string;
+      expect(executionPrompt).toContain(scenario.expectedStatus);
+      expect(executionPrompt).toContain("Open Task Candidates (auto-claim scan):");
+      expect(executionPrompt).not.toContain("FN-6872");
+      expect(executionPrompt).not.toContain("Re-ratchet line-count baseline archived cached title");
+      expect(executionPrompt).not.toContain("Re-ratchet line-count baseline archived canonical title");
+      expect(executionPrompt).toContain("- FN-TODO: Canonical neutral queue title");
+    });
+
     it("reuses one snapshot rebuild across concurrent no-task heartbeats", async () => {
       const listTasks = vi.fn().mockResolvedValue([
         {

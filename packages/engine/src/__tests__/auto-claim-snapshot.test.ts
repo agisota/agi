@@ -26,9 +26,10 @@ function makeTask(overrides: Partial<Task> & Pick<Task, "id">): Task {
 
 describe("AutoClaimSnapshotManager", () => {
   it("uses the shared predicate for unchanged runnability filter cases", () => {
-    const runnable = makeTask({ id: "FN-1", dependencies: ["FN-done", "FN-archived"] });
+    const firstRunnable = makeTask({ id: "FN-1", dependencies: ["FN-done", "FN-archived"] });
+    const secondRunnable = makeTask({ id: "FN-2" });
     const tasks = [
-      runnable,
+      firstRunnable,
       makeTask({ id: "FN-paused", paused: true }),
       makeTask({ id: "FN-assigned", assignedAgentId: "agent-1" }),
       makeTask({ id: "FN-checked", checkedOutBy: "agent-2" }),
@@ -38,10 +39,12 @@ describe("AutoClaimSnapshotManager", () => {
       makeTask({ id: "FN-done", column: "done" }),
       makeTask({ id: "FN-archived", column: "archived" }),
       makeTask({ id: "FN-open", column: "in-progress" }),
+      makeTask({ id: "FN-review", column: "in-review" }),
+      secondRunnable,
     ];
     const tasksById = new Map(tasks.map((task) => [task.id, task]));
 
-    expect(tasks.filter((task) => isRunnableAutoClaimCandidate(task, tasksById)).map((task) => task.id)).toEqual(["FN-1"]);
+    expect(tasks.filter((task) => isRunnableAutoClaimCandidate(task, tasksById)).map((task) => task.id)).toEqual(["FN-1", "FN-2"]);
   });
 
   it("shares one listTasks call across concurrent getSnapshot calls", async () => {
@@ -135,6 +138,49 @@ describe("AutoClaimSnapshotManager", () => {
       descriptionFirstLine: "updated first line",
       column: "todo",
     });
+  });
+
+  it("drops archived-while-cached candidates but keeps runnable siblings with canonical fields", async () => {
+    const initialTasks = [
+      makeTask({ id: "FN-6872", title: "Re-ratchet line-count baseline", description: "archived later", createdAt: "2026-01-01T00:00:00.000Z" }),
+      makeTask({ id: "FN-TODO", title: "Old sibling title", description: "old sibling desc", createdAt: "2026-01-02T00:00:00.000Z" }),
+    ];
+    const canonicalTasks = [
+      makeTask({ id: "FN-6872", title: "Re-ratchet line-count baseline", description: "now archived", column: "archived", createdAt: "2026-01-01T00:00:00.000Z" }),
+      makeTask({ id: "FN-TODO", title: "Canonical sibling title", description: "canonical first line\nsecond", createdAt: "2026-01-02T00:00:00.000Z" }),
+    ];
+    const listTasks = vi.fn()
+      .mockResolvedValueOnce(initialTasks)
+      .mockResolvedValueOnce(canonicalTasks);
+    const manager = new AutoClaimSnapshotManager({ taskStore: { listTasks }, now: () => Date.parse("2026-01-12T00:00:00.000Z") });
+
+    const snapshot = await manager.getSnapshot();
+    expect(snapshot.tasks.map((candidate) => candidate.id)).toEqual(["FN-6872", "FN-TODO"]);
+
+    const resolved = await resolveFreshAutoClaimCandidates({ listTasks }, snapshot.tasks, () => Date.parse("2026-01-12T00:00:00.000Z"));
+
+    expect(resolved.map((candidate) => candidate.id)).toEqual(["FN-TODO"]);
+    expect(resolved[0]).toMatchObject({
+      title: "Canonical sibling title",
+      description: "canonical first line\nsecond",
+      descriptionFirstLine: "canonical first line",
+      column: "todo",
+    });
+  });
+
+  it("treats archived dependencies as satisfied without making archived tasks candidates", async () => {
+    const dependent = makeTask({ id: "FN-dependent", dependencies: ["FN-archived-dependency"] });
+    const archivedDependency = makeTask({ id: "FN-archived-dependency", column: "archived" });
+    const tasks = [dependent, archivedDependency];
+    const tasksById = new Map(tasks.map((task) => [task.id, task]));
+
+    expect(isRunnableAutoClaimCandidate(dependent, tasksById)).toBe(true);
+    expect(isRunnableAutoClaimCandidate(archivedDependency, tasksById)).toBe(false);
+
+    const manager = new AutoClaimSnapshotManager({ taskStore: { listTasks: vi.fn(async () => tasks) } });
+    const snapshot = await manager.getSnapshot();
+
+    expect(snapshot.tasks.map((candidate) => candidate.id)).toEqual(["FN-dependent"]);
   });
 
   it("sorts by columnMovedAt then createdAt ascending", async () => {
