@@ -4281,7 +4281,13 @@ export function TaskDetailContent({
               )}
 
               {/* Actions dropdown — less common operations */}
-              {(task.column !== "triage" || task.status === "awaiting-approval" || canRetryTask || isTaskPaused) && (
+              {(
+                task.column !== "triage"
+                || task.status === "awaiting-approval"
+                || canRetryTask
+                || isTaskPaused
+                || Boolean(task.assignedAgentId)
+              ) && (
                 <div className="detail-actions-dropdown" ref={actionsMenuRef}>
                   <button
                     className="btn btn-sm"
@@ -4359,8 +4365,11 @@ export function TaskDetailContent({
                         </button>
                       )}
 
-                      {/* Pause/Unpause */}
-                      {task.column !== "done" && !task.assignedAgentId && (
+                      {/*
+                      FNXC:TaskPauseControls 2026-06-21-00:00:
+                      Users may pause or unpause agent-assigned and agent-paused tasks at any time from the detail Actions menu. The Paused by agent note remains informational context, not a substitute for the actionable unpause control.
+                      */}
+                      {task.column !== "done" && task.column !== "archived" && (
                         <button
                           className="detail-actions-menu-item"
                           role="menuitem"
@@ -4369,7 +4378,7 @@ export function TaskDetailContent({
                           {isTaskPaused ? t("taskDetail.pause.unpauseBtn", "Unpause") : t("taskDetail.pause.pauseBtn", "Pause")}
                         </button>
                       )}
-                      {task.column !== "done" && task.paused && task.pausedByAgentId && (
+                      {task.column !== "done" && task.column !== "archived" && task.paused && task.pausedByAgentId && (
                         <span
                           className="detail-actions-menu-item detail-actions-menu-note"
                           role="note"

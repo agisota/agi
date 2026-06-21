@@ -152,7 +152,7 @@ Approval pause/resume lifecycle (FN-3548):
 
 - Permanent-agent gating short-circuits `block` and `require-approval` actions before tool execution and returns structured non-success tool results.
 - For `require-approval`, the engine creates/reuses a durable approval request and pauses execution with canonical `pauseReason: "awaiting-approval"`.
-- If task-backed, the owning task is paused (`Task.paused=true`, `pausedByAgentId=<requester>`); the requesting agent is paused (`state="paused"`, `pauseReason="awaiting-approval"`).
+- If task-backed, the owning task is paused (`Task.paused=true`, `pausedByAgentId=<requester>`); the requesting agent is paused (`state="paused"`, `pauseReason="awaiting-approval"`). The task-detail **Paused by agent** indicator is context only: operators may still manually pause or unpause an agent-assigned task, and unpause clears the task pause latch.
 - Dedupe semantics by `approvalDedupeKey`: `pending` reuses the same request, `approved` allows exactly one execution and then marks request `completed`, `denied` stays blocked, `completed` requires a fresh request.
 - HTTP decision endpoint resumes best-effort: `POST /api/approvals/:id/decision` with `{ decision: "approve" | "deny", comment? }` unpauses matching task/agent when they are paused for `awaiting-approval`.
 - Approval API surface: `GET /api/approvals` (supports status/limit/offset and returns `{ requests, total, pendingCount }`), `GET /api/approvals/:id` (includes request context + audit/history), `POST /api/approvals/:id/decision`.

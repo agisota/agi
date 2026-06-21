@@ -943,14 +943,16 @@ describe("TaskDetailModal", () => {
       });
     });
 
-    it("hides Pause/Unpause button for agent-assigned tasks", async () => {
-      const { fetchAgent } = await import("../../api");
+    it("renders actionable Unpause button for agent-assigned paused tasks", async () => {
+      const { fetchAgent, unpauseTask } = await import("../../api");
       const mockFetchAgent = vi.mocked(fetchAgent);
+      const mockUnpauseTask = vi.mocked(unpauseTask);
       mockFetchAgent.mockResolvedValue({ id: "agent-1", name: "Agent 1", role: "executor", state: "active" } as any);
+      mockUnpauseTask.mockClear();
 
       render(
         <TaskDetailModal
-          task={makeTask({ column: "triage", paused: true, assignedAgentId: "agent-1" })}
+          task={makeTask({ id: "FN-ASSIGNED", column: "triage", paused: true, assignedAgentId: "agent-1" })}
           initialTab="definition"
           onClose={noop}
           onMoveTask={noopMove}
@@ -966,14 +968,15 @@ describe("TaskDetailModal", () => {
       });
 
       await userEvent.click(screen.getByRole("button", { name: /actions/i }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Unpause" }));
 
       await waitFor(() => {
-        expect(screen.queryByRole("menuitem", { name: "Pause" })).toBeNull();
-        expect(screen.queryByRole("menuitem", { name: "Unpause" })).toBeNull();
+        expect(mockUnpauseTask).toHaveBeenCalledTimes(1);
+        expect(mockUnpauseTask).toHaveBeenCalledWith("FN-ASSIGNED", undefined);
       });
     });
 
-    it("shows paused-by-agent indicator for agent-paused tasks", async () => {
+    it("shows paused-by-agent indicator alongside actionable Unpause for agent-paused tasks", async () => {
       const { fetchAgent } = await import("../../api");
       const mockFetchAgent = vi.mocked(fetchAgent);
       mockFetchAgent.mockResolvedValue({ id: "agent-1", name: "Agent 1", role: "executor", state: "paused" } as any);
@@ -997,7 +1000,89 @@ describe("TaskDetailModal", () => {
 
       await userEvent.click(screen.getByRole("button", { name: /actions/i }));
 
+      expect(screen.getByRole("menuitem", { name: "Unpause" })).toBeTruthy();
       expect(await screen.findByText("Paused by agent")).toBeTruthy();
+    });
+
+    it("renders actionable Pause button for agent-assigned tasks that are not paused", async () => {
+      const { fetchAgent, pauseTask } = await import("../../api");
+      const mockFetchAgent = vi.mocked(fetchAgent);
+      const mockPauseTask = vi.mocked(pauseTask);
+      mockFetchAgent.mockResolvedValue({ id: "agent-1", name: "Agent 1", role: "executor", state: "active" } as any);
+      mockPauseTask.mockClear();
+
+      render(
+        <TaskDetailModal
+          task={makeTask({ id: "FN-ASSIGNED", column: "triage", paused: false, userPaused: false, assignedAgentId: "agent-1" })}
+          initialTab="definition"
+          onClose={noop}
+          onMoveTask={noopMove}
+          onDeleteTask={noopDelete}
+          onMergeTask={noopMerge}
+          onOpenDetail={noopOpenDetail}
+          addToast={noop}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(mockFetchAgent).toHaveBeenCalledWith("agent-1", undefined);
+      });
+
+      await userEvent.click(screen.getByRole("button", { name: /actions/i }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Pause" }));
+
+      await waitFor(() => {
+        expect(mockPauseTask).toHaveBeenCalledTimes(1);
+        expect(mockPauseTask).toHaveBeenCalledWith("FN-ASSIGNED", undefined);
+      });
+    });
+
+    it.each([
+      ["paused-only", { paused: true, userPaused: false }, "Unpause"],
+      ["userPaused-only", { paused: false, userPaused: true }, "Unpause"],
+      ["paused-and-userPaused", { paused: true, userPaused: true }, "Unpause"],
+      ["not-paused", { paused: false, userPaused: false }, "Pause"],
+    ])("uses the correct Pause/Unpause label for agent-assigned %s tasks", async (_name, state, expectedLabel) => {
+      const { fetchAgent } = await import("../../api");
+      const mockFetchAgent = vi.mocked(fetchAgent);
+      mockFetchAgent.mockResolvedValue({ id: "agent-1", name: "Agent 1", role: "executor", state: "active" } as any);
+
+      render(
+        <TaskDetailModal
+          task={makeTask({ column: "todo", assignedAgentId: "agent-1", ...state })}
+          initialTab="definition"
+          onClose={noop}
+          onMoveTask={noopMove}
+          onDeleteTask={noopDelete}
+          onMergeTask={noopMerge}
+          onOpenDetail={noopOpenDetail}
+          addToast={noop}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: /actions/i }));
+
+      expect(screen.getByRole("menuitem", { name: expectedLabel })).toBeTruthy();
+    });
+
+    it.each(["done", "archived"])("hides Pause/Unpause button for %s tasks", async (column) => {
+      render(
+        <TaskDetailModal
+          task={makeTask({ column: column as "done" | "archived", paused: true, userPaused: true, assignedAgentId: "agent-1" })}
+          initialTab="definition"
+          onClose={noop}
+          onMoveTask={noopMove}
+          onDeleteTask={noopDelete}
+          onMergeTask={noopMerge}
+          onOpenDetail={noopOpenDetail}
+          addToast={noop}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: /actions/i }));
+
+      expect(screen.queryByRole("menuitem", { name: "Pause" })).toBeNull();
+      expect(screen.queryByRole("menuitem", { name: "Unpause" })).toBeNull();
     });
 
     it("does NOT render Actions dropdown for a non-paused, non-awaiting-approval, non-retryable triage task", () => {

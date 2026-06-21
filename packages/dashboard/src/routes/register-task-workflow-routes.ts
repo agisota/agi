@@ -2222,14 +2222,15 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
     }
   });
 
+  /*
+  FNXC:TaskPauseControls 2026-06-21-00:00:
+  Agent-assigned tasks must remain manually recoverable from approval-gating and other pauses. The engine still owns automatic pauses recorded with pausedByAgentId, while pauseTask(id, false) clears pausedByAgentId and userPaused so a human unpause can resume dispatch.
+  */
   // Pause task
   router.post("/tasks/:id/pause", async (req, res) => {
     try {
       const { store: scopedStore } = await getProjectContext(req);
-      const task = await scopedStore.getTask(req.params.id);
-      if (task.assignedAgentId) {
-        throw conflict(`Cannot manually pause/unpause task assigned to agent ${task.assignedAgentId}. Use agent pause controls instead.`);
-      }
+      await scopedStore.getTask(req.params.id);
       const updated = await scopedStore.pauseTask(req.params.id, true);
       res.json(updated);
     } catch (err: unknown) {
@@ -2244,10 +2245,7 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
   router.post("/tasks/:id/unpause", async (req, res) => {
     try {
       const { store: scopedStore } = await getProjectContext(req);
-      const task = await scopedStore.getTask(req.params.id);
-      if (task.assignedAgentId) {
-        throw conflict(`Cannot manually pause/unpause task assigned to agent ${task.assignedAgentId}. Use agent pause controls instead.`);
-      }
+      await scopedStore.getTask(req.params.id);
       const updated = await scopedStore.pauseTask(req.params.id, false);
       res.json(updated);
     } catch (err: unknown) {
