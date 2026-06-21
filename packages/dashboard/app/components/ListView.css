@@ -581,10 +581,18 @@ FN-6529 requires list-view agent-active tasks to use a simple static highlight i
   max-width: 100%;
 }
 
+/* FNXC:ListView 2026-06-21-01:42: Desktop list task titles clamp to two wrapped lines so longer task names remain legible in the narrower split sidebar without allowing unbounded row growth. */
 .list-title-text {
+  display: -webkit-box;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
+  overflow-wrap: anywhere;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .list-cell-date {

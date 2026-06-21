@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
@@ -400,7 +401,7 @@ describe("ListView", () => {
     expect(document.getElementById("list-view-options-panel")).toBeNull();
   });
 
-  it("displays tasks in table format", () => {
+  it("displays tasks in table format with two-line title styling", () => {
     const tasks = [
       createMockTask({ id: "FN-001", title: "First Task" }),
       createMockTask({ id: "FN-002", title: "Second Task" }),
@@ -412,6 +413,13 @@ describe("ListView", () => {
     expect(screen.getByText("First Task")).toBeDefined();
     expect(screen.getByText("FN-002")).toBeDefined();
     expect(screen.getByText("Second Task")).toBeDefined();
+    const listTitleTextRule = readFileSync("app/components/ListView.css", "utf8").match(/\.list-title-text\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(listTitleTextRule).toContain("display: -webkit-box");
+    expect(listTitleTextRule).toContain("-webkit-line-clamp: 2");
+    expect(listTitleTextRule).toContain("-webkit-box-orient: vertical");
+    expect(listTitleTextRule).toContain("white-space: normal");
+    expect(listTitleTextRule).toContain("overflow-wrap: anywhere");
+    expect(listTitleTextRule).not.toContain("white-space: nowrap");
   });
 
   it("shows fast indicator in desktop rows only for fast-mode tasks", () => {
@@ -1072,23 +1080,27 @@ describe("ListView", () => {
     viewportSpy.mockRestore();
   });
 
-  it("supports keyboard resizing on the desktop split-pane handle", () => {
+  it("supports keyboard resizing on the desktop split-pane handle", async () => {
     const viewportSpy = mockDesktopViewport();
     const clientWidthSpy = vi.spyOn(window.HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1000);
+    localStorage.setItem(scopedStorageKey("kb-dashboard-list-sidebar-width"), "150");
     const tasks = [createMockTask({ id: "FN-001", title: "Task" })];
 
     renderListView({ tasks });
+    await waitFor(() => expect(screen.getByTestId("list-split-sidebar")).toHaveStyle({ width: "200px" }));
 
     const handle = screen.getByTestId("list-split-resize-handle");
     const startWidth = Number(handle.getAttribute("aria-valuenow"));
 
     expect(handle).toHaveAttribute("tabindex", "0");
-    expect(handle).toHaveAttribute("aria-valuemin", "280");
-    expect(Number(handle.getAttribute("aria-valuemax"))).toBeGreaterThanOrEqual(280);
+    expect(handle).toHaveAttribute("aria-valuemin", "200");
+    expect(Number(handle.getAttribute("aria-valuemax"))).toBeGreaterThanOrEqual(200);
 
     fireEvent.keyDown(handle, { key: "ArrowRight" });
-
     expect(Number(handle.getAttribute("aria-valuenow"))).toBeGreaterThan(startWidth);
+    fireEvent.keyDown(handle, { key: "Home" });
+    expect(handle).toHaveAttribute("aria-valuenow", "200");
+    expect(screen.getByTestId("list-split-sidebar")).toHaveStyle({ width: "200px" });
     clientWidthSpy.mockRestore();
     viewportSpy.mockRestore();
   });
