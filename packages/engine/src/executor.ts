@@ -7603,18 +7603,34 @@ export class TaskExecutor {
         const priorRequeues = task.taskDoneRetryCount ?? 0;
         const nextRequeueCount = priorRequeues + 1;
         const terminalAction = priorRequeues < MAX_TASK_DONE_REQUEUE_RETRIES ? "requeue-todo" : "park-in-review";
-        if (livenessClassification) {
+        const isRepoRootCollision = livenessFailure === "realpath_matches_repo_root";
+        const auditClassification = livenessClassification ?? (isRepoRootCollision ? "repo-root" : null);
+        const auditReason = livenessFailureReason ?? (isRepoRootCollision ? "worktree path realpath matches the project root, not a task worktree" : null);
+        /*
+         * FNXC:WorktreeLiveness 2026-06-21-11:10:
+         * The executor still keeps the repo-root realpath check as defense in depth. If acquisition ever hands the root to this gate, emit structured evidence that separates the invalid checkout path from the normal git registered-worktree snapshot and the configured task-worktree pattern.
+         */
+        if (auditClassification) {
+          const registeredContainsObserved = registeredPaths.includes(observedWorktreeRealpath);
           await audit.git({
             type: "worktree:incomplete-detected",
             target: worktreePath,
             metadata: {
-              classification: livenessClassification,
-              reason: livenessFailureReason ?? undefined,
+              classification: auditClassification,
+              reason: auditReason ?? undefined,
               source: "executor-liveness-gate",
               taskId: task.id,
               retryCount: nextRequeueCount,
               maxRetries: MAX_TASK_DONE_REQUEUE_RETRIES,
               terminalAction,
+              observed: worktreePath,
+              observedRealpath: observedWorktreeRealpath,
+              expected,
+              registered: visibleRegistered,
+              registeredTotal: registeredPaths.length,
+              registeredContainsObserved,
+              invalidCheckoutPath: isRepoRootCollision ? "repo-root" : undefined,
+              expectedPatternExcludesRepoRoot: isRepoRootCollision,
             },
           });
         }

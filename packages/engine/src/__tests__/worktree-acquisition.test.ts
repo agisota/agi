@@ -1,4 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { execSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { acquireTaskWorktree } from "../worktree-acquisition.js";
 import { classifyTaskWorktree, PoolDoubleLeaseError } from "../worktree-pool.js";
@@ -35,6 +39,33 @@ vi.mock("../worktree-db-hydrate.js", () => ({
 vi.mock("../worktree-desktop-artifacts.js", () => ({
   removeDesktopBuildArtifacts: vi.fn().mockResolvedValue({ removed: [], skipped: [], failures: [] }),
 }));
+
+const cleanupPaths: string[] = [];
+function track(path: string): string {
+  cleanupPaths.push(path);
+  return path;
+}
+
+function git(cwd: string, command: string): string {
+  return execSync(command, { cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+}
+
+function makeRepo(): string {
+  const rootDir = track(mkdtempSync(join(tmpdir(), "fn-6861-acquisition-root-")));
+  git(rootDir, "git init -b main");
+  git(rootDir, 'git config user.email "test@example.com"');
+  git(rootDir, 'git config user.name "Test User"');
+  writeFileSync(join(rootDir, "README.md"), "root\n", "utf-8");
+  git(rootDir, "git add README.md");
+  git(rootDir, 'git commit -m "init"');
+  return rootDir;
+}
+
+afterEach(() => {
+  for (const path of cleanupPaths.splice(0)) {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
 
 describe("acquireTaskWorktree", () => {
   const task = {
@@ -261,6 +292,40 @@ describe("acquireTaskWorktree", () => {
       metadata: expect.objectContaining({ classification: "unregistered", source: "resume" }),
     }));
     expect(store.updateTask).toHaveBeenCalledWith("FN-1", { worktree: null, branch: null, sessionFile: null });
+  });
+
+  it("FN-6861 creates a fresh configured worktree when a resumed assignment points at the repo root", async () => {
+    const rootDir = makeRepo();
+    const actualPool = await vi.importActual<typeof import("../worktree-pool.js")>("../worktree-pool.js");
+    vi.mocked(classifyTaskWorktree).mockImplementationOnce(actualPool.classifyTaskWorktree);
+    const freshPath = join(rootDir, ".worktrees", "fn-6861-fresh");
+    const createWorktree = vi.fn().mockResolvedValue({ path: freshPath, branch: "fusion/fn-1" });
+    const auditGit = vi.fn().mockResolvedValue(undefined);
+
+    const result = await acquireTaskWorktree({
+      task: { ...task, worktree: rootDir, branch: "fusion/fn-1", sessionFile: "/tmp/session.json" },
+      rootDir,
+      store,
+      settings: {} as any,
+      createWorktree,
+      audit: { git: auditGit } as any,
+    });
+
+    expect(result).toMatchObject({
+      worktreePath: freshPath,
+      branch: "fusion/fn-1",
+      source: "fresh",
+      isResume: false,
+    });
+    expect(result.worktreePath).not.toBe(rootDir);
+    expect(result.worktreePath).toContain(`${join(rootDir, ".worktrees")}/`);
+    expect(auditGit).toHaveBeenCalledWith(expect.objectContaining({
+      type: "worktree:incomplete-detected",
+      target: rootDir,
+      metadata: expect.objectContaining({ classification: "repo-root", source: "resume" }),
+    }));
+    expect(store.updateTask).toHaveBeenCalledWith("FN-1", { worktree: null, branch: null, sessionFile: null });
+    expect(store.updateTask).toHaveBeenCalledWith("FN-1", { worktree: freshPath, branch: "fusion/fn-1" });
   });
 
   it("falls through to fresh creation when pool acquire throws PoolDoubleLeaseError", async () => {

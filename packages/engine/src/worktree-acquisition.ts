@@ -220,6 +220,10 @@ export async function acquireTaskWorktree(opts: AcquireTaskWorktreeOptions): Pro
   let isResume = Boolean(task.worktree && existsSync(worktreePath));
   if (task.worktree && isResume) {
     const resumeClassification = await classifyTaskWorktree(rootDir, worktreePath);
+    /*
+     * FNXC:WorktreeLiveness 2026-06-21-11:10:
+     * A resumed task can carry a stale or recovered `task.worktree` that points at the repository root. Treat every non-usable classification, including repo-root, as self-healable metadata so acquisition clears the assignment and creates a fresh task worktree instead of feeding the executor's defensive gate forever.
+     */
     if (!resumeClassification.ok) {
       await audit?.git({
         type: "worktree:incomplete-detected",

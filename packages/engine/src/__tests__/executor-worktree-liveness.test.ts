@@ -56,13 +56,18 @@ describe("FN-4114 worktree liveness assertion", () => {
     expect(store.moveTask).toHaveBeenCalledWith("FN-4114", "todo", { preserveProgress: true });
   });
 
-  it("FN-4114 aborts when worktree realpath collides with repo root", async () => {
+  it("FN-6861 aborts with structured audit when worktree realpath collides with repo root", async () => {
     vi.spyOn(worktreePool, "classifyTaskWorktree").mockResolvedValue({ ok: true });
+    vi.spyOn(worktreePool, "describeRegisteredWorktrees").mockResolvedValue({
+      rawOutput: "worktree /repo\nworktree /repo/.worktrees/swift-falcon\n",
+      canonicalized: ["/repo", "/repo/.worktrees/swift-falcon"],
+    });
     mockedExecSync.mockImplementation((cmd: string) => {
       if (cmd.includes("rev-parse HEAD")) return Buffer.from("abc123\n");
       return Buffer.from("");
     });
     const store = createMockStore();
+    store.recordRunAuditEvent = vi.fn().mockResolvedValue(undefined);
     store.getTask.mockResolvedValue(task({ worktree: "/repo" }));
 
     const executor = new TaskExecutor(store as any, "/repo");
@@ -70,6 +75,22 @@ describe("FN-4114 worktree liveness assertion", () => {
 
     expect(mockedCreateFnAgent).not.toHaveBeenCalled();
     expect(store.moveTask).toHaveBeenCalledWith("FN-4114", "todo", { preserveProgress: true });
+    expect(store.recordRunAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+      domain: "git",
+      mutationType: "worktree:incomplete-detected",
+      target: "/repo",
+      metadata: expect.objectContaining({
+        classification: "repo-root",
+        observed: "/repo",
+        observedRealpath: "/repo",
+        expected: "/repo/.worktrees/* (usable, registered)",
+        registered: ["/repo", "/repo/.worktrees/swift-falcon"],
+        registeredContainsObserved: true,
+        invalidCheckoutPath: "repo-root",
+        expectedPatternExcludesRepoRoot: true,
+        terminalAction: "requeue-todo",
+      }),
+    }));
   });
 
   it.each([
