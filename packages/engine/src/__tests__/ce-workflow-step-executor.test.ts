@@ -233,6 +233,36 @@ describe("CE workflow-step executor integration", () => {
       );
       expect(cap.last?.taskEnv?.FUSION_HEADLESS).toBeUndefined();
     });
+
+    it("strips an INHERITED FUSION_HEADLESS on a board run (default-safe invariant)", async () => {
+      const store = createMockStore();
+      const { executor } = makeExecutor(store);
+      const cap = captureSession();
+
+      // An outer pipeline exported FUSION_HEADLESS=1 into the inherited env. A board
+      // run (unattended=false) must NOT inherit it — otherwise the step silently
+      // skips user questions instead of parking. (PR #1696 review fix.)
+      await (executor as any).executeWorkflowStep(
+        baseStepTask(),
+        makeStep({ skillName: "compound-engineering:ce-plan" }),
+        "/tmp/wt",
+        {},
+        { FUSION_HEADLESS: "1" },
+        { unattended: false },
+      );
+      expect(cap.last?.taskEnv?.FUSION_HEADLESS).toBeUndefined();
+
+      // An explicit unattended opt-in still sets it.
+      await (executor as any).executeWorkflowStep(
+        baseStepTask(),
+        makeStep({ skillName: "compound-engineering:ce-plan" }),
+        "/tmp/wt",
+        {},
+        { FUSION_HEADLESS: "1" },
+        { unattended: true },
+      );
+      expect(cap.last?.taskEnv?.FUSION_HEADLESS).toBe("1");
+    });
   });
 
   // ── Item 2 (integration half): skillName → requestedSkillNames + paths ───────

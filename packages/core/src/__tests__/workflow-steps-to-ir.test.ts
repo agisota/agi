@@ -16,6 +16,7 @@ function step(overrides: Partial<WorkflowStep>): WorkflowStep {
     gateMode: overrides.gateMode ?? "advisory",
     prompt: overrides.prompt ?? "",
     toolMode: overrides.toolMode,
+    skillName: overrides.skillName,
     scriptName: overrides.scriptName,
     enabled: overrides.enabled ?? true,
     defaultOn: overrides.defaultOn,

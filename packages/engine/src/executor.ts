@@ -12696,8 +12696,18 @@ You have access to the file system to review changes.${verdictBlock}`;
       const stepEnv: NodeJS.ProcessEnv = {
         ...(taskEnv ?? process.env),
         FUSION_WORKFLOW_STEP: "1",
-        ...(unattended ? { FUSION_HEADLESS: "1" } : {}),
       };
+      // FNXC:WorkflowSteps 2026-06-21-06:30:
+      // Default-safe invariant (KTD-3): a board run must NEVER be headless. Since
+      // stepEnv spreads taskEnv/process.env, an inherited FUSION_HEADLESS (e.g. an
+      // outer pipeline exported it) would otherwise leak in and silently skip user
+      // questions. Set it ONLY on an explicit opt-in; strip any inherited value
+      // otherwise so absence of the flag always yields a board run.
+      if (unattended) {
+        stepEnv.FUSION_HEADLESS = "1";
+      } else {
+        delete stepEnv.FUSION_HEADLESS;
+      }
 
       // (U1) Load the step's named skill into THIS session. The interactive fix
       // proved the resolver works when fed BOTH a requested name AND a discovery
