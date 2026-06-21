@@ -32,6 +32,7 @@ import { executorLog } from "./logger.js";
 const MAX_OUTPUT_BYTES = 200 * 1024; // 200 KB
 const QUIET_HEARTBEAT_INTERVAL_MS = 60_000; // emit synthetic heartbeat after 60s silence
 const SIGKILL_GRACE_MS = 10_000;
+const NORMAL_EXIT_REAP_GRACE_MS = 500;
 export const DEFAULT_TIMEOUT_PACKAGE_SEC = 300;
 export const DEFAULT_TIMEOUT_WORKSPACE_SEC = 900;
 export const MAX_TIMEOUT_SEC = 1800;
@@ -309,6 +310,19 @@ function killVerificationProcess(supervised: SupervisedChild, signal: NodeJS.Sig
   supervised.kill(signal);
 }
 
+function reapVerificationProcessGroup(supervised: SupervisedChild): void {
+  /*
+   * FNXC:Verification 2026-06-21-10:00:
+   * Verification commands may spawn background test/dev children and then let the shell exit cleanly.
+   * Reap the process group after normal close so fn_run_verification does not report completion while orphaned test workers keep later task progress stuck.
+   */
+  killVerificationProcess(supervised, "SIGTERM");
+  const forceKillTimer = setTimeout(() => {
+    killVerificationProcess(supervised, "SIGKILL");
+  }, NORMAL_EXIT_REAP_GRACE_MS);
+  forceKillTimer.unref?.();
+}
+
 // ---------------------------------------------------------------------------
 // Tool parameter schema
 // ---------------------------------------------------------------------------
@@ -561,6 +575,9 @@ export async function runVerificationCommand(
         executorLog.warn(
           `[fn_run_verification] command failed (exit=${exitCode}, signal=${signal ?? "none"}): ${command}`,
         );
+      }
+      if (!timedOut) {
+        reapVerificationProcessGroup(supervised);
       }
 
       resolve({

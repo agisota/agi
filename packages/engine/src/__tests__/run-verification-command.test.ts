@@ -19,6 +19,19 @@ import {
 const onPosix = process.platform !== "win32";
 const itPosix = onPosix ? it : it.skip;
 
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Tests for runVerificationCommand - the core verification execution logic.
  * These tests validate basic command execution, output capture, and error handling.
@@ -367,6 +380,35 @@ describe("runVerificationCommand", { timeout: 30000 }, () => {
       expect(result.success).toBe(false);
       expect(result.timedOut).toBe(true);
       expect(result.durationMs).toBeLessThan(5_000);
+    });
+
+    itPosix("reaps background children after a command exits cleanly", async () => {
+      /*
+       * FNXC:Verification 2026-06-21-10:00:
+       * A clean shell exit is not enough evidence that verification is fully done; background children must be gone too or later task completion can stall behind leaked test workers.
+       */
+      const childScript = "setInterval(() => {}, 1000)";
+      const parentScript = [
+        "const { spawn } = require('node:child_process');",
+        `const child = spawn(process.execPath, ['-e', ${JSON.stringify(childScript)}], { stdio: 'ignore' });`,
+        "console.log(child.pid);",
+        "child.unref();",
+      ].join(" ");
+      const result = await runVerificationCommand({
+        command: `${process.execPath} -e ${JSON.stringify(parentScript)}`,
+        cwd: tempDir,
+        timeoutMs: 30_000,
+        onHeartbeat: vi.fn(),
+      });
+
+      expect(result.success).toBe(true);
+      const leakedPid = Number.parseInt(result.stdout.trim(), 10);
+      expect(Number.isFinite(leakedPid)).toBe(true);
+
+      for (let i = 0; i < 15 && isProcessAlive(leakedPid); i++) {
+        await sleep(100);
+      }
+      expect(isProcessAlive(leakedPid)).toBe(false);
     });
   });
 
