@@ -948,6 +948,8 @@ export function GitManagerModal({ isOpen, onClose, tasks: _tasks, addToast, proj
                       key={section.id}
                       role="tab"
                       aria-selected={activeSection === section.id}
+                      aria-label={sectionLabel}
+                      title={sectionLabel}
                       className={`gm-nav-item${activeSection === section.id ? " active" : ""}`}
                       onClick={() => setActiveSection(section.id)}
                     >

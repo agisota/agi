@@ -469,10 +469,6 @@ export function TerminalModal({ isOpen, onClose, initialCommand, initialCommandG
     setDisplayModeState(writeTerminalDisplayMode(mode, projectId));
   }, [projectId]);
 
-  const persistDockedHeight = useCallback((height: number) => {
-    setDockedHeight(writeTerminalDockedHeight(height, projectId));
-  }, [projectId]);
-
   const persistFloatingSize = useCallback((size: TerminalFloatSize) => {
     setFloatingSize(writeTerminalFloatSize(size, projectId));
   }, [projectId]);
@@ -496,11 +492,24 @@ export function TerminalModal({ isOpen, onClose, initialCommand, initialCommandG
     const startHeight = dockedHeight;
     const previousUserSelect = document.body.style.userSelect;
     document.body.style.userSelect = "none";
+    /*
+    FNXC:Terminal 2026-06-22-01:30:
+    Smooth docked resize: batch height state to one update per animation frame during the drag and write localStorage only once on pointer-up, instead of a synchronous clamp + localStorage write on every pointermove (which janked the drag).
+    */
+    let latestHeight = startHeight;
+    let frame = 0;
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
-      persistDockedHeight(startHeight + (startY - moveEvent.clientY));
+      latestHeight = clampTerminalDockedHeight(startHeight + (startY - moveEvent.clientY));
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        setDockedHeight(latestHeight);
+      });
     };
     const handlePointerUp = () => {
+      if (frame) cancelAnimationFrame(frame);
+      setDockedHeight(writeTerminalDockedHeight(latestHeight, projectId));
       document.body.style.userSelect = previousUserSelect;
       document.removeEventListener("pointermove", handlePointerMove);
       document.removeEventListener("pointerup", handlePointerUp);
@@ -510,7 +519,7 @@ export function TerminalModal({ isOpen, onClose, initialCommand, initialCommandG
     document.addEventListener("pointermove", handlePointerMove);
     document.addEventListener("pointerup", handlePointerUp);
     document.addEventListener("pointercancel", handlePointerUp);
-  }, [dockedHeight, isDockedMode, persistDockedHeight]);
+  }, [dockedHeight, isDockedMode, projectId]);
 
   const handleFloatingDragPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (!isFloatingMode || (event.target as HTMLElement).closest("button")) return;

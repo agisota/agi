@@ -82,14 +82,19 @@ The override MUST out-specify the base `.modal-overlay` (which sets a dimmed bac
   box-shadow: var(--shadow-xl);
 }
 
+/*
+FNXC:Terminal 2026-06-22-01:30:
+Larger grab target for the docked terminal top resize handle: it straddles the panel's top edge (extends above it) and is taller, so it is easy to grab on desktop and touch. touch-action:none keeps the drag from being hijacked by scroll/gestures so the resize stays smooth.
+*/
 .terminal-docked-resize-handle {
   position: absolute;
-  top: 0;
+  top: calc(var(--space-sm) * -1);
   left: 0;
   right: 0;
-  height: var(--space-sm);
+  height: calc(var(--space-md) + var(--space-sm));
   cursor: ns-resize;
-  z-index: 1;
+  touch-action: none;
+  z-index: 2;
 }
 
 .terminal-docked-resize-handle::before {

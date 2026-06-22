@@ -156,7 +156,7 @@ FNXC:Navigation 2026-06-20-00:00:
 Experimental sidebar plugin labels must read as plain navigation nouns without an appended "view" suffix. The Compound Engineering plugin is intentionally shortened to "Compound" so its label fits the narrower sidebar.
 */
 function getSidebarPluginLabel(entry: PluginDashboardViewEntry): string {
-  return entry.pluginId === "fusion-plugin-compound-engineering" ? "Compound" : entry.view.label;
+  return entry.pluginId === "fusion-plugin-compound-engineering" ? "Compound Eng" : entry.view.label;
 }
 
 export function LeftSidebarNav({
