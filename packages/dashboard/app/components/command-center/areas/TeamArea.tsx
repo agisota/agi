@@ -518,6 +518,29 @@ export function TeamArea({
           ) : null}
 
           {/*
+          FNXC:CommandCenter 2026-06-22-14:30:
+          AI engine card shortcuts (View Board / View Agents) sit directly UNDER the engine toggle button so they read as engine-card navigation, above the heartbeat-speed slider. Navigation is owned by App (onChangeView), so these only render when wired up.
+          */}
+          {onChangeView ? (
+            <div className="cc-team-engine-nav">
+              <button
+                type="button"
+                className="btn btn-sm cc-team-engine-nav-btn"
+                onClick={() => onChangeView("board")}
+              >
+                {t("commandCenter.controls.engine.viewBoard", "View Board")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm cc-team-engine-nav-btn"
+                onClick={() => onChangeView("agents")}
+              >
+                {t("commandCenter.controls.engine.viewAgents", "View Agents")}
+              </button>
+            </div>
+          ) : null}
+
+          {/*
           FNXC:CommandCenter 2026-06-22-00:00:
           Heartbeat-speed multiplier slider replicated from the Agents page (range 0.1–10, step 0.1, ×0.1–×10 presets) so users can scale all agent heartbeat intervals from the dashboard's AI engine card. Wired to the same settings.heartbeatMultiplier endpoint.
           */}
@@ -566,29 +589,6 @@ export function TeamArea({
               {t("agents.heartbeatSpeedHint", "Scales all agent heartbeat intervals. ×0.5 = twice as fast, ×2.0 = twice as slow. Default: ×1.0")}
             </small>
           </div>
-
-          {/*
-          FNXC:CommandCenter 2026-06-22-00:00:
-          AI engine card shortcuts: jump straight to the board or agents views. Navigation is owned by App (onChangeView), so these only fire when wired up.
-          */}
-          {onChangeView ? (
-            <div className="cc-team-engine-nav">
-              <button
-                type="button"
-                className="btn btn-sm cc-team-engine-nav-btn"
-                onClick={() => onChangeView("board")}
-              >
-                {t("commandCenter.controls.engine.viewBoard", "View Board")}
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm cc-team-engine-nav-btn"
-                onClick={() => onChangeView("agents")}
-              >
-                {t("commandCenter.controls.engine.viewAgents", "View Agents")}
-              </button>
-            </div>
-          ) : null}
         </section>
       </div>
 
