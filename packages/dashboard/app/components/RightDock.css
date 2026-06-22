@@ -20,6 +20,12 @@ The right dock CSS uses a mobile media query as a belt-and-suspenders guard only
   padding-bottom: var(--executor-footer-height);
 }
 
+.right-dock--collapsed {
+  width: calc(var(--space-2xl) + var(--space-sm));
+  min-width: calc(var(--space-2xl) + var(--space-sm));
+  max-width: calc(var(--space-2xl) + var(--space-sm));
+}
+
 .right-dock__resize-handle {
   position: absolute;
   inset-block: 0;
@@ -58,6 +64,12 @@ The right dock CSS uses a mobile media query as a belt-and-suspenders guard only
   border-bottom: thin solid var(--border);
 }
 
+.right-dock--collapsed .right-dock__toolbar {
+  flex-direction: column;
+  justify-content: flex-start;
+  height: 100%;
+}
+
 .right-dock__tabs,
 .right-dock__actions {
   display: flex;
@@ -70,6 +82,12 @@ The right dock CSS uses a mobile media query as a belt-and-suspenders guard only
   flex: 1;
   overflow-x: auto;
   scrollbar-width: thin;
+}
+
+.right-dock--collapsed .right-dock__tabs,
+.right-dock--collapsed .right-dock__actions {
+  flex-direction: column;
+  overflow: visible;
 }
 
 .right-dock__tab {

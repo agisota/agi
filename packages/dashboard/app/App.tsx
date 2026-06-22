@@ -1998,7 +1998,6 @@ function AppInner() {
         projectId={currentProject?.id}
         mobileNavEnabled={isMobile}
         leftSidebarNavActive={sidebarActive}
-        rightDockActive={rightDockActive} rightDockOpen={rightDock.open} onToggleRightDock={rightDock.toggle}
         // Node switching props
         availableNodes={nodes}
         currentNode={currentNode}

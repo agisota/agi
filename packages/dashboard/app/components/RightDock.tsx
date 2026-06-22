@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Maximize2, X } from "lucide-react";
+import { Maximize2, PanelRight } from "lucide-react";
 import {
   findOverflowViewEntry,
   getVisibleOverflowViewEntries,
@@ -29,8 +29,8 @@ export function readStoredRightDockWidth(): number {
 }
 
 export function readStoredRightDockOpen(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(RIGHT_DOCK_OPEN_STORAGE_KEY) === "true";
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(RIGHT_DOCK_OPEN_STORAGE_KEY) !== "false";
 }
 
 export function persistRightDockOpen(open: boolean): void {
@@ -83,6 +83,9 @@ The right dock is an auxiliary tablet/desktop surface: it remembers the last ove
 
 FNXC:Navigation 2026-06-21-20:14:
 FN-6882 splits right-dock entries into launcher actions and inline views. Action tabs invoke their existing Header handlers without replacing the Files body; only inline entries persist selection or expand into the modal.
+
+FNXC:Navigation 2026-06-21-23:40:
+The right dock is persistent and visible by default on tablet/desktop project screens. Its in-dock collapse toggle replaces the removed Header right-dock toggle, keeping one far-right control surface while preserving a narrow rail for restoring the panel.
 */
 export function RightDock({
   open,
@@ -118,10 +121,11 @@ export function RightDock({
     persistRightDockView(key);
   }, [renderProps, visibilityOptions]);
 
-  const closeDock = useCallback(() => {
-    persistRightDockOpen(false);
-    onOpenChange(false);
-  }, [onOpenChange]);
+  const toggleCollapsed = useCallback(() => {
+    const nextOpen = !open;
+    persistRightDockOpen(nextOpen);
+    onOpenChange(nextOpen);
+  }, [onOpenChange, open]);
 
   const handleResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -167,32 +171,35 @@ export function RightDock({
     persistRightDockWidth(nextWidth);
   }, [width]);
 
-  if (!open || !selectedEntry) {
+  if (!selectedEntry) {
     return null;
   }
 
   const SelectedIcon = selectedEntry.icon;
+  const dockWidth = open ? `${width}px` : undefined;
 
   return (
     <aside
-      className={`right-dock${footerVisible ? " right-dock--with-footer" : ""}`}
-      style={{ width: `${width}px` }}
+      className={`right-dock${open ? "" : " right-dock--collapsed"}${footerVisible ? " right-dock--with-footer" : ""}`}
+      style={dockWidth ? { width: dockWidth } : undefined}
       aria-label="Right dock"
       data-testid="right-dock"
     >
-      <div
-        className="right-dock__resize-handle"
-        role="separator"
-        aria-orientation="vertical"
-        aria-valuemin={RIGHT_DOCK_MIN_WIDTH}
-        aria-valuemax={RIGHT_DOCK_MAX_WIDTH}
-        aria-valuenow={width}
-        aria-label="Resize right dock"
-        tabIndex={0}
-        data-testid="right-dock-resize-handle"
-        onPointerDown={handleResizeStart}
-        onKeyDown={handleResizeKeyDown}
-      />
+      {open ? (
+        <div
+          className="right-dock__resize-handle"
+          role="separator"
+          aria-orientation="vertical"
+          aria-valuemin={RIGHT_DOCK_MIN_WIDTH}
+          aria-valuemax={RIGHT_DOCK_MAX_WIDTH}
+          aria-valuenow={width}
+          aria-label="Resize right dock"
+          tabIndex={0}
+          data-testid="right-dock-resize-handle"
+          onPointerDown={handleResizeStart}
+          onKeyDown={handleResizeKeyDown}
+        />
+      ) : null}
       <div className="right-dock__toolbar">
         <div className="right-dock__tabs" role="tablist" aria-label="Right dock views">
           {entries.map((entry) => {
@@ -216,7 +223,7 @@ export function RightDock({
           })}
         </div>
         <div className="right-dock__actions">
-          {selectedEntry.render ? (
+          {open && selectedEntry.render ? (
             <button
               type="button"
               className="btn-icon right-dock__expand"
@@ -230,23 +237,28 @@ export function RightDock({
           ) : null}
           <button
             type="button"
-            className="btn-icon right-dock__close"
-            aria-label="Close right dock"
-            title="Close right dock"
-            data-testid="right-dock-close"
-            onClick={closeDock}
+            className="btn-icon right-dock__collapse-toggle"
+            aria-label={open ? "Collapse right dock" : "Expand right dock"}
+            title={open ? "Collapse right dock" : "Expand right dock"}
+            aria-expanded={open}
+            data-testid="right-dock-collapse-toggle"
+            onClick={toggleCollapsed}
           >
-            <X size={16} />
+            <PanelRight size={16} />
           </button>
         </div>
       </div>
-      <div className="right-dock__header">
-        <SelectedIcon size={16} />
-        <div className="right-dock__title" role="heading" aria-level={3}>{selectedEntry.label}</div>
-      </div>
-      <div className="right-dock__body" role="tabpanel" aria-label={selectedEntry.label} data-testid="right-dock-body">
-        {selectedEntry.render?.(renderProps)}
-      </div>
+      {open ? (
+        <>
+          <div className="right-dock__header">
+            <SelectedIcon size={16} />
+            <div className="right-dock__title" role="heading" aria-level={3}>{selectedEntry.label}</div>
+          </div>
+          <div className="right-dock__body" role="tabpanel" aria-label={selectedEntry.label} data-testid="right-dock-body">
+            {selectedEntry.render?.(renderProps)}
+          </div>
+        </>
+      ) : null}
     </aside>
   );
 }

@@ -46,8 +46,8 @@ export interface RightDockController {
 }
 
 /*
-FNXC:Navigation 2026-06-21-12:20:
-App owns whether the default-on right dock is available, but this controller owns the persisted open state and shared view props so App.tsx does not duplicate each overflow destination's dock/modal rendering contract.
+FNXC:Navigation 2026-06-21-23:40:
+The right dock is visible by default and collapses from inside the dock. Keep the persisted open/collapsed state in this controller so App and Header do not need duplicate right-dock toggle wiring.
 */
 export function useRightDockController(input: RightDockControllerInput): RightDockController {
   const [open, setOpen] = useState(readStoredRightDockOpen);

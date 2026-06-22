@@ -50,10 +50,7 @@ describe("RightDock", () => {
   });
 
   it("renders Files by default and restores only persisted inline views", () => {
-    const onOpenChange = vi.fn();
-    const { unmount } = render(
-      <RightDock open={true} onOpenChange={onOpenChange} renderProps={renderProps} />,
-    );
+    const { unmount } = render(<RightDock open={true} onOpenChange={vi.fn()} renderProps={renderProps} />);
 
     expect(screen.getByTestId("right-dock-tab-files")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("right-dock-files-view")).toBeInTheDocument();
@@ -62,7 +59,7 @@ describe("RightDock", () => {
     expect(window.localStorage.getItem(RIGHT_DOCK_VIEW_STORAGE_KEY)).toBeNull();
     unmount();
 
-    render(<RightDock open={true} onOpenChange={onOpenChange} renderProps={renderProps} />);
+    render(<RightDock open={true} onOpenChange={vi.fn()} renderProps={renderProps} />);
     expect(screen.getByTestId("right-dock-tab-files")).toHaveAttribute("aria-selected", "true");
   });
 
@@ -148,11 +145,11 @@ describe("RightDock", () => {
     expect(screen.getByTestId("right-dock-files-view")).toBeInTheDocument();
   });
 
-  it("closes internally and clamps then persists resize width", () => {
+  it("collapses internally and clamps then persists resize width", () => {
     const onOpenChange = vi.fn();
     render(<RightDock open={true} onOpenChange={onOpenChange} renderProps={renderProps} />);
 
-    fireEvent.click(screen.getByTestId("right-dock-close"));
+    fireEvent.click(screen.getByTestId("right-dock-collapse-toggle"));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(window.localStorage.getItem(RIGHT_DOCK_OPEN_STORAGE_KEY)).toBe("false");
 
@@ -172,6 +169,26 @@ describe("RightDock", () => {
 
     expect(screen.getByTestId("right-dock")).toHaveStyle({ width: "400px" });
     expect(screen.getByTestId("right-dock-resize-handle")).toHaveAttribute("aria-valuenow", "400");
+  });
+
+  it("shows an in-dock collapse toggle and keeps the collapsed rail persistent", () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(<RightDock open={true} onOpenChange={onOpenChange} renderProps={renderProps} />);
+
+    expect(screen.getByTestId("right-dock-collapse-toggle")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("right-dock-body")).toBeInTheDocument();
+    expect(screen.getByTestId("right-dock-resize-handle")).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.getAttribute("data-testid"))).toEqual(toolTabIds);
+
+    rerender(<RightDock open={false} onOpenChange={onOpenChange} renderProps={renderProps} />);
+    expect(screen.getByTestId("right-dock")).toHaveClass("right-dock--collapsed");
+    expect(screen.getByTestId("right-dock-collapse-toggle")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("right-dock-body")).toBeNull();
+    expect(screen.queryByTestId("right-dock-resize-handle")).toBeNull();
+    expect(screen.getAllByRole("tab").map((tab) => tab.getAttribute("data-testid"))).toEqual(toolTabIds);
+    fireEvent.click(screen.getByTestId("right-dock-collapse-toggle"));
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    expect(window.localStorage.getItem(RIGHT_DOCK_OPEN_STORAGE_KEY)).toBe("true");
   });
 
   it("renders the expanded modal through the same registry and restores focus on close", async () => {
