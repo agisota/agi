@@ -687,17 +687,45 @@ export function ListView({
     return target?.id;
   }, [listColumns]);
 
-  const handleListQuickCreate = useCallback((input: TaskCreateInput) => {
+  /**
+   * FNXC:WorkflowList 2026-06-21-21:37:
+   * List quick-create shares Board's workflow filtering invariant: when taskWorkflowIds lags task creation, optimistically recording the selected workflow keeps the newly-created row visible in the active workflow lane until the authoritative refetch reconciles it (FN-6903).
+   */
+  const applyOptimisticTaskWorkflow = useCallback((taskId: string, workflowId: string) => {
+    setBoardWorkflowsState((previous) => {
+      if (!previous || previous.projectId !== projectId) return previous;
+      if (previous.payload.taskWorkflowIds[taskId]) return previous;
+
+      const payload: BoardWorkflowsPayload = {
+        ...previous.payload,
+        taskWorkflowIds: {
+          ...previous.payload.taskWorkflowIds,
+          [taskId]: workflowId,
+        },
+      };
+      writeBoardWorkflowsCache(projectId, payload);
+      return { projectId, payload };
+    });
+  }, [projectId]);
+
+  const handleListQuickCreate = useCallback(async (input: TaskCreateInput) => {
     const create = onQuickCreate ?? (async () => addToast(t("listView.taskCreationUnavailable", "Task creation not available"), "error"));
     if (workflowMode && selectedWorkflow && createTargetColumn) {
-      return create({
+      const workflowId = input.workflowId ?? selectedWorkflow.id;
+      const created = await create({
         ...input,
         column: input.column ?? createTargetColumn,
-        workflowId: input.workflowId ?? selectedWorkflow.id,
+        workflowId,
       });
+      if (created?.id) {
+        const createdWorkflowId = (created as Task & { workflowId?: string }).workflowId ?? workflowId;
+        applyOptimisticTaskWorkflow(created.id, createdWorkflowId);
+        refreshBoardWorkflows();
+      }
+      return created;
     }
     return create(input);
-  }, [addToast, createTargetColumn, onQuickCreate, selectedWorkflow, t, workflowMode]);
+  }, [addToast, applyOptimisticTaskWorkflow, createTargetColumn, onQuickCreate, refreshBoardWorkflows, selectedWorkflow, t, workflowMode]);
 
 
   // Column display labels

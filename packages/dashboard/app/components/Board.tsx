@@ -491,6 +491,38 @@ export function Board({ tasks, projectId, maxConcurrent, onMoveTask, onPauseTask
     });
   }, [boardWorkflows, selectedWorkflow, tasks, workflowMode]);
 
+  const applyOptimisticTaskWorkflow = useCallback((taskId: string, workflowId: string) => {
+    setBoardWorkflowsState((previous) => {
+      if (!previous || previous.projectId !== projectId) return previous;
+      if (previous.payload.taskWorkflowIds[taskId]) return previous;
+
+      const payload: BoardWorkflowsPayload = {
+        ...previous.payload,
+        taskWorkflowIds: {
+          ...previous.payload.taskWorkflowIds,
+          [taskId]: workflowId,
+        },
+      };
+      writeBoardWorkflowsCache(projectId, payload);
+      return { projectId, payload };
+    });
+  }, [projectId]);
+
+  /**
+   * FNXC:WorkflowBoard 2026-06-21-21:34:
+   * A task created on a selected non-default workflow lane must render in that lane immediately. The task list updates before board-workflows taskWorkflowIds, so without this optimistic project-scoped assignment the filter falls back to the default workflow and hides the new card until the next metadata refetch (FN-6903).
+   */
+  const handleWorkflowQuickCreate = useCallback(async (input: TaskCreateInput) => {
+    if (!onQuickCreate || !selectedWorkflow) return undefined;
+    const created = await onQuickCreate(input);
+    if (created?.id) {
+      const createdWorkflowId = (created as Task & { workflowId?: string }).workflowId ?? selectedWorkflow.id;
+      applyOptimisticTaskWorkflow(created.id, createdWorkflowId);
+      refreshBoardWorkflows();
+    }
+    return created;
+  }, [applyOptimisticTaskWorkflow, onQuickCreate, refreshBoardWorkflows, selectedWorkflow]);
+
   const selectedWorkflowArchivedColumn = useMemo(() => {
     if (!selectedWorkflow) return null;
     return selectedWorkflow.columns.find((column) => column.flags.archived) ?? null;
@@ -658,7 +690,7 @@ export function Board({ tasks, projectId, maxConcurrent, onMoveTask, onPauseTask
                 blockerFanoutMap={blockerFanoutMap}
                 prAuthAvailable={prAuthAvailable}
                 autoMerge={autoMerge}
-                {...(isCreateColumn ? { onQuickCreate, onNewTask, onPlanningMode, onSubtaskBreakdown } : {})}
+                {...(isCreateColumn ? { onQuickCreate: handleWorkflowQuickCreate, onNewTask, onPlanningMode, onSubtaskBreakdown } : {})}
                 {...(columnDef.flags.mergeBlocker || columnDef.flags.humanReview ? { onToggleAutoMerge: handleToggleAutoMerge } : {})}
                 {...(columnDef.id === "done" ? { onArchiveAllDone } : {})}
               />
