@@ -38,6 +38,12 @@ export interface FloatingWindowProps {
   defaultSize?: FloatingWindowSize;
   defaultPosition?: FloatingWindowPosition;
   minSize?: FloatingWindowSize;
+  /*
+  FNXC:FloatingWindow 2026-06-22-12:20:
+  Task detail pop-outs should look like the fixed "Open task" modal: one task header containing task id, status badge, edit, and close. `hideHeader` removes the generic window chrome, while `dragHandleSelector` lets that task header remain the drag handle so the modal stays movable and resizable.
+  */
+  hideHeader?: boolean;
+  dragHandleSelector?: string;
 }
 
 const DEFAULT_WIDTH = 720;
@@ -100,6 +106,8 @@ export function FloatingWindow({
   defaultSize,
   defaultPosition,
   minSize,
+  hideHeader = false,
+  dragHandleSelector,
 }: FloatingWindowProps) {
   const resolvedMinSize: FloatingWindowSize = minSize ?? { width: DEFAULT_MIN_WIDTH, height: DEFAULT_MIN_HEIGHT };
 
@@ -181,6 +189,16 @@ export function FloatingWindow({
       captureTarget.addEventListener("pointercancel", handlePointerUp);
     },
     [bringToFront, position, size]
+  );
+
+  const handlePanelPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!hideHeader || !dragHandleSelector) return;
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest(dragHandleSelector)) return;
+      handleDragPointerDown(event);
+    },
+    [dragHandleSelector, handleDragPointerDown, hideHeader]
   );
 
   const handleResizePointerDown = useCallback(
@@ -280,10 +298,11 @@ export function FloatingWindow({
       style={{ zIndex }}
     >
       <div
-        className="floating-window"
+        className={`floating-window${hideHeader ? " floating-window--headerless" : ""}`}
         style={panelStyle}
         data-testid={`floating-window-${windowKey}`}
         onPointerDownCapture={bringToFront}
+        onPointerDown={handlePanelPointerDown}
         onFocusCapture={bringToFront}
       >
         {RESIZE_DIRECTIONS.map((direction) => (
@@ -296,22 +315,24 @@ export function FloatingWindow({
             onPointerDown={(event) => handleResizePointerDown(event, direction)}
           />
         ))}
-        <div
-          className="floating-window__header"
-          data-testid={`floating-window-drag-handle-${windowKey}`}
-          onPointerDown={handleDragPointerDown}
-        >
-          <div className="floating-window__title">{title}</div>
-          <button
-            type="button"
-            className="floating-window__close"
-            onClick={onClose}
-            aria-label="Close floating window"
-            data-testid={`floating-window-close-${windowKey}`}
+        {!hideHeader && (
+          <div
+            className="floating-window__header"
+            data-testid={`floating-window-drag-handle-${windowKey}`}
+            onPointerDown={handleDragPointerDown}
           >
-            <X size={18} />
-          </button>
-        </div>
+            <div className="floating-window__title">{title}</div>
+            <button
+              type="button"
+              className="floating-window__close"
+              onClick={onClose}
+              aria-label="Close floating window"
+              data-testid={`floating-window-close-${windowKey}`}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
         <div className="floating-window__body" data-testid={`floating-window-body-${windowKey}`}>
           {children}
         </div>

@@ -54,6 +54,29 @@ Header is the drag handle. `touch-action: none` (matching the resize handles) ha
   cursor: grabbing;
 }
 
+/*
+FNXC:FloatingWindow 2026-06-22-12:20:
+Headerless task pop-outs still need a visible drag affordance. The embedded task-detail modal header becomes the grab handle, matching the one-header "Open task" modal while preserving FloatingWindow's drag and resize behavior.
+*/
+.floating-window--headerless .floating-window__body {
+  overflow: hidden;
+}
+
+.floating-window--headerless .task-detail-content--embedded {
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.floating-window--headerless .task-detail-content--embedded > .modal-header {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.floating-window--headerless .task-detail-content--embedded > .modal-header:active {
+  cursor: grabbing;
+}
+
 .floating-window__title {
   display: flex;
   flex: 1;

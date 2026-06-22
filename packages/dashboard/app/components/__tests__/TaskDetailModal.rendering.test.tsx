@@ -707,6 +707,27 @@ describe("TaskDetailModal", () => {
     expect(screen.getByRole("button", { name: "Definition" })).toBeInTheDocument();
   });
 
+  it("renders header close control for embedded floating task details", () => {
+    const onRequestClose = vi.fn();
+    render(
+      <TaskDetailContent
+        task={makeTask()}
+        onMoveTask={noopMove}
+        onDeleteTask={noopDelete}
+        onMergeTask={noopMerge}
+        onOpenDetail={noopOpenDetail}
+        addToast={noop}
+        embedded
+        onRequestClose={onRequestClose}
+      />,
+    );
+
+    const closeButton = screen.getByRole("button", { name: "Close" });
+    expect(closeButton).toHaveClass("task-detail-floating-close");
+    fireEvent.click(closeButton);
+    expect(onRequestClose).toHaveBeenCalledTimes(1);
+  });
+
   it("styles detail-body scrollbar rules", () => {
     const css = readDashboardStylesSource();
 

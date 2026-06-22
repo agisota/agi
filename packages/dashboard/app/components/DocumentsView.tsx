@@ -24,6 +24,7 @@ export interface DocumentsViewProps {
   projectId?: string;
   addToast: (message: string, type?: ToastType) => void;
   onOpenDetail: (task: TaskDetail) => void;
+  onOpenArtifactTaskDetail?: (task: TaskDetail) => void;
   onSendSelectionToTask?: (description: string) => void;
 }
 
@@ -248,7 +249,7 @@ function ArtifactCard({ artifact, projectId, onOpenTask, onExpandMedia }: Artifa
   );
 }
 
-export function DocumentsView({ projectId, addToast, onOpenDetail, onSendSelectionToTask }: DocumentsViewProps) {
+export function DocumentsView({ projectId, addToast, onOpenDetail, onOpenArtifactTaskDetail, onSendSelectionToTask }: DocumentsViewProps) {
   const { t } = useTranslation("app");
   const [activeTab, setActiveTab] = useState<DocumentsTab>("project");
   const [searchQuery, setSearchQuery] = useState("");
@@ -419,6 +420,22 @@ export function DocumentsView({ projectId, addToast, onOpenDetail, onSendSelecti
       addToast(`Failed to open task ${taskId}`, "error");
     }
   }, [projectId, onOpenDetail, addToast]);
+
+  /*
+  FNXC:ArtifactRegistry 2026-06-22-12:00:
+  Artifact cards should open their parent task in the same movable task popup
+  used by board/list pop-out flows, not the fixed task-detail modal. Keep task
+  document groups on the existing onOpenDetail path so only artifact-origin
+  task opens change surface.
+  */
+  const handleOpenArtifactTask = useCallback(async (taskId: string) => {
+    try {
+      const task = await fetchTaskDetail(taskId, projectId);
+      (onOpenArtifactTaskDetail ?? onOpenDetail)(task);
+    } catch {
+      addToast(`Failed to open task ${taskId}`, "error");
+    }
+  }, [projectId, onOpenArtifactTaskDetail, onOpenDetail, addToast]);
 
   const handleSelectProjectFile = useCallback(async (file: MarkdownFileEntry) => {
     setSelectedFile(file);
@@ -763,7 +780,7 @@ export function DocumentsView({ projectId, addToast, onOpenDetail, onSendSelecti
                   key={artifact.id}
                   artifact={artifact}
                   projectId={projectId}
-                  onOpenTask={handleOpenTask}
+                  onOpenTask={handleOpenArtifactTask}
                   onExpandMedia={handleExpandArtifact}
                 />
               ))}

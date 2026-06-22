@@ -42,6 +42,30 @@ describe("FloatingWindow", () => {
     }
   });
 
+  it("can hide generic chrome and delegate dragging to a child header", () => {
+    render(
+      <FloatingWindow
+        windowKey="task"
+        title="KB-001"
+        onClose={() => {}}
+        hideHeader
+        dragHandleSelector=".task-detail-content--embedded > .modal-header"
+      >
+        <div className="task-detail-content--embedded">
+          <div className="modal-header">KB-001</div>
+          <div>task body</div>
+        </div>
+      </FloatingWindow>
+    );
+
+    expect(screen.queryByTestId("floating-window-drag-handle-task")).toBeNull();
+    expect(screen.getByTestId("floating-window-task")).toHaveClass("floating-window--headerless");
+    expect(screen.getByText("KB-001")).toBeInTheDocument();
+    for (const dir of ["n", "s", "e", "w", "ne", "nw", "se", "sw"]) {
+      expect(screen.getByTestId(`floating-window-resize-${dir}`)).toBeTruthy();
+    }
+  });
+
   it("focus-to-front: interacting with an older window raises its z-index above the newest", () => {
     render(
       <>

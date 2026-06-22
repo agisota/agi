@@ -275,6 +275,7 @@ describe("DocumentsView", () => {
   });
 
   it("renders artifacts tab counts and all media card paths without non-media expand shells", async () => {
+    const onOpenArtifactTaskDetail = vi.fn();
     mockUseArtifacts.mockReturnValue({
       artifacts: mockArtifacts,
       loading: false,
@@ -282,7 +283,13 @@ describe("DocumentsView", () => {
       refresh: vi.fn().mockResolvedValue(undefined),
     });
 
-    render(<DocumentsView addToast={addToast} onOpenDetail={onOpenDetail} />);
+    render(
+      <DocumentsView
+        addToast={addToast}
+        onOpenDetail={onOpenDetail}
+        onOpenArtifactTaskDetail={onOpenArtifactTaskDetail}
+      />
+    );
 
     const artifactsTab = screen.getByRole("tab", { name: /show artifacts/i });
     expect(artifactsTab).toHaveTextContent("5");
@@ -310,8 +317,9 @@ describe("DocumentsView", () => {
     fireEvent.click(screen.getByRole("button", { name: /open task KB-001/i }));
     await waitFor(() => {
       expect(mockFetchTaskDetail).toHaveBeenCalledWith("KB-001", undefined);
-      expect(onOpenDetail).toHaveBeenCalledWith({ id: "KB-001" });
+      expect(onOpenArtifactTaskDetail).toHaveBeenCalledWith({ id: "KB-001" });
     });
+    expect(onOpenDetail).not.toHaveBeenCalled();
     expect(screen.getAllByRole("button", { name: /open task/i })).toHaveLength(1);
   });
 

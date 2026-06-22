@@ -153,6 +153,11 @@ html {
   Derivation (border-box): vertical padding var(--space-lg)*2 = 32px + 1px bottom divider + ~28px tallest content row (btn-sm: 4+4 padding + 1+1 border + ~18px 12px-font line) = 61px.
   */
   --view-header-min-height: calc(var(--space-lg) * 2 + 28px + 1px);
+  /*
+  FNXC:ViewHeader 2026-06-23-05:00:
+  Canonical content-row height (28px = btn-sm box: 4+4 padding + 1+1 border + ~18px line). ViewHeader bounds every action child to this so taller controls (touch-target 44px close buttons, view-toggle 32px segmented switches, base .btn 36px primary buttons) collapse to the canonical row instead of stretching the header past --view-header-min-height. Skills (was 77px / 44px touch-target), Goals (was 69px / 36px primary btn), and Agents (was 65px / 32px view-toggle) all clamp to ~61px without clipping their 16-18px icons, which stay centered.
+  */
+  --view-header-content-row: 28px;
   --column-gap: var(--space-md);
   --board-padding: var(--space-lg) var(--space-xl);
   --icon-size-md: 16px;

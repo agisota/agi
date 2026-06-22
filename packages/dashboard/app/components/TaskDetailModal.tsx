@@ -422,6 +422,10 @@ export interface TaskDetailModalProps {
 
 export type TaskDetailContentProps = Omit<TaskDetailModalProps, "onClose"> & {
   embedded?: boolean;
+  /*
+  FNXC:TaskDetail 2026-06-22-12:20:
+  Embedded task detail can be hosted by a movable FloatingWindow. In that surface the task header is the only visible header, so onRequestClose must render a close icon beside edit instead of relying on separate window chrome.
+  */
   onRequestClose?: () => void;
   /*
   FNXC:TaskDetail 2026-06-22-18:40:
@@ -2798,6 +2802,16 @@ export function TaskDetailContent({
                 aria-label={t("taskDetail.header.editTask", "Edit task")}
               >
                 <Pencil size={14} />
+              </button>
+            )}
+            {embedded && onRequestClose && !onBackToBoard && (
+              <button
+                className="modal-close task-detail-floating-close"
+                onClick={requestClose}
+                aria-label={t("common.close", "Close")}
+                type="button"
+              >
+                <X size={16} aria-hidden="true" />
               </button>
             )}
             {!embedded && mobileHeaderMode === "back" && (

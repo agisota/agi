@@ -866,25 +866,6 @@ export function ListView({
     return Object.values(groupedTasks).reduce((sum, group) => sum + group.length, 0);
   }, [groupedTasks]);
 
-  // Calculate done and archived task counts for stats display
-  const completedTaskCount = useMemo(() => {
-    const completedColumns = new Set(
-      listColumns
-        .filter((column) => column.flags.complete || column.flags.archived)
-        .map((column) => column.id),
-    );
-    return tasks.filter((task) => {
-      if (selectedWorkflowTaskIds && !selectedWorkflowTaskIds.has(task.id)) return false;
-      return completedColumns.has(task.column);
-    }).length;
-  }, [listColumns, selectedWorkflowTaskIds, tasks]);
-
-  // Calculate hidden done+archived tasks count
-  const hiddenCompletedCount = useMemo(() => {
-    if (!hideDoneTasks) return 0;
-    return completedTaskCount;
-  }, [hideDoneTasks, completedTaskCount]);
-
   // Selection logic that depends on groupedTasks (must be after groupedTasks definition)
   // Toggle all visible tasks
   const toggleSelectAll = useCallback(() => {

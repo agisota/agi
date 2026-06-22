@@ -13,7 +13,6 @@ import { Header, useViewportMode } from "./components/Header";
 import { Board } from "./components/Board";
 import { TaskCard } from "./components/TaskCard";
 import { ListView } from "./components/ListView";
-import { Maximize2 } from "lucide-react";
 import { TaskDetailContent } from "./components/TaskDetailModal";
 import { FloatingWindow } from "./components/FloatingWindow";
 import { ProjectOverview } from "./components/ProjectOverview";
@@ -1755,6 +1754,7 @@ function AppInner() {
               projectId={currentProject?.id}
               addToast={addToast}
               onOpenDetail={openDetailTask}
+              onOpenArtifactTaskDetail={popOutTaskDetail}
               onSendSelectionToTask={modalManager.openNewTaskWithDescription}
             />
           </Suspense>
@@ -2516,6 +2516,9 @@ function AppInner() {
       {/*
       FNXC:FloatingWindow 2026-06-22-20:45:
       One movable, resizable, non-blocking FloatingWindow per popped-out task. Each hosts the same embedded TaskDetailContent List/Board use, wired to the same App task handlers. Live row preferred by id; falls back to the snapshot. Terminal/destructive actions and the window close button both remove the entry. Multiple entries → multiple coexisting windows; FloatingWindow's per-window z-counter handles focus-to-front so the clicked one comes on top.
+
+      FNXC:TaskDetail 2026-06-22-12:20:
+      Task pop-outs use TaskDetailContent's own gray header as the only visible header, matching the one-header fixed task modal while keeping FloatingWindow drag/resize. The generic Maximize title chrome is hidden; close now lives beside edit inside the task header.
       */}
       {poppedOutTasks.map((snapshot) => {
         const liveTask = tasks.find((candidate) => candidate.id === snapshot.id) ?? snapshot;
@@ -2524,13 +2527,10 @@ function AppInner() {
           <FloatingWindow
             key={snapshot.id}
             windowKey={`task-detail-${snapshot.id}`}
-            title={
-              <>
-                <Maximize2 size={14} aria-hidden="true" />
-                <span>{liveTask.id}</span>
-              </>
-            }
+            title={liveTask.id}
             onClose={close}
+            hideHeader
+            dragHandleSelector=".task-detail-content--embedded > .modal-header"
           >
             <TaskDetailContent
               task={liveTask}
