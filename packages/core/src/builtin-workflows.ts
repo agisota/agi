@@ -208,7 +208,6 @@ export const BUILTIN_WORKFLOWS: WorkflowDefinition[] = [
           prompt: "Execute the plan for this task, following existing patterns and maintaining quality throughout.",
         },
       },
-      { id: "review", kind: "prompt", config: builtinPromptConfig("review", "Review") },
       {
         id: "code-review",
         kind: "gate",
@@ -217,6 +216,10 @@ export const BUILTIN_WORKFLOWS: WorkflowDefinition[] = [
           executor: "skill",
           skillName: "compound-engineering:ce-code-review",
           gateMode: "gate",
+          /*
+           * FNXC:Workflows 2026-06-21-00:00:
+           * FN-6891 requires the compound-engineering Review stage to invoke compound-engineering:ce-code-review directly. The prior generic reviewer seam was removed so CE review runs through the CE skill and still blocks merge as a gate.
+           */
           // Coding mode so ce-code-review can fan out to its reviewer-persona
           // subagents via fn_spawn_agent. As a gate step it still emits the
           // verdict JSON (KTD-6); it is not meant to write the tree (Risk-1).
