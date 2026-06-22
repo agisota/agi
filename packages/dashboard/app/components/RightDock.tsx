@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Maximize2, PanelRight } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 import {
   findOverflowViewEntry,
   getVisibleOverflowViewEntries,
@@ -89,7 +89,6 @@ The right dock is persistent and visible by default on tablet/desktop project sc
 */
 export function RightDock({
   open,
-  onOpenChange,
   renderProps,
   visibilityOptions = {},
   onExpand,
@@ -120,12 +119,6 @@ export function RightDock({
     setSelectedKey(key);
     persistRightDockView(key);
   }, [renderProps, visibilityOptions]);
-
-  const toggleCollapsed = useCallback(() => {
-    const nextOpen = !open;
-    persistRightDockOpen(nextOpen);
-    onOpenChange(nextOpen);
-  }, [onOpenChange, open]);
 
   const handleResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -243,17 +236,6 @@ export function RightDock({
               <Maximize2 size={16} />
             </button>
           ) : null}
-          <button
-            type="button"
-            className="btn-icon right-dock__collapse-toggle"
-            aria-label={open ? "Collapse right dock" : "Expand right dock"}
-            title={open ? "Collapse right dock" : "Expand right dock"}
-            aria-expanded={open}
-            data-testid="right-dock-collapse-toggle"
-            onClick={toggleCollapsed}
-          >
-            <PanelRight size={16} />
-          </button>
         </div>
       </div>
       {open ? (

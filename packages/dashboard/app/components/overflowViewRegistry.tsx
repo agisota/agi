@@ -18,6 +18,9 @@ import type { DetailTaskTab, PluginDashboardViewContext } from "../plugins/types
 import { FileBrowser } from "./FileBrowser";
 import { PageErrorBoundary } from "./ErrorBoundary";
 import { getPluginNavIcon } from "./pluginNavIcon";
+import { UsageIndicator } from "./UsageIndicator";
+import { ActivityLogModal } from "./ActivityLogModal";
+import { GitManagerModal } from "./GitManagerModal";
 
 export type OverflowViewKey =
   | "usage"
@@ -116,20 +119,35 @@ The right dock and its expand modal must resolve every hosted overflow destinati
 FNXC:Navigation 2026-06-21-20:10:
 FN-6882 makes the right dock a tools rail for Activity, Activity Log, GitHub Import, Git Manager, Files, and Automation so content views live only in the left sidebar and do not duplicate across navigation surfaces.
 */
+/*
+FNXC:Navigation 2026-06-22-00:00:
+Right-dock tools render INLINE inside the dock container, not as popup modals: usage, activity-log, and git-manager use each modal's `presentation="embedded"` mode instead of launching an overlay. (github-import and automation remain launcher actions here only until their left-sidebar/main destinations land, then they leave the dock.)
+*/
 export const STATIC_OVERFLOW_VIEW_ENTRIES: readonly OverflowViewEntry[] = [
   {
     key: "usage",
     label: "Activity",
     icon: Activity,
     testId: "right-dock-tab-usage",
-    onActivate: (props) => props.onOpenUsage?.(null),
+    render: (props) => wrapOverflowView(
+      <UsageIndicator isOpen={true} onClose={() => {}} projectId={props.projectId} presentation="embedded" />,
+    ),
   },
   {
     key: "activity-log",
     label: "Activity Log",
     icon: History,
     testId: "right-dock-tab-activity-log",
-    onActivate: (props) => props.onOpenActivityLog?.(),
+    render: (props) => wrapOverflowView(
+      <ActivityLogModal
+        isOpen={true}
+        onClose={() => {}}
+        tasks={(props.tasks ?? []) as Task[]}
+        onOpenTaskDetail={props.onOpenTaskDetail}
+        projectId={props.projectId}
+        presentation="embedded"
+      />,
+    ),
   },
   {
     key: "github-import",
@@ -143,7 +161,16 @@ export const STATIC_OVERFLOW_VIEW_ENTRIES: readonly OverflowViewEntry[] = [
     label: "Git Manager",
     icon: GitBranch,
     testId: "right-dock-tab-git-manager",
-    onActivate: (props) => props.onOpenGitManager?.(),
+    render: (props) => wrapOverflowView(
+      <GitManagerModal
+        isOpen={true}
+        onClose={() => {}}
+        tasks={(props.tasks ?? []) as Task[]}
+        addToast={props.addToast}
+        projectId={props.projectId}
+        presentation="embedded"
+      />,
+    ),
   },
   {
     key: "files",

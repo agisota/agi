@@ -199,15 +199,25 @@ interface GitManagerModalProps {
   tasks: Task[];
   addToast: (message: string, type?: ToastType) => void;
   projectId?: string;
+  /*
+  FNXC:RightDockEmbedding 2026-06-22-00:00:
+  Right-dock redesign renders dock items inline inside the dock container rather than as fixed popup modals.
+  `presentation="embedded"` switches GitManager from a fixed `.modal-overlay` overlay to an inline view that fills its container.
+  Default stays "modal" so all existing overlay call sites keep byte-identical behavior.
+  Embedded mode must disable modal-only behaviors (scroll lock, resize persistence, Escape-to-close, overlay click dismiss) since they break the host page.
+  */
+  presentation?: "modal" | "embedded";
 }
 
 // ── Main Component ────────────────────────────────────────────────
 
-export function GitManagerModal({ isOpen, onClose, tasks: _tasks, addToast, projectId }: GitManagerModalProps) {
+export function GitManagerModal({ isOpen, onClose, tasks: _tasks, addToast, projectId, presentation = "modal" }: GitManagerModalProps) {
   const { t } = useTranslation("app");
   const confirmContext = useConfirm();
   const viewportMode = useViewportMode();
-  useMobileScrollLock(isOpen);
+  // FNXC:RightDockEmbedding 2026-06-22-00:00: embedded mode gates modal-only behaviors below.
+  const isEmbedded = presentation === "embedded";
+  useMobileScrollLock(isOpen && !isEmbedded);
   const { keyboardOverlap, viewportHeight, viewportOffsetTop, keyboardOpen } = useMobileKeyboard({
     enabled: viewportMode === "mobile",
   });
@@ -235,7 +245,8 @@ export function GitManagerModal({ isOpen, onClose, tasks: _tasks, addToast, proj
   const [loading, setLoading] = useState(false);
   const [sectionError, setSectionError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
-  useModalResizePersist(modalRef, isOpen, "fusion:git-modal-size");
+  // FNXC:RightDockEmbedding 2026-06-22-00:00: skip modal resize persist/restore when embedded inline.
+  useModalResizePersist(modalRef, isOpen && !isEmbedded, "fusion:git-modal-size");
   const overlayDismissProps = useOverlayDismiss(handleClose);
   const copyToClipboard = useCopyToClipboard(addToast);
 
@@ -367,7 +378,8 @@ export function GitManagerModal({ isOpen, onClose, tasks: _tasks, addToast, proj
   // ── Keyboard Navigation ─────────────────────────────────────────
 
   useEffect(() => {
-    if (!isOpen) return;
+    // FNXC:RightDockEmbedding 2026-06-22-00:00: embedded mode has no overlay to dismiss; a global Escape listener would hijack page keys.
+    if (!isOpen || isEmbedded) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         handleClose();
@@ -386,7 +398,7 @@ export function GitManagerModal({ isOpen, onClose, tasks: _tasks, addToast, proj
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [isOpen, handleClose, activeSection]);
+  }, [isOpen, isEmbedded, handleClose, activeSection]);
 
   // ── Changes Handlers ────────────────────────────────────────────
 
@@ -914,6 +926,223 @@ export function GitManagerModal({ isOpen, onClose, tasks: _tasks, addToast, proj
 
   if (!isOpen) return null;
 
+  // FNXC:RightDockEmbedding 2026-06-22-00:00: shared git body reused by both the embedded inline view and the modal overlay below; kept identical between presentations.
+  const gitBody = (
+    <>
+              {/* Sidebar Navigation */}
+              <nav className="gm-sidebar" role="tablist" aria-label={t("git.sidebarAriaLabel", "Git Manager Sections")}>
+                {SECTIONS.map((section) => {
+                  const Icon = section.icon;
+                  const sectionLabel = {
+                    status: t("git.sectionStatus", "Status"),
+                    changes: t("git.sectionChanges", "Changes"),
+                    commits: t("git.sectionCommits", "Commits"),
+                    branches: t("git.sectionBranches", "Branches"),
+                    worktrees: t("git.sectionWorktrees", "Worktrees"),
+                    stashes: t("git.sectionStashes", "Stashes"),
+                    recovery: t("git.sectionRecovery", "Recovery"),
+                    remotes: t("git.sectionRemotes", "Remotes"),
+                  }[section.id] ?? section.label;
+                  return (
+                    <button
+                      key={section.id}
+                      role="tab"
+                      aria-selected={activeSection === section.id}
+                      className={`gm-nav-item${activeSection === section.id ? " active" : ""}`}
+                      onClick={() => setActiveSection(section.id)}
+                    >
+                      <Icon size={16} />
+                      <span className="gm-nav-label">{sectionLabel}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Content Area */}
+              <div className="gm-content" role="tabpanel">
+                {/* Loading overlay */}
+                {loading && (
+                  <div className="gm-loading">
+                    <Loader2 size={24} className="spin" />
+                    <span>{t("git.loading", "Loading...")}</span>
+                  </div>
+                )}
+
+                {/* Error state */}
+                {sectionError && !loading && (
+                  <div className="gm-error">
+                    <AlertCircle size={18} />
+                    <span>{sectionError}</span>
+                    <button className="btn btn-sm" onClick={fetchSectionData}>
+                      {t("git.retry", "Retry")}
+                    </button>
+                  </div>
+                )}
+
+                {/* ── Status Panel ── */}
+                {activeSection === "status" && !loading && status && (
+                  <StatusPanel
+                    status={status}
+                    copyToClipboard={copyToClipboard}
+                    onSyncWorkingTree={handleSyncIntegrationTip}
+                    syncing={remoteLoading === "sync-integration"}
+                  />
+                )}
+
+                {/* ── Changes Panel ── */}
+                {activeSection === "changes" && !loading && (
+                  <ChangesPanel
+                    status={status}
+                    stagedFiles={stagedFiles}
+                    unstagedFiles={unstagedFiles}
+                    selectedFiles={selectedFiles}
+                    toggleFileSelection={toggleFileSelection}
+                    onStageFiles={handleStageFiles}
+                    onUnstageFiles={handleUnstageFiles}
+                    onDiscardChanges={handleDiscardChanges}
+                    onSelectDiffFile={handleSelectDiffFile}
+                    selectedDiffTarget={selectedDiffTarget}
+                    changeDiff={changeDiff}
+                    loadingChangeDiff={loadingChangeDiff}
+                    changeDiffError={changeDiffError}
+                    commitMessage={commitMessage}
+                    setCommitMessage={setCommitMessage}
+                    onCommit={handleCommit}
+                    onStageAllAndCommit={handleStageAllAndCommit}
+                    committing={committing}
+                  />
+                )}
+
+                {/* ── Commits Panel ── */}
+                {activeSection === "commits" && !loading && (
+                  <CommitsPanel
+                    commits={filteredCommits}
+                    commitSearch={commitSearch}
+                    setCommitSearch={setCommitSearch}
+                    selectedCommit={selectedCommit}
+                    commitDiff={commitDiff}
+                    loadingDiff={loadingDiff}
+                    onCommitClick={handleCommitClick}
+                    onLoadMore={handleLoadMoreCommits}
+                    canLoadMore={commits.length >= commitsLimit && commitsLimit < 100}
+                    copyToClipboard={copyToClipboard}
+                  />
+                )}
+
+                {/* ── Branches Panel ── */}
+                {activeSection === "branches" && !loading && (
+                  <BranchesPanel
+                    branches={filteredBranches}
+                    branchSearch={branchSearch}
+                    setBranchSearch={setBranchSearch}
+                    newBranchName={newBranchName}
+                    setNewBranchName={setNewBranchName}
+                    branchBase={branchBase}
+                    setBranchBase={setBranchBase}
+                    onCreateBranch={handleCreateBranch}
+                    onCheckoutBranch={handleCheckoutBranch}
+                    onDeleteBranch={handleDeleteBranch}
+                    loading={loading}
+                    allBranches={branches}
+                    selectedBranch={selectedBranch}
+                    branchCommits={branchCommits}
+                    loadingBranchCommits={loadingBranchCommits}
+                    expandedBranchCommit={expandedBranchCommit}
+                    branchCommitDiff={branchCommitDiff}
+                    loadingBranchCommitDiff={loadingBranchCommitDiff}
+                    onSelectBranch={handleSelectBranch}
+                    onBranchCommitClick={handleBranchCommitClick}
+                    onCloseBranchDetails={handleCloseBranchDetails}
+                  />
+                )}
+
+                {/* ── Worktrees Panel ── */}
+                {activeSection === "worktrees" && !loading && (
+                  <WorktreesPanel worktrees={worktrees} />
+                )}
+
+                {/* ── Stashes Panel ── */}
+                {activeSection === "stashes" && !loading && (
+                  <StashesPanel
+                    stashes={stashes}
+                    stashMessage={stashMessage}
+                    setStashMessage={setStashMessage}
+                    onCreateStash={handleCreateStash}
+                    onApplyStash={handleApplyStash}
+                    onDropStash={handleDropStash}
+                    onToggleStashDiff={handleToggleStashDiff}
+                    stashLoading={stashLoading}
+                    expandedStashIndex={expandedStashIndex}
+                    stashDiff={stashDiff}
+                    loadingStashDiff={loadingStashDiff}
+                    stashDiffError={stashDiffError}
+                  />
+                )}
+
+                {/* ── Recovery Panel ── */}
+                {activeSection === "recovery" && !loading && (
+                  <StashRecoveryView />
+                )}
+
+                {/* ── Remotes Panel ── */}
+                {activeSection === "remotes" && !loading && (
+                  <RemotesPanel
+                    status={status}
+                    remoteLoading={remoteLoading}
+                    lastRemoteResult={lastRemoteResult}
+                    onFetch={handleFetch}
+                    onPull={handlePull}
+                    onPush={handlePush}
+                    onSync={handleSyncWithOrigin}
+                    onSyncIntegrationTip={handleSyncIntegrationTip}
+                    syncIntegrationDisabled={
+                      !status?.integrationBranch ||
+                      status?.isOnIntegrationBranch === false ||
+                      remoteLoading !== null
+                    }
+                    addToast={addToast}
+                    projectId={projectId}
+                    copyToClipboard={copyToClipboard}
+                  />
+                )}
+              </div>
+    </>
+  );
+
+  /*
+  FNXC:RightDockEmbedding 2026-06-22-00:00:
+  Embedded mode renders the same git content inline (fills the right-dock container) with no fixed overlay, no resize handle, and no close button.
+  Modal mode (default) keeps the exact original overlay markup byte-identical.
+  */
+  if (isEmbedded) {
+    return (
+      <div className="git-manager-embedded right-dock-embedded-view">
+        <div className="gm-modal gm-modal--embedded" ref={modalRef} style={keyboardStyle}>
+          <div className="modal-header">
+            <h3>
+              <FolderGit2 size={18} style={{ marginRight: 8, verticalAlign: "middle" }} />
+              {t("git.modalTitle", "Git Manager")}
+            </h3>
+            <div className="gm-header-actions">
+              <button
+                className="btn btn-sm"
+                onClick={fetchSectionData}
+                disabled={loading}
+                title={t("git.refresh", "Refresh")}
+              >
+                <RefreshCw size={14} className={loading ? "spin" : ""} />
+              </button>
+            </div>
+          </div>
+
+          <div className="gm-layout">
+            {gitBody}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="modal-overlay open git-manager-modal-overlay" {...overlayDismissProps} role="dialog" aria-modal="true">
       <div className="modal gm-modal" ref={modalRef} style={keyboardStyle}>
@@ -938,183 +1167,7 @@ export function GitManagerModal({ isOpen, onClose, tasks: _tasks, addToast, proj
         </div>
 
         <div className="gm-layout">
-          {/* Sidebar Navigation */}
-          <nav className="gm-sidebar" role="tablist" aria-label={t("git.sidebarAriaLabel", "Git Manager Sections")}>
-            {SECTIONS.map((section) => {
-              const Icon = section.icon;
-              const sectionLabel = {
-                status: t("git.sectionStatus", "Status"),
-                changes: t("git.sectionChanges", "Changes"),
-                commits: t("git.sectionCommits", "Commits"),
-                branches: t("git.sectionBranches", "Branches"),
-                worktrees: t("git.sectionWorktrees", "Worktrees"),
-                stashes: t("git.sectionStashes", "Stashes"),
-                recovery: t("git.sectionRecovery", "Recovery"),
-                remotes: t("git.sectionRemotes", "Remotes"),
-              }[section.id] ?? section.label;
-              return (
-                <button
-                  key={section.id}
-                  role="tab"
-                  aria-selected={activeSection === section.id}
-                  className={`gm-nav-item${activeSection === section.id ? " active" : ""}`}
-                  onClick={() => setActiveSection(section.id)}
-                >
-                  <Icon size={16} />
-                  <span className="gm-nav-label">{sectionLabel}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Content Area */}
-          <div className="gm-content" role="tabpanel">
-            {/* Loading overlay */}
-            {loading && (
-              <div className="gm-loading">
-                <Loader2 size={24} className="spin" />
-                <span>{t("git.loading", "Loading...")}</span>
-              </div>
-            )}
-
-            {/* Error state */}
-            {sectionError && !loading && (
-              <div className="gm-error">
-                <AlertCircle size={18} />
-                <span>{sectionError}</span>
-                <button className="btn btn-sm" onClick={fetchSectionData}>
-                  {t("git.retry", "Retry")}
-                </button>
-              </div>
-            )}
-
-            {/* ── Status Panel ── */}
-            {activeSection === "status" && !loading && status && (
-              <StatusPanel
-                status={status}
-                copyToClipboard={copyToClipboard}
-                onSyncWorkingTree={handleSyncIntegrationTip}
-                syncing={remoteLoading === "sync-integration"}
-              />
-            )}
-
-            {/* ── Changes Panel ── */}
-            {activeSection === "changes" && !loading && (
-              <ChangesPanel
-                status={status}
-                stagedFiles={stagedFiles}
-                unstagedFiles={unstagedFiles}
-                selectedFiles={selectedFiles}
-                toggleFileSelection={toggleFileSelection}
-                onStageFiles={handleStageFiles}
-                onUnstageFiles={handleUnstageFiles}
-                onDiscardChanges={handleDiscardChanges}
-                onSelectDiffFile={handleSelectDiffFile}
-                selectedDiffTarget={selectedDiffTarget}
-                changeDiff={changeDiff}
-                loadingChangeDiff={loadingChangeDiff}
-                changeDiffError={changeDiffError}
-                commitMessage={commitMessage}
-                setCommitMessage={setCommitMessage}
-                onCommit={handleCommit}
-                onStageAllAndCommit={handleStageAllAndCommit}
-                committing={committing}
-              />
-            )}
-
-            {/* ── Commits Panel ── */}
-            {activeSection === "commits" && !loading && (
-              <CommitsPanel
-                commits={filteredCommits}
-                commitSearch={commitSearch}
-                setCommitSearch={setCommitSearch}
-                selectedCommit={selectedCommit}
-                commitDiff={commitDiff}
-                loadingDiff={loadingDiff}
-                onCommitClick={handleCommitClick}
-                onLoadMore={handleLoadMoreCommits}
-                canLoadMore={commits.length >= commitsLimit && commitsLimit < 100}
-                copyToClipboard={copyToClipboard}
-              />
-            )}
-
-            {/* ── Branches Panel ── */}
-            {activeSection === "branches" && !loading && (
-              <BranchesPanel
-                branches={filteredBranches}
-                branchSearch={branchSearch}
-                setBranchSearch={setBranchSearch}
-                newBranchName={newBranchName}
-                setNewBranchName={setNewBranchName}
-                branchBase={branchBase}
-                setBranchBase={setBranchBase}
-                onCreateBranch={handleCreateBranch}
-                onCheckoutBranch={handleCheckoutBranch}
-                onDeleteBranch={handleDeleteBranch}
-                loading={loading}
-                allBranches={branches}
-                selectedBranch={selectedBranch}
-                branchCommits={branchCommits}
-                loadingBranchCommits={loadingBranchCommits}
-                expandedBranchCommit={expandedBranchCommit}
-                branchCommitDiff={branchCommitDiff}
-                loadingBranchCommitDiff={loadingBranchCommitDiff}
-                onSelectBranch={handleSelectBranch}
-                onBranchCommitClick={handleBranchCommitClick}
-                onCloseBranchDetails={handleCloseBranchDetails}
-              />
-            )}
-
-            {/* ── Worktrees Panel ── */}
-            {activeSection === "worktrees" && !loading && (
-              <WorktreesPanel worktrees={worktrees} />
-            )}
-
-            {/* ── Stashes Panel ── */}
-            {activeSection === "stashes" && !loading && (
-              <StashesPanel
-                stashes={stashes}
-                stashMessage={stashMessage}
-                setStashMessage={setStashMessage}
-                onCreateStash={handleCreateStash}
-                onApplyStash={handleApplyStash}
-                onDropStash={handleDropStash}
-                onToggleStashDiff={handleToggleStashDiff}
-                stashLoading={stashLoading}
-                expandedStashIndex={expandedStashIndex}
-                stashDiff={stashDiff}
-                loadingStashDiff={loadingStashDiff}
-                stashDiffError={stashDiffError}
-              />
-            )}
-
-            {/* ── Recovery Panel ── */}
-            {activeSection === "recovery" && !loading && (
-              <StashRecoveryView />
-            )}
-
-            {/* ── Remotes Panel ── */}
-            {activeSection === "remotes" && !loading && (
-              <RemotesPanel
-                status={status}
-                remoteLoading={remoteLoading}
-                lastRemoteResult={lastRemoteResult}
-                onFetch={handleFetch}
-                onPull={handlePull}
-                onPush={handlePush}
-                onSync={handleSyncWithOrigin}
-                onSyncIntegrationTip={handleSyncIntegrationTip}
-                syncIntegrationDisabled={
-                  !status?.integrationBranch ||
-                  status?.isOnIntegrationBranch === false ||
-                  remoteLoading !== null
-                }
-                addToast={addToast}
-                projectId={projectId}
-                copyToClipboard={copyToClipboard}
-              />
-            )}
-          </div>
+        {gitBody}
         </div>
       </div>
     </div>
