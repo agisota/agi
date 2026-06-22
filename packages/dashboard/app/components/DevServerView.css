@@ -20,6 +20,35 @@ Header migrated to the shared ViewHeader (.view-header), which supplies the --sp
 FNXC:DevServer 2026-06-22-01:00:
 .dev-server-header-title now wraps just the status badge inside ViewHeader's actions slot; the mobile flex-wrap rule keeps it from overflowing on narrow widths.
 */
+/*
+FNXC:RightDockEmbedded 2026-06-22-19:05:
+DevServerView is a right-dock tool with no --embedded variant; it renders directly inside the dock body
+(.right-dock__body) and inside the pop-out (.right-dock-expand-modal__body). In both, the chrome already labels the
+view — the dock tab strip names it, and the pop-out's RightDockExpandModal supplies its own header — so the view's own
+shared ViewHeader (.view-header) is redundant title chrome there. Hide it in those two host contexts. The header stays
+in the DOM; only display is suppressed. The base view is a flex column, so the panels fill the freed space (the header
+slot was auto-height, not a fixed reserve). The standalone full-page and Settings-section renders are NOT inside these
+ancestors, so their header stays visible.
+*/
+.right-dock__body .dev-server-view > .view-header,
+.right-dock-expand-modal__body .dev-server-view > .view-header {
+  display: none;
+}
+
+/*
+FNXC:RightDockEmbedded 2026-06-22-19:05:
+On real mobile-narrow the view goes full-screen with no dock tab strip or pop-out header, so it must own its title
+again. The viewport @media (max-width:768px) fires only on a true narrow viewport (never in the desktop dock/pop-out,
+where the @container right-dock-body query drives layout instead), so restoring the header here brings the title back
+exactly when the surrounding chrome is gone.
+*/
+@media (max-width: 768px) {
+  .right-dock__body .dev-server-view > .view-header,
+  .right-dock-expand-modal__body .dev-server-view > .view-header {
+    display: flex;
+  }
+}
+
 .dev-server-header-title {
   display: flex;
   align-items: center;

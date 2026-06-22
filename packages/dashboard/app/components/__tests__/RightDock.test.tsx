@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { RightDock, RIGHT_DOCK_VIEW_STORAGE_KEY, RIGHT_DOCK_WIDTH_STORAGE_KEY } from "../RightDock";
 import { RightDockExpandModal } from "../RightDockExpandModal";
+import { useRightDockController, type RightDockControllerInput } from "../useRightDockController";
 
 vi.mock("../../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../api")>();
@@ -266,7 +267,10 @@ describe("RightDock", () => {
   it("drags the floating pop-out by its header and clamps + persists the new position", () => {
     /*
     FNXC:RightDock 2026-06-22-17:40:
-    Pointerdown on the header drag handle then pointermove on the document moves the panel via state-driven fixed left/top, and pointerup persists the clamped position. Assert the panel moved and that a position was persisted (clamped on-screen).
+    Pointerdown on the header drag handle then pointermove moves the panel via state-driven fixed left/top, and pointerup persists the clamped position. Assert the panel moved and that a position was persisted (clamped on-screen).
+
+    FNXC:RightDock 2026-06-22-18:50:
+    Move/up are now dispatched on the captured handle element (not document) because the handler attaches its pointermove/up/cancel listeners to the captured target — setPointerCapture redirects the touch stream there, which is what makes touch dragging smooth.
     */
     render(
       <RightDockExpandModal
@@ -278,8 +282,8 @@ describe("RightDock", () => {
 
     const handle = screen.getByTestId("right-dock-expand-drag-handle");
     fireEvent.pointerDown(handle, { pointerId: 1, clientX: 100, clientY: 100 });
-    fireEvent.pointerMove(document, { pointerId: 1, clientX: 60, clientY: 140 });
-    fireEvent.pointerUp(document, { pointerId: 1, clientX: 60, clientY: 140 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 60, clientY: 140 });
+    fireEvent.pointerUp(handle, { pointerId: 1, clientX: 60, clientY: 140 });
 
     const persisted = window.localStorage.getItem("fusion:right-dock-expand-modal-position");
     expect(persisted).not.toBeNull();
@@ -298,5 +302,63 @@ describe("RightDock", () => {
     fireEvent.click(screen.getByTestId("right-dock-tab-git-manager"));
     fireEvent.click(screen.getByTestId("right-dock-expand"));
     expect(onExpand).toHaveBeenCalledWith("git-manager");
+  });
+
+  /*
+  FNXC:RightDock 2026-06-22-18:50:
+  The popped-out expand modal is independent of the dock's open state. This drives the real controller, pops out a view, then toggles the dock closed and asserts the floating modal is STILL mounted and interactive — only its own close button dismisses it. Guards against the regression where toggling the dock cleared expandedView (and where the modal was a child of the dock that early-returns null when closed).
+  */
+  it("keeps the popped-out expand modal mounted when the dock is toggled closed", () => {
+    const controllerInput = {
+      active: true,
+      projectId: "project-1",
+      addToast: vi.fn(),
+      settingsLoaded: true,
+      researchReadinessVersion: 0,
+      tasks: [],
+      workflowSteps: [],
+      subscribePluginEvents: () => () => {},
+      openDetailTask: vi.fn(),
+      openFileInBrowser: vi.fn(),
+      openSettings: vi.fn(),
+      onSendSelectionToTask: vi.fn(),
+      onCreateTaskFromInsight: vi.fn(),
+      onNavigateToMission: vi.fn(),
+      onTaskCreated: vi.fn(),
+      workflowStepNameLookup: new Map<string, string>(),
+      prAuthAvailable: false,
+      autoMerge: false,
+      visibilityOptions: {},
+      footerVisible: false,
+    } as unknown as RightDockControllerInput;
+
+    function Harness() {
+      const controller = useRightDockController(controllerInput);
+      return (
+        <>
+          <button type="button" data-testid="harness-toggle-dock" onClick={controller.toggle}>
+            toggle dock
+          </button>
+          {controller.dock}
+          {controller.modal}
+        </>
+      );
+    }
+
+    render(<Harness />);
+
+    // Pop out the currently selected (Files) view from the open dock.
+    fireEvent.click(screen.getByTestId("right-dock-expand"));
+    expect(screen.getByTestId("right-dock-expand-modal")).toBeInTheDocument();
+
+    // Toggle the dock closed: the dock itself unmounts, the floating modal MUST survive.
+    fireEvent.click(screen.getByTestId("harness-toggle-dock"));
+    expect(screen.queryByTestId("right-dock")).toBeNull();
+    expect(screen.getByTestId("right-dock-expand-modal")).toBeInTheDocument();
+    expect(screen.getByTestId("right-dock-expand-body")).toBeInTheDocument();
+
+    // Its own close button still dismisses it.
+    fireEvent.click(screen.getByTestId("right-dock-expand-close"));
+    expect(screen.queryByTestId("right-dock-expand-modal")).toBeNull();
   });
 });

@@ -167,8 +167,20 @@ vi.mock("../../components/TaskDetailModal", () => ({
     </div>
   ),
   // FNXC:Navigation 2026-06-22-00:00: Board card clicks now open task detail in the full main panel via TaskDetailContent (not the modal). The mock exposes a stable testid so the embedded-panel popstate tests can assert on the new surface.
-  TaskDetailContent: ({ task }: { task: { id: string; title?: string } }) => (
+  // FNXC:TaskDetail 2026-06-22-18:40: "Back to board" moved into TaskDetailContent's gray header (rendered when embedded && onBackToBoard). The mock surfaces that button via onBackToBoard so the panel-dismiss popstate tests still drive the same affordance.
+  TaskDetailContent: ({
+    task,
+    onBackToBoard,
+  }: {
+    task: { id: string; title?: string };
+    onBackToBoard?: () => void;
+  }) => (
     <div data-testid="task-detail-main-panel-content">
+      {onBackToBoard && (
+        <button type="button" onClick={onBackToBoard}>
+          Back to board
+        </button>
+      )}
       <h2>{task.title ?? task.id}</h2>
     </div>
   ),

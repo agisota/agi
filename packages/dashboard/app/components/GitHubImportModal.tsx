@@ -15,6 +15,7 @@ import {
 } from "../api";
 import { Loader2, RefreshCw, ArrowLeft, GitPullRequest, CircleDot } from "lucide-react";
 import { GithubIcon } from "./GithubIcon";
+import { MailboxMessageContent } from "./MailboxMessageContent";
 import { useModalResizePersist } from "../hooks/useModalResizePersist";
 import { useMobileScrollLock } from "../hooks/useMobileScrollLock";
 import { useOverlayDismiss } from "../hooks/useOverlayDismiss";
@@ -48,15 +49,12 @@ function clampListPaneWidth(width: number) {
   return Math.max(GITHUB_IMPORT_LIST_PANE_MIN_WIDTH, Math.min(GITHUB_IMPORT_LIST_PANE_MAX_WIDTH, width));
 }
 
-function formatPreviewBody(body: string | null | undefined, isMobile: boolean) {
-  if (!body) {
-    return null;
-  }
-  if (isMobile) {
-    return body;
-  }
-  return body.slice(0, 200) + (body.length > 200 ? "…" : "");
-}
+/*
+FNXC:GitHubImport 2026-06-22-18:30:
+The Import-from-GitHub preview pane must show the FULL selected issue/PR, not a truncated snapshot.
+The list endpoint already returns the complete (untruncated) body, so no per-item detail fetch is needed — the prior 200-char desktop slice in formatPreviewBody was the only thing truncating the preview, and it has been removed.
+The full body renders as GitHub-flavored markdown via the shared MailboxMessageContent component; the preview pane is already scrollable (prior fix), so the body takes full height with no line clamping.
+*/
 
 export function GitHubImportModal({ isOpen, onClose, onImport, tasks, projectId, presentation = "modal" }: GitHubImportModalProps) {
   const { isEmbedded, scrollLockEnabled, resizePersistEnabled, escapeEnabled } = useEmbeddedPresentation(presentation);
@@ -832,13 +830,43 @@ export function GitHubImportModal({ isOpen, onClose, onImport, tasks, projectId,
 
               <div className="github-import-pane-content">
                 {/* Issue preview */}
+                {/*
+                FNXC:GitHubImport 2026-06-22-18:30:
+                Full-issue preview: complete title, full body rendered as markdown, and key metadata (number, state, author, labels, URL). No body truncation/clamping.
+                */}
                 {activeTab === "issues" && selectedIssue ? (
                   <div className="issue-preview" data-testid="github-import-preview-card">
                     <div className="preview-meta">{t("git.previewIssueMeta", "Issue #{{number}}", { number: selectedIssue.number })}</div>
                     <div className="preview-title">{selectedIssue.title}</div>
-                    <div className="preview-body">
-                      {formatPreviewBody(selectedIssue.body, isMobile) || t("git.noDescription", "(no description)")}
+                    <div className="preview-metadata">
+                      {selectedIssue.state && (
+                        <span className={`preview-state-badge preview-state-badge--${selectedIssue.state}`}>{selectedIssue.state}</span>
+                      )}
+                      {selectedIssue.author && (
+                        <span className="preview-author">{t("git.previewAuthor", "by {{author}}", { author: selectedIssue.author })}</span>
+                      )}
+                      <a className="preview-url" href={selectedIssue.html_url} target="_blank" rel="noopener noreferrer">
+                        {t("git.viewOnGitHub", "View on GitHub")}
+                      </a>
                     </div>
+                    {selectedIssue.labels.length > 0 && (
+                      <span className="preview-labels">
+                        {selectedIssue.labels.map((l) => (
+                          <span key={l.name} className="label-chip">{l.name}</span>
+                        ))}
+                      </span>
+                    )}
+                    {selectedIssue.body ? (
+                      <MailboxMessageContent
+                        className="preview-body preview-body--markdown"
+                        content={selectedIssue.body}
+                        testId="github-import-preview-body"
+                      />
+                    ) : (
+                      <div className="preview-body" data-testid="github-import-preview-body">
+                        {t("git.noDescription", "(no description)")}
+                      </div>
+                    )}
                   </div>
                 ) : activeTab === "issues" ? (
                   <div className="github-import-state github-import-state--idle" data-testid="github-import-preview-empty">
@@ -850,16 +878,39 @@ export function GitHubImportModal({ isOpen, onClose, onImport, tasks, projectId,
                 ) : null}
 
                 {/* Pull request preview */}
+                {/*
+                FNXC:GitHubImport 2026-06-22-18:30:
+                Full-PR preview: complete title, full body as markdown, and key metadata (number, state, author, base/head branches, URL). No body truncation/clamping.
+                */}
                 {activeTab === "pulls" && selectedPull ? (
                   <div className="issue-preview" data-testid="github-import-preview-card">
                     <div className="preview-meta">{t("git.previewPullMeta", "Pull Request #{{number}}", { number: selectedPull.number })}</div>
                     <div className="preview-title">{selectedPull.title}</div>
+                    <div className="preview-metadata">
+                      {selectedPull.state && (
+                        <span className={`preview-state-badge preview-state-badge--${selectedPull.state}`}>{selectedPull.state}</span>
+                      )}
+                      {selectedPull.author && (
+                        <span className="preview-author">{t("git.previewAuthor", "by {{author}}", { author: selectedPull.author })}</span>
+                      )}
+                      <a className="preview-url" href={selectedPull.html_url} target="_blank" rel="noopener noreferrer">
+                        {t("git.viewOnGitHub", "View on GitHub")}
+                      </a>
+                    </div>
                     <div className="preview-branch">
                       <strong>{t("git.branchLabel", "Branch:")}</strong> {selectedPull.headBranch} → {selectedPull.baseBranch}
                     </div>
-                    <div className="preview-body">
-                      {formatPreviewBody(selectedPull.body, isMobile) || t("git.noDescription", "(no description)")}
-                    </div>
+                    {selectedPull.body ? (
+                      <MailboxMessageContent
+                        className="preview-body preview-body--markdown"
+                        content={selectedPull.body}
+                        testId="github-import-preview-body"
+                      />
+                    ) : (
+                      <div className="preview-body" data-testid="github-import-preview-body">
+                        {t("git.noDescription", "(no description)")}
+                      </div>
+                    )}
                   </div>
                 ) : activeTab === "pulls" ? (
                   <div className="github-import-state github-import-state--idle" data-testid="github-import-preview-empty">

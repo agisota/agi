@@ -34,6 +34,24 @@ The embedded root is a plain flow box that fills the dock; the inner panel sheds
 }
 
 /*
+FNXC:RightDockEmbedded 2026-06-22-19:05:
+In the right dock the tab strip already labels the view, and in the pop-out the RightDockExpandModal supplies its own header — so the embedded variant's inner "Activity Log" header row (.activity-log-header) is redundant chrome there. Hide it by default in the embedded variant. The header stays in the DOM (not unmounted) so query-by-text/test hooks still resolve; only display is suppressed. The body's flex column fills the freed space since the header was flex-shrink:0.
+*/
+.activity-log-modal--embedded .activity-log-header {
+  display: none;
+}
+
+/*
+FNXC:RightDockEmbedded 2026-06-22-19:05:
+On real mobile-narrow the view goes full-screen with no dock tab strip or pop-out header, so it must own its own title again. The viewport @media (max-width:768px) fires only on a true narrow viewport (never inside the desktop dock/pop-out, where the @container query drives layout instead), so restoring the header here brings the title back exactly when the chrome is gone.
+*/
+@media (max-width: 768px) {
+  .activity-log-modal--embedded .activity-log-header {
+    display: flex;
+  }
+}
+
+/*
 FNXC:RightDockEmbedded 2026-06-22-00:00:
 Mirror the phone-width (@media max-width:768px) activity-log layout-stacking rules for the narrow dock, scoped to the
 embedded variant. Header wraps (title + close on top row, actions/filters stack full-width), filters/selects go 100%,

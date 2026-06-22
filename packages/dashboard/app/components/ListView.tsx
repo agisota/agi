@@ -2032,6 +2032,7 @@ export function ListView({
                 projectId={projectId}
                 autoExpand={false}
                 defaultExpanded={false}
+                singleLine /* FNXC:QuickEntry 2026-06-22-19:25: List view uses the compact single-line quick-add so the box stays one line tall. */
                 favoriteProviders={favoriteProviders}
                 favoriteModels={favoriteModels}
                 onToggleFavorite={onToggleFavorite}

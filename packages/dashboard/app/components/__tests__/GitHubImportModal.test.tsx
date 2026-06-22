@@ -810,7 +810,8 @@ describe("GitHubImportModal", () => {
       expect(previewCard.textContent).not.toContain(`${"P".repeat(200)}…`);
     });
 
-    it("truncates long selected issue body on desktop", async () => {
+    // FNXC:GitHubImport 2026-06-22-18:30: Desktop preview must show the FULL issue/PR body (no 200-char clamp). The list response already carries the complete body, so no detail fetch is needed.
+    it("renders long selected issue body in full on desktop without a truncation ellipsis", async () => {
       Object.defineProperty(window, "innerWidth", {
         writable: true,
         configurable: true,
@@ -834,12 +835,14 @@ describe("GitHubImportModal", () => {
       fireEvent.click(screen.getByRole("radio", { name: /Select issue #1/i }));
 
       const previewCard = await screen.findByTestId("github-import-preview-card");
-      expect(previewCard.textContent).toContain(`${"I".repeat(200)}…`);
-      expect(previewCard.textContent).not.toContain(beyondDesktopCutoff);
-      expect(previewCard.textContent).not.toContain(longBody);
+      expect(previewCard.textContent).toContain(longBody);
+      expect(previewCard.textContent).toContain(beyondDesktopCutoff);
+      expect(previewCard.textContent).not.toContain(`${"I".repeat(200)}…`);
+      // Body renders as markdown via the shared MailboxMessageContent surface.
+      expect(screen.getByTestId("github-import-preview-body")).toBeTruthy();
     });
 
-    it("truncates long selected pull request body on desktop", async () => {
+    it("renders long selected pull request body in full on desktop without a truncation ellipsis", async () => {
       Object.defineProperty(window, "innerWidth", {
         writable: true,
         configurable: true,
@@ -865,9 +868,52 @@ describe("GitHubImportModal", () => {
       fireEvent.click(screen.getByRole("radio", { name: /Select pull request #1/i }));
 
       const previewCard = await screen.findByTestId("github-import-preview-card");
-      expect(previewCard.textContent).toContain(`${"R".repeat(200)}…`);
-      expect(previewCard.textContent).not.toContain(beyondDesktopCutoff);
-      expect(previewCard.textContent).not.toContain(longBody);
+      expect(previewCard.textContent).toContain(longBody);
+      expect(previewCard.textContent).toContain(beyondDesktopCutoff);
+      expect(previewCard.textContent).not.toContain(`${"R".repeat(200)}…`);
+      expect(screen.getByTestId("github-import-preview-body")).toBeTruthy();
+    });
+
+    // FNXC:GitHubImport 2026-06-22-18:30: Full-issue preview must surface key metadata (state, author, GitHub URL) alongside the full markdown body.
+    it("renders full issue metadata (state, author, GitHub link) in the desktop preview", async () => {
+      Object.defineProperty(window, "innerWidth", {
+        writable: true,
+        configurable: true,
+        value: 1200,
+      });
+
+      const issues = [
+        {
+          number: 7,
+          title: "Metadata Issue",
+          body: "**bold** issue body with `code`",
+          html_url: "https://github.com/owner/repo/issues/7",
+          labels: [{ name: "bug" }],
+          state: "open" as const,
+          author: "octocat",
+        },
+      ];
+      vi.mocked(fetchGitRemotes).mockResolvedValueOnce(singleRemote);
+      vi.mocked(apiFetchGitHubIssues).mockResolvedValueOnce(issues);
+
+      render(<GitHubImportModal isOpen={true} onClose={onClose} onImport={onImport} tasks={[]} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Metadata Issue")).toBeTruthy();
+      });
+
+      fireEvent.click(screen.getByRole("radio", { name: /Select issue #7/i }));
+
+      const previewCard = await screen.findByTestId("github-import-preview-card");
+      expect(within(previewCard).getByText("open")).toBeTruthy();
+      expect(within(previewCard).getByText(/octocat/)).toBeTruthy();
+      expect(within(previewCard).getByText("bug")).toBeTruthy();
+      const link = within(previewCard).getByRole("link", { name: /View on GitHub/i }) as HTMLAnchorElement;
+      expect(link.getAttribute("href")).toBe("https://github.com/owner/repo/issues/7");
+      // Markdown is rendered (bold/code become elements, not literal asterisks/backticks).
+      const body = screen.getByTestId("github-import-preview-body");
+      expect(body.querySelector("strong")).toBeTruthy();
+      expect(body.querySelector("code")).toBeTruthy();
     });
 
     it("returns to list view on mobile after successful import", async () => {

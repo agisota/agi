@@ -147,11 +147,16 @@ export function RightDockExpandModal({
   /*
   FNXC:RightDock 2026-06-22-17:40:
   Header drag: pointerdown on the title bar moves the panel via state-driven `position: fixed; left/top`. Pointer capture keeps the drag alive past the header bounds, updates are rAF-batched so the move stays smooth, and the panel is clamped on-screen. Clicks on the close button are excluded so dragging never swallows the close.
+
+  FNXC:RightDock 2026-06-22-18:50:
+  Touch smoothness fix: listen for pointermove/up on the CAPTURED element (`captureTarget` = event.currentTarget) rather than `document`. `setPointerCapture` redirects every move for this pointerId to that element, so element-scoped listeners receive the full stream even when the finger drifts off the header — and they pair cleanly with `touch-action: none` (CSS) without a separate non-passive document listener. clientX/clientY are read from the captured pointer's move events. Raw moves are coalesced into a single rAF (`frame`) so we set left/top at most once per frame and never thrash layout on a flood of touch-move events.
   */
   const handleFloatingDragPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button")) return;
     event.preventDefault();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const captureTarget = event.currentTarget;
+    const pointerId = event.pointerId;
+    captureTarget.setPointerCapture?.(pointerId);
     const startX = event.clientX;
     const startY = event.clientY;
     const startPosition = position;
@@ -163,6 +168,7 @@ export function RightDockExpandModal({
     let frame = 0;
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
       latest = { x: startPosition.x + moveEvent.clientX - startX, y: startPosition.y + moveEvent.clientY - startY };
       if (frame) return;
       frame = requestAnimationFrame(() => {
@@ -170,29 +176,31 @@ export function RightDockExpandModal({
         setPositionState(clampExpandPosition(latest, currentSize));
       });
     };
-    const handlePointerUp = () => {
+    const detachListeners = () => {
+      captureTarget.releasePointerCapture?.(pointerId);
+      captureTarget.removeEventListener("pointermove", handlePointerMove);
+      captureTarget.removeEventListener("pointerup", handlePointerUp);
+      captureTarget.removeEventListener("pointercancel", handlePointerUp);
+    };
+    function handlePointerUp() {
       if (frame) cancelAnimationFrame(frame);
       persistPosition(latest, currentSize);
       document.body.style.userSelect = previousUserSelect;
-      document.removeEventListener("pointermove", handlePointerMove);
-      document.removeEventListener("pointerup", handlePointerUp);
-      document.removeEventListener("pointercancel", handlePointerUp);
+      detachListeners();
       dragTeardownRef.current = null;
-    };
+    }
 
     // FNXC:RightDock 2026-06-22-17:40: Close/unmount-mid-drag teardown cancels the rAF and drops the listeners without persisting a partial move.
     dragTeardownRef.current = () => {
       if (frame) cancelAnimationFrame(frame);
       document.body.style.userSelect = previousUserSelect;
-      document.removeEventListener("pointermove", handlePointerMove);
-      document.removeEventListener("pointerup", handlePointerUp);
-      document.removeEventListener("pointercancel", handlePointerUp);
+      detachListeners();
       dragTeardownRef.current = null;
     };
 
-    document.addEventListener("pointermove", handlePointerMove);
-    document.addEventListener("pointerup", handlePointerUp);
-    document.addEventListener("pointercancel", handlePointerUp);
+    captureTarget.addEventListener("pointermove", handlePointerMove);
+    captureTarget.addEventListener("pointerup", handlePointerUp);
+    captureTarget.addEventListener("pointercancel", handlePointerUp);
   }, [persistPosition, position, size]);
 
   /*
@@ -202,7 +210,9 @@ export function RightDockExpandModal({
   const handleFloatingResizePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>, direction: ExpandResizeDirection) => {
     event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const captureTarget = event.currentTarget;
+    const pointerId = event.pointerId;
+    captureTarget.setPointerCapture?.(pointerId);
     const startX = event.clientX;
     const startY = event.clientY;
     const startSize = size;
@@ -215,6 +225,7 @@ export function RightDockExpandModal({
     let frame = 0;
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
       const dx = moveEvent.clientX - startX;
       const dy = moveEvent.clientY - startY;
       const nextSize = clampExpandSize({
@@ -234,30 +245,32 @@ export function RightDockExpandModal({
         setPositionState(clampExpandPosition(latestPosition, latestSize));
       });
     };
-    const handlePointerUp = () => {
+    const detachListeners = () => {
+      captureTarget.releasePointerCapture?.(pointerId);
+      captureTarget.removeEventListener("pointermove", handlePointerMove);
+      captureTarget.removeEventListener("pointerup", handlePointerUp);
+      captureTarget.removeEventListener("pointercancel", handlePointerUp);
+    };
+    function handlePointerUp() {
       if (frame) cancelAnimationFrame(frame);
       persistSize(latestSize);
       persistPosition(latestPosition, latestSize);
       document.body.style.userSelect = previousUserSelect;
-      document.removeEventListener("pointermove", handlePointerMove);
-      document.removeEventListener("pointerup", handlePointerUp);
-      document.removeEventListener("pointercancel", handlePointerUp);
+      detachListeners();
       dragTeardownRef.current = null;
-    };
+    }
 
     // FNXC:RightDock 2026-06-22-17:40: Close/unmount-mid-resize teardown.
     dragTeardownRef.current = () => {
       if (frame) cancelAnimationFrame(frame);
       document.body.style.userSelect = previousUserSelect;
-      document.removeEventListener("pointermove", handlePointerMove);
-      document.removeEventListener("pointerup", handlePointerUp);
-      document.removeEventListener("pointercancel", handlePointerUp);
+      detachListeners();
       dragTeardownRef.current = null;
     };
 
-    document.addEventListener("pointermove", handlePointerMove);
-    document.addEventListener("pointerup", handlePointerUp);
-    document.addEventListener("pointercancel", handlePointerUp);
+    captureTarget.addEventListener("pointermove", handlePointerMove);
+    captureTarget.addEventListener("pointerup", handlePointerUp);
+    captureTarget.addEventListener("pointercancel", handlePointerUp);
   }, [persistPosition, persistSize, position, size]);
 
   // FNXC:RightDock 2026-06-22-17:40: Run any active drag/resize teardown on unmount so document pointer listeners + a pending rAF never outlive the modal.
