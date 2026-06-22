@@ -27,13 +27,13 @@
 }
 
 /*
-FNXC:ListView 2026-06-22-23:30:
-Single compact header toolbar: count (secondary, left) + action group (right) on one row.
-align-items:center keeps the three controls a consistent height; flex-wrap is a last-resort overflow guard, not the default layout.
+FNXC:ListView 2026-06-23-02:45:
+The action buttons (Bulk Edit / View / New Task) are the sole content of this toolbar row and must be horizontally CENTERED in the view, not pushed to one side. justify-content:center centers the action group; the prior margin-left:auto right-push (and the New Task margin-left:auto far-push) are removed so the three controls stay a tight centered cluster. align-items:center keeps them a consistent height; flex-wrap is a last-resort overflow guard that keeps them centered when they wrap on narrow widths.
 */
 .list-sidebar-controls__toolbar {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-sm);
   flex-wrap: wrap;
 }
@@ -41,9 +41,9 @@ align-items:center keeps the three controls a consistent height; flex-wrap is a 
 .list-sidebar-controls__actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
   gap: var(--space-xs);
-  margin-left: auto;
 }
 
 /*
@@ -65,9 +65,7 @@ View options was oversized (full-width stacked button). Render it as a compact i
   min-width: 0;
 }
 
-.list-sidebar-controls__actions .list-new-task-action {
-  margin-left: auto;
-}
+/* FNXC:ListView 2026-06-23-02:45: New Task no longer pushes to the far right of the centered action group — the three buttons stay tightly grouped and centered together. */
 
 .list-toolbar .list-new-task-action {
   margin-left: auto;
@@ -433,55 +431,57 @@ Widen the split resize column so the task-list sidebar is easy to grab and drag 
   min-height: 0;
 }
 
+/*
+FNXC:SidebarDivider 2026-06-23-02:45:
+The static 1px divider line lives on the sidebar pane's right border, IDENTICAL to Chat where `.chat-sidebar` carries `border-right: 1px solid var(--border)`. Previously List painted the visible line via the handle `::after`, which rendered at a different position/edge than Chat's pane border; moving it to the pane border reconciles the two so the 1px var(--border) line matches exactly in thickness, color, and position.
+*/
 .list-split-sidebar {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  border-right: 1px solid var(--border);
 }
 
 /*
-FNXC:SidebarDivider 2026-06-23-01:45:
-The List split divider must read identically to the Chat sidebar divider: a single 1px var(--border) line, with the wider var(--space-sm) handle track acting only as an invisible drag hit-area that tints on hover/focus. Previously the handle painted a persistent color-mix band across its full var(--space-sm) width plus a 2px ::after grip, so the List divider looked noticeably thicker than Chat's clean 1px line. Keep the drag hit-area width (var(--space-sm) grid track) for usability; only the visible line thickness/color changes — handle background is transparent and the centered ::after line is 1px var(--border).
+FNXC:SidebarDivider 2026-06-23-02:45:
+The List split divider is now IDENTICAL to Chat's `.chat-sidebar-resize-handle`: the handle itself is a transparent var(--space-sm)-wide drag hit-area (no persistent background, no persistent visible line). The static 1px var(--border) divider line is drawn by the sibling sidebar pane's border-right (see .list-split-sidebar above), exactly as Chat draws it on .chat-sidebar. A centered var(--space-xs) ::before band tints (color-mix --todo 30%) only on hover/active — matching Chat's ::before tint. focus-visible keeps the keyboard ring (the List handle is a focusable resize control with aria) and also tints the band so keyboard resizers get the same affordance.
 */
 .list-split-resize-handle {
   position: relative;
   cursor: col-resize;
   background: transparent;
-  transition: background var(--transition-fast);
   touch-action: none;
+  transition: background var(--transition-fast);
 }
 
-/* Centered 1px grip line — the static visible divider, matching Chat's 1px sidebar border. */
-.list-split-resize-handle::after {
+.list-split-resize-handle::before {
   content: "";
   position: absolute;
-  inset-block: 0;
-  inset-inline-start: 50%;
-  width: 1px;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--space-xs);
   transform: translateX(-50%);
-  background: var(--border);
-  transition: background var(--transition-fast);
 }
 
-.list-split-resize-handle:hover,
-.list-split-resize-handle:focus-visible {
-  background: color-mix(in srgb, var(--todo) 35%, transparent);
-}
-
-.list-split-resize-handle:hover::after,
-.list-split-resize-handle:focus-visible::after {
-  background: var(--todo);
+.list-split-resize-handle:hover::before,
+.list-split-resize-handle:active::before,
+.list-split-resize-handle:focus-visible::before {
+  background: color-mix(in srgb, var(--todo) 30%, transparent);
 }
 
 .list-split-resize-handle:focus-visible {
-  box-shadow: var(--focus-ring-strong);
   outline: none;
+  box-shadow: var(--focus-ring-strong);
 }
 
+/*
+FNXC:SidebarDivider 2026-06-23-02:45:
+No border-left on the detail pane. Chat draws the single divider line solely on the sidebar pane's border-right; the thread pane is unbordered. Keeping a border-left here would produce a second faint line on the far edge of the handle track (a double divider), so it is removed to make the rendered line match Chat exactly (one 1px var(--border) line at the sidebar's right edge).
+*/
 .list-split-detail {
   min-width: 0;
   min-height: 0;
-  border-left: 1px solid var(--border);
   overflow: hidden;
   background: var(--card);
 }
