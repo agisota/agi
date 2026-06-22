@@ -137,11 +137,21 @@ Embedded settings is a main-content destination (taskView === "settings"), mirro
 FNXC:Settings 2026-06-22-00:00:
 The embedded title reads like other embedded-view titles (Planning modal-header--embedded, Command Center cc-title): a plain heading with no tinted modal-header bar, no bottom divider, no close button, aligned to the content edge, at the shared 1.125rem embedded-title size. Header actions (Star/Discord) and footer remain so the full-width panel keeps its controls.
 */
+/* FNXC:Settings 2026-06-23-04:45: The embedded Settings header now matches the canonical ViewHeader/other sidebar views exactly — same min-height, space-lg/space-xl padding, surface bg, single bottom divider, var(--todo) icon, 1.125rem/600 title, actions pinned right. (Supersedes the earlier no-divider/transparent embedded treatment.) */
 .settings-modal--embedded .modal-header--embedded {
-  padding: 0 0 var(--space-md);
-  background: transparent;
-  border-bottom: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--view-header-min-height);
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+.settings-modal--embedded .modal-header--embedded .settings-header-actions {
+  margin-left: auto;
 }
 
 .settings-modal--embedded .modal-header--embedded .settings-modal-heading h3 {
@@ -149,13 +159,22 @@ The embedded title reads like other embedded-view titles (Planning modal-header-
   align-items: center;
   gap: var(--space-sm);
   font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
   letter-spacing: normal;
 }
 
-/* Embedded footer actions sit flush on the content surface (no tinted modal bar). */
+.settings-modal--embedded .modal-header--embedded .settings-modal-heading svg {
+  color: var(--todo);
+  flex-shrink: 0;
+}
+
+/* Embedded footer actions sit flush on the content surface (no tinted modal bar).
+   FNXC:Settings 2026-06-23-04:45: Trim the footer's bottom padding so the space BELOW the Save/Help/Version/Import-Export row matches the space above it (the base .modal-actions var(--modal-padding) left too large a gap under the row in the embedded full-height view). */
 .settings-modal--embedded .modal-actions {
   background: transparent;
   flex-shrink: 0;
+  padding-bottom: var(--space-sm);
 }
 
 /* Mobile: full-screen sheet. The desktop `min-width: 520px` was forcing the
