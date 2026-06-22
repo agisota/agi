@@ -76,6 +76,7 @@ import {
 } from "./agent-session-helpers.js";
 import { buildSessionSkillContext } from "./session-skill-context.js";
 import { reviewStep, type ReviewVerdict } from "./reviewer.js";
+import { selectUserCommentsForAgentContext } from "./agent-user-comments.js";
 import { resolveSandboxBackend } from "./sandbox/index.js";
 import type { SandboxBackend } from "./sandbox/types.js";
 import { ModelRegistry, SessionManager, type ToolDefinition, type AgentSession } from "@earendil-works/pi-coding-agent";
@@ -11175,7 +11176,9 @@ export class TaskExecutor {
           // Merge per-task effective workflow settings (U3, KTD-3) so the
           // validator model-lane reads below pick up workflow values; this tool
           // closure re-fetches independently. Behavior-inert by default.
-          const settings = await mergeEffectiveSettings(store, detail, await store.getSettings());
+          const latestDetailForReview = await store.getTask(taskId);
+          const userComments = selectUserCommentsForAgentContext(latestDetailForReview);
+          const settings = await mergeEffectiveSettings(store, latestDetailForReview, await store.getSettings());
           // Run the reviewer via semaphore.runNested so its slot accounting
           // is honest: activeCount transiently bumps to reflect the second
           // agent session, but the reviewer doesn't enter the wait queue
@@ -11195,10 +11198,10 @@ export class TaskExecutor {
               defaultModelId: settings.defaultModelId,
               fallbackProvider: settings.fallbackProvider,
               fallbackModelId: settings.fallbackModelId,
-              defaultThinkingLevel: detail.thinkingLevel ?? settings.defaultThinkingLevel,
+              defaultThinkingLevel: latestDetailForReview.thinkingLevel ?? settings.defaultThinkingLevel,
               // Task-level validator override (from task)
-              taskValidatorProvider: detail.validatorModelProvider,
-              taskValidatorModelId: detail.validatorModelId,
+              taskValidatorProvider: latestDetailForReview.validatorModelProvider,
+              taskValidatorModelId: latestDetailForReview.validatorModelId,
               // Project-level validator override
               projectValidatorProvider: settings.validatorProvider,
               projectValidatorModelId: settings.validatorModelId,
@@ -11213,7 +11216,8 @@ export class TaskExecutor {
               projectDefaultOverrideModelId: settings.defaultModelIdOverride,
               store,
               taskId,
-              task: detail,
+              task: latestDetailForReview,
+              userComments: userComments.length > 0 ? userComments : undefined,
               agentPrompts: settings.agentPrompts,
               agentStore: this.options.agentStore,
               rootDir: this.rootDir,

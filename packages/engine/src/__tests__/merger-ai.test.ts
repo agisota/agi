@@ -28,6 +28,7 @@ import {
   parseReviewVerdict,
   buildMergeSystemPrompt,
   buildMergePrompt,
+  buildReviewPrompt,
   buildReviewSystemPrompt,
   REVIEW_VERDICT_MARKER,
   AiMergeBlockedError,
@@ -150,6 +151,59 @@ describe("parseReviewVerdict", () => {
     const p = buildMergeSystemPrompt(cfg);
     expect(p).toContain("CUSTOM MERGER PERSONA");
     expect(p).toContain("Verify before committing");
+  });
+
+  it("merge prompt includes user comments when present and omits the section when absent", () => {
+    const baseInput = {
+      taskId: "FN-1",
+      branch: "fusion/fn-1",
+      integrationBranch: "main",
+      tipSha: "abc1234567890",
+      includeTaskId: true,
+      trailers: ["Fusion-Task-Id: FN-1"],
+    };
+
+    const withComments = buildMergePrompt({
+      ...baseInput,
+      userComments: [{
+        id: "c1",
+        text: "Please keep the old API export",
+        author: "user",
+        createdAt: "2026-06-21T10:00:00.000Z",
+      }],
+    });
+    const withoutComments = buildMergePrompt(baseInput);
+
+    expect(withComments).toContain("## User Comments");
+    expect(withComments).toContain("Please keep the old API export");
+    expect(withoutComments).not.toContain("## User Comments");
+  });
+
+  it("review prompt includes user comments when present and omits the section when absent", () => {
+    const baseInput = {
+      taskId: "FN-1",
+      branch: "fusion/fn-1",
+      integrationBranch: "main",
+      tipSha: "abc1234567890",
+      squashSha: "def1234567890",
+      diffStat: "file.ts | 1 +",
+      priorReasons: [],
+    };
+
+    const withComments = buildReviewPrompt({
+      ...baseInput,
+      userComments: [{
+        id: "c1",
+        text: "Please preserve the public export",
+        author: "user",
+        createdAt: "2026-06-21T10:00:00.000Z",
+      }],
+    });
+    const withoutComments = buildReviewPrompt(baseInput);
+
+    expect(withComments).toContain("## User Comments");
+    expect(withComments).toContain("Please preserve the public export");
+    expect(withoutComments).not.toContain("## User Comments");
   });
 
   it("merge prompt requires subject, body summary, and diff-stat in commit message", () => {

@@ -4,6 +4,7 @@ import * as childProcess from "node:child_process";
 import { promisify } from "node:util";
 import { IDENTITY_GUARD_BYPASS_ENV } from "./worktree-hooks.js";
 import { mergeEffectiveSettings } from "./effective-settings.js";
+import { buildUserCommentsPromptSection, selectUserCommentsForAgentContext } from "./agent-user-comments.js";
 
 // Internal git plumbing intentionally bypasses sandbox backends.
 const execAsync = promisify(exec);
@@ -100,6 +101,7 @@ import {
   type PostMergeAuditMode,
   type TaskSourceIssue,
   type Task,
+  type TaskComment,
   type TaskDetail,
   type AutostashOrphanRecord,
   normalizeMergeAdvanceAutoSyncMode,
@@ -370,6 +372,9 @@ const MERGE_COMMIT_LOG_MAX_CHARS = 5000;
 
 /** Maximum characters for diff stat in merge prompt — prevents context overflow on large diffs */
 const MERGE_DIFF_STAT_MAX_CHARS = 3000;
+
+/** Maximum characters for user comments in merge prompt — preserves steering context without crowding merge instructions. */
+const MERGE_USER_COMMENTS_MAX_CHARS = 4000;
 
 /**
  * @deprecated Use summarizeVerificationOutput from verification-utils.js instead
@@ -11909,6 +11914,8 @@ async function runAiAgentForCommit(params: AiAgentParams): Promise<{ success: bo
 
   try {
     // Build appropriate prompt
+    const latestTaskForMergePrompt = await store.getTask(taskId);
+    const userComments = selectUserCommentsForAgentContext(latestTaskForMergePrompt);
     const prompt = buildMergePrompt({
       taskId,
       branch,
@@ -11921,6 +11928,7 @@ async function runAiAgentForCommit(params: AiAgentParams): Promise<{ success: bo
       authorArg,
       sourceIssueRef,
       preMergeRebaseFallthrough,
+      userComments,
     });
 
     // Attempt prompting with fresh session (first attempt).
@@ -11952,6 +11960,8 @@ async function runAiAgentForCommit(params: AiAgentParams): Promise<{ success: bo
         // The fall-through preamble is preserved (it's the safety constraint,
         // not bulk context) so the AI's truncated retry still knows main's
         // deletions are authoritative.
+        const latestTaskForTruncatedMergePrompt = await store.getTask(taskId);
+        const truncatedUserComments = selectUserCommentsForAgentContext(latestTaskForTruncatedMergePrompt);
         const truncatedPrompt = buildMergePrompt({
           taskId,
           branch,
@@ -11964,6 +11974,7 @@ async function runAiAgentForCommit(params: AiAgentParams): Promise<{ success: bo
           authorArg,
           sourceIssueRef,
           preMergeRebaseFallthrough,
+          userComments: truncatedUserComments,
         });
 
         try {
@@ -12097,14 +12108,19 @@ interface MergePromptParams {
    *  gate; this preamble gives the AI a fighting chance to do the right
    *  thing on its first try. */
   preMergeRebaseFallthrough?: string;
+  userComments?: TaskComment[];
 }
 
 export function buildMergePrompt(params: MergePromptParams): string {
-  const { taskId, branch, commitLog, diffStat, hasConflicts, simplifiedContext, sourceIssueRef, testCommand, buildCommand, authorArg, preMergeRebaseFallthrough } = params;
+  const { taskId, branch, commitLog, diffStat, hasConflicts, simplifiedContext, sourceIssueRef, testCommand, buildCommand, authorArg, preMergeRebaseFallthrough, userComments } = params;
 
   // Apply truncation to prevent context overflow for large branches/diffs
   const truncatedCommitLog = truncateWithEllipsis(commitLog, MERGE_COMMIT_LOG_MAX_CHARS);
   const truncatedDiffStat = truncateWithEllipsis(diffStat, MERGE_DIFF_STAT_MAX_CHARS);
+  const userCommentsSection = truncateWithEllipsis(
+    buildUserCommentsPromptSection(userComments ?? []),
+    MERGE_USER_COMMENTS_MAX_CHARS,
+  );
 
   const parts: string[] = [];
 
@@ -12154,6 +12170,10 @@ export function buildMergePrompt(params: MergePromptParams): string {
       truncatedDiffStat,
       "```",
     );
+  }
+
+  if (userCommentsSection) {
+    parts.push("", userCommentsSection);
   }
 
   if (hasConflicts) {

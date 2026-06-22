@@ -818,6 +818,7 @@ Inspect task definition, logs, review feedback, comments, artifacts, workflow ou
 
 - Editable tasks with descriptions show **Summarize as title** beside the read-mode title; it asks AI to generate a concise title from the description and saves it without opening the edit form.
 - The **Chat** tab includes an expand/collapse control that lets the transcript and composer fill the task-detail modal, then restores the normal header, tabs, and action footer when collapsed.
+- Task-detail Chat messages are persisted as user comments/steering guidance and surfaced to every relevant agent lane: live executor sessions receive steering injection, while planner, reviewer (spec/plan/code), and merger agents (standard and clean-room AI merge/review) receive the latest user comments in their next prompt/pass.
 - The priority chip in task metadata is an inline picker: you can change priority directly without entering full edit mode.
 - Execution mode has a read-mode inline lightning-bolt toggle for Fast mode on/off without opening the full edit form.
 - These two metadata controls share matched sizing/alignment in read mode (including mobile wrapping) so they behave like a single polished control group.

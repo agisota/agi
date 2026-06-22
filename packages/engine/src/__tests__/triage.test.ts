@@ -555,6 +555,29 @@ describe("buildSpecificationPrompt", () => {
       expect(prompt).toContain("Missing comment coverage is a spec quality failure");
     });
 
+    it("pins task-detail chat comments as planning-agent context", () => {
+      const taskWithChatComment: TaskDetail = {
+        ...baseTask,
+        comments: [
+          {
+            id: "chat-1",
+            text: "Please keep the old API export in the generated spec",
+            author: "user",
+            createdAt: "2026-06-21T15:30:00.000Z",
+          },
+        ],
+      };
+
+      const prompt = buildSpecificationPrompt(
+        taskWithChatComment,
+        ".fusion/tasks/KB-001/PROMPT.md",
+      );
+
+      expect(prompt).toContain("## User Comments");
+      expect(prompt).toContain("Please keep the old API export in the generated spec");
+      expect(prompt).toContain("Address every comment");
+    });
+
     it("excludes agent/system comments from user comments section", () => {
       const taskWithMixedComments: TaskDetail = {
         ...baseTask,

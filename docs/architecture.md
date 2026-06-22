@@ -602,6 +602,7 @@ See [Memory Plugin Contract](./memory-plugin-contract.md) for the full plan.
 - **Executor**: `TaskExecutor` (`executor.ts`) implements tasks in worktrees
 - **Reviewer**: `reviewStep()` (`reviewer.ts`) performs plan/code/spec reviews
 - **Merger**: `aiMergeTask()` (`merger.ts`) merges approved work
+- **Task-detail chat / steering comments**: `TaskStore.addSteeringComment()` writes chat steering text to both `task.comments` and `task.steeringComments`. The executor still uses `steeringComments` for live in-session injection, while next-prompt agent lanes read canonical user-authored `task.comments`: planning/spec generation, spec review, plan/code reviewers, standard merger prompts, and clean-room AI merge + merge-review prompts all surface recent user comments through the shared `agent-user-comments.ts` formatter.
 
 #### Reviewer verdict recovery contract (FN-4092)
 - Reviewer verdicts are `APPROVE`, `REVISE`, `RETHINK`, or `UNAVAILABLE`.
