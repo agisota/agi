@@ -199,6 +199,43 @@ describe("DependencyGraph", () => {
     expect(setGraphBounds).toHaveBeenCalled();
   });
 
+  // FNXC:Graph 2026-06-23-02:45: the component can mount at 0×0 (hidden behind a tab / before the
+  // container is laid out) and only later report a real size via ResizeObserver. The first real paint
+  // must center WITHOUT any user click/drag. This guards the zero-size-at-mount → RO-driven fit path.
+  it("does not fit while the viewport is zero-sized, then fits once ResizeObserver reports a real size", async () => {
+    render(<DependencyGraph tasks={[createTask("A", "todo"), createTask("B", "todo", ["A"])]} onOpenTaskDetail={vi.fn()} />);
+
+    // Mount-time measured size is 0×0 (jsdom default). A 0-sized fit would mis-center, so none fires.
+    setViewportSize(0, 0);
+    await Promise.resolve();
+    expect(fitToGraph).not.toHaveBeenCalled();
+
+    // Hidden→visible transition: ResizeObserver now reports a real non-zero size → fit must run.
+    setViewportSize(1200, 800);
+    await waitFor(() => expect(fitToGraph).toHaveBeenCalled());
+
+    // FNXC:Graph 2026-06-23-02:45: fit must run on the normalized (origin-shifted) positions and the
+    // real measured size so clampPan clamps against the committed normalized bounds — never the 0-box.
+    const [fittedPositions, fittedWidth, fittedHeight] = fitToGraph.mock.calls.at(-1)!;
+    expect(fittedWidth).toBe(1200);
+    expect(fittedHeight).toBe(800);
+    const minLeft = Math.min(...Array.from((fittedPositions as Map<string, { x: number; y: number }>).values()).map((p) => p.x));
+    const minTop = Math.min(...Array.from((fittedPositions as Map<string, { x: number; y: number }>).values()).map((p) => p.y));
+    expect(minLeft).toBe(0);
+    expect(minTop).toBe(0);
+    expect(setGraphBounds).toHaveBeenCalled();
+  });
+
+  it("does not auto-fit when the user has saved positions (manual layout opt-out)", async () => {
+    mockSavedPositions = { A: { x: 10, y: 10 }, B: { x: 300, y: 10 } };
+    render(<DependencyGraph tasks={[createTask("A", "todo"), createTask("B", "todo", ["A"])]} projectId="p1" onOpenTaskDetail={vi.fn()} />);
+
+    setViewportSize(1200, 800);
+    // Give the deferred (rAF) fit path a chance to fire; it must stay suppressed for saved layouts.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fitToGraph).not.toHaveBeenCalled();
+  });
+
   it("forwards keyboard events to interaction hook", () => {
     render(<DependencyGraph tasks={[createTask("A", "todo")]} onOpenTaskDetail={vi.fn()} />);
     const viewport = document.querySelector(".dependency-graph__viewport");
