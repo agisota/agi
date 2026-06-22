@@ -2800,16 +2800,16 @@ describe("ChatView", () => {
     const toggle = screen.getByTestId("chat-thread-render-toggle");
     const providerIcon = identity.querySelector(".provider-icon");
     const modelTag = identity.querySelector(".chat-model-tag");
-    const newChatButton = screen.getByTestId("chat-thread-new-chat-btn");
+    const newChatButton = screen.getByTestId("chat-new-btn");
 
     expect(header).toBeInTheDocument();
+    expect(newChatButton.closest(".view-header")).toBeInTheDocument();
     expect(providerIcon).toBeInTheDocument();
     expect(within(identity).getByText("Agent Chat")).toBeInTheDocument();
     expect(modelTag).toBeInTheDocument();
     expect(modelTag).toHaveTextContent("Claude Sonnet 4.5");
     expect(toggle).toBeInTheDocument();
-    expect(header?.children[header.children.length - 2]).toBe(toggle);
-    expect(header?.children[header.children.length - 1]).toBe(newChatButton);
+    expect(header?.children[header.children.length - 1]).toBe(toggle);
     expect(document.querySelectorAll(".chat-thread-header .chat-model-tag")).toHaveLength(1);
   });
 
@@ -3445,7 +3445,8 @@ describe("ChatView sidebar structure", () => {
     expect(document.querySelector(".chat-sidebar")).toBeInTheDocument();
     expect(document.querySelector(".chat-sidebar-search")).toBeInTheDocument();
     expect(document.querySelector(".chat-sidebar-list")).toBeInTheDocument();
-    expect(document.querySelector(".chat-sidebar-footer")).toBeInTheDocument();
+    expect(document.querySelector(".chat-sidebar-footer")).not.toBeInTheDocument();
+    expect(screen.getByTestId("chat-new-btn").closest(".view-header")).toBeInTheDocument();
     expect(document.querySelector(".chat-sidebar-header")).not.toBeInTheDocument();
   });
 
@@ -3994,30 +3995,31 @@ describe("resizable sidebar", () => {
   });
 });
 
-describe("thread header New Chat button", () => {
+describe("Chat header New Chat button", () => {
   const activeSession = { id: "session-001", agentId: "agent-001", status: "active", title: "Test Chat", createdAt: "2026-04-08T00:00:00.000Z", updatedAt: "2026-04-08T00:00:00.000Z" };
 
-  it("renders New Chat button in thread header on desktop when session is active", async () => {
+  it("renders New Chat button in the shared header on desktop when session is active", async () => {
     const viewportSpy = mockViewportMode("desktop");
     setupMockChat({ activeSession });
 
     await renderWithAct(<ChatView projectId="proj-123" addToast={vi.fn()} />);
 
-    const btn = screen.getByTestId("chat-thread-new-chat-btn");
+    const btn = screen.getByTestId("chat-new-btn");
     expect(btn).toBeInTheDocument();
+    expect(btn.closest(".view-header")).toBeInTheDocument();
     expect(btn).toHaveTextContent("New Chat");
     expect(btn).toHaveClass("btn", "btn-sm", "btn-primary");
 
     viewportSpy.mockRestore();
   });
 
-  it("clicking thread header New Chat button opens the NewChatDialog", async () => {
+  it("clicking shared header New Chat button opens the NewChatDialog", async () => {
     const viewportSpy = mockViewportMode("desktop");
     setupMockChat({ activeSession });
 
     await renderWithAct(<ChatView projectId="proj-123" addToast={vi.fn()} />);
 
-    const btn = screen.getByTestId("chat-thread-new-chat-btn");
+    const btn = screen.getByTestId("chat-new-btn");
     await act(async () => {
       fireEvent.click(btn);
     });
@@ -4027,13 +4029,14 @@ describe("thread header New Chat button", () => {
     viewportSpy.mockRestore();
   });
 
-  it("does not render New Chat button in thread header on mobile", async () => {
+  it("does not render New Chat button in the shared header on mobile", async () => {
     const viewportSpy = mockViewportMode("mobile");
     setupMockChat({ activeSession });
 
     await renderWithAct(<ChatView projectId="proj-123" addToast={vi.fn()} />);
 
     expect(screen.queryByTestId("chat-thread-new-chat-btn")).toBeNull();
+    expect(document.querySelector(".view-header [data-testid='chat-new-btn']")).toBeNull();
 
     viewportSpy.mockRestore();
   });
@@ -5566,6 +5569,18 @@ describe("ChatView mobile CSS contract", () => {
   it("mobile .chat-sidebar uses height: 100% instead of max-height: 40vh", async () => {
     expect(mobileRuleContains(".chat-sidebar", "height: 100%")).toBe(true);
     expect(mobileRuleNotContains(".chat-sidebar", "max-height: 40vh")).toBe(true);
+  });
+
+  it("keeps the shared header outside the bounded chat body row", async () => {
+    const viewRule = css.match(/\.chat-view\s*\{([^}]*)\}/)?.[1] ?? "";
+    const bodyRule = css.match(/\.chat-view__body\s*\{([^}]*)\}/)?.[1] ?? "";
+
+    expect(viewRule).toContain("flex-direction: column;");
+    expect(viewRule).toContain("min-height: 0;");
+    expect(bodyRule).toContain("display: flex;");
+    expect(bodyRule).toContain("flex: 1 1 auto;");
+    expect(bodyRule).toContain("min-height: 0;");
+    expect(bodyRule).toContain("overflow: hidden;");
   });
 
   it("mobile .chat-sidebar-header is hidden", async () => {

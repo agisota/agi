@@ -114,27 +114,30 @@ Non-Command-Center dashboard CSS must use the canonical --text token. The legacy
   min-height: 0;
 }
 
-/* Scheduling scope selector */
+/*
+FNXC:Automations 2026-06-22-12:45:
+The Automations sub-header scope button bar should match the Artifacts tab bar style: each scope is a standalone bordered surface button with the same todo-accent active state, not a segmented control inside a filled capsule.
+*/
 .scheduling-scope-selector {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-xs);
+  gap: var(--space-sm);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .scope-btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   padding: var(--space-xs) var(--space-md);
   font-size: 0.75rem;
   font-weight: 500;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
   color: var(--text-muted);
   cursor: pointer;
   transition: background-color var(--transition-fast), color var(--transition-fast);
@@ -146,8 +149,9 @@ Non-Command-Center dashboard CSS must use the canonical --text token. The legacy
 }
 
 .scope-btn.active {
-  background: var(--todo);
-  color: var(--cta-text);
+  color: var(--todo);
+  border-color: var(--todo);
+  background: color-mix(in srgb, var(--todo) 12%, transparent);
 }
 
 .scope-btn:focus-visible {

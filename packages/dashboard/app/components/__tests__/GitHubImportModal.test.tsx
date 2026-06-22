@@ -95,6 +95,21 @@ describe("GitHubImportModal", () => {
     expect(source).toContain(".github-import-preview-pane.mobile.active .github-import-pane-content {\n    flex: 1;\n    min-height: 0;\n    overflow-y: auto;\n    overscroll-behavior: contain;");
   });
 
+  it("styles import type tabs like the Artifacts button bar", () => {
+    const source = readFileSync(resolve(__dirname, "../GitHubImportModal.css"), "utf8");
+    const tabsRule = source.match(/\.github-import-tabs\s*\{[^}]*\}/)?.[0] ?? "";
+    const tabRule = source.match(/\.github-import-tab\s*\{[^}]*\}/)?.[0] ?? "";
+    const activeRule = source.match(/\.github-import-tab\.active\s*\{[^}]*\}/)?.[0] ?? "";
+
+    expect(tabsRule).toContain("background: transparent;");
+    expect(tabsRule).toContain("border-bottom: none;");
+    expect(tabRule).toContain("border: 1px solid var(--border);");
+    expect(tabRule).toContain("background: var(--surface);");
+    expect(activeRule).toContain("color: var(--todo);");
+    expect(activeRule).toContain("border-color: var(--todo);");
+    expect(activeRule).toContain("background: color-mix(in srgb, var(--todo) 12%, transparent);");
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fetchGitRemotes).mockReset();

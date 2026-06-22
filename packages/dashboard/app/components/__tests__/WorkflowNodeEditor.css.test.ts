@@ -42,6 +42,21 @@ function expectNoHardcodedWhiteBackground(rule: string): void {
 }
 
 describe("WorkflowNodeEditor themed React Flow CSS contract", () => {
+  it("matches the shared Insights/ViewHeader chrome", () => {
+    const editorCss = readComponentCss("WorkflowNodeEditor.css");
+    const headerRule = findRule([editorCss], /\.wf-editor-header\s*\{[^}]*\}/);
+    const titleRule = findRule([editorCss], /\.wf-editor-header h2\s*\{[^}]*\}/);
+    const iconRule = findRule([editorCss], /\.wf-editor-header h2 svg\s*\{[^}]*\}/);
+
+    expect(headerRule).toMatch(/min-height\s*:\s*var\(--view-header-min-height\)\s*;/);
+    expect(headerRule).toMatch(/padding\s*:\s*var\(--space-lg\) var\(--space-xl\)\s*;/);
+    expect(headerRule).toMatch(/background\s*:\s*var\(--surface\)\s*;/);
+    expect(headerRule).toMatch(/border-bottom\s*:\s*1px solid var\(--border\)\s*;/);
+    expect(titleRule).toMatch(/font-size\s*:\s*1\.125rem\s*;/);
+    expect(titleRule).toMatch(/font-weight\s*:\s*600\s*;/);
+    expect(iconRule).toMatch(/color\s*:\s*var\(--todo\)\s*;/);
+  });
+
   it("FN-6701 themes zoom controls, mini-map, and sidebar checkboxes with tokens", () => {
     const baseCss = loadAllAppCssBaseOnly();
 
@@ -146,8 +161,10 @@ describe("WorkflowNodeEditor sidebar overflow CSS contract", () => {
     expect(collapsedSidebarRule).toMatch(/display\s*:\s*none\s*;/);
 
     const restoreRule = findRule([editorCss], /\.wf-sidebar-shell-restore\s*\{[^}]*\}/);
-    expect(restoreRule).toMatch(/position\s*:\s*absolute\s*;/);
-    expect(restoreRule).toMatch(/left\s*:\s*var\(--space-sm\)\s*;/);
+    expect(restoreRule).not.toMatch(/position\s*:\s*absolute\s*;/);
+    expect(restoreRule).toMatch(/flex\s*:\s*0 0 auto\s*;/);
+    expect(restoreRule).toMatch(/width\s*:\s*30px\s*;/);
+    expect(restoreRule).toMatch(/padding-inline\s*:\s*0\s*;/);
     expect(restoreRule).toMatch(/white-space\s*:\s*nowrap\s*;/);
   });
 

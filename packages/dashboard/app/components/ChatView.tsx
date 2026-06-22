@@ -53,6 +53,7 @@ import { recordResumeEvent } from "../utils/resumeInstrumentation";
 import { parseQuestionToolCall } from "../utils/parseQuestionToolCall";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { ViewHeader } from "./ViewHeader";
 
 export interface ChatViewProps {
   projectId?: string;
@@ -3183,10 +3184,27 @@ export function ChatView({ projectId, addToast, experimentalFeatures }: ChatView
 
   return (
     /*
-    FNXC:Navigation 2026-06-22-01:10:
-    Chat deliberately does NOT adopt the shared ViewHeader. Unlike the other main-content views, .chat-view has no view-level title row to swap: its root is a height-sensitive two-pane flex-row (sidebar | thread) and each pane already owns its own header (chat-thread-header / chat-sidebar). The thread height is driven by flex:1 + the mobile-keyboard drift compensation applied directly to .chat-thread, so prepending a full-width column header would change the flex/height contract that those keyboard/scroll/resize paths depend on. Stacking a redundant "Chat" title above the existing thread header would also be visually duplicative. Consistency is therefore intentionally scoped to the views that have a single title row.
+    FNXC:Chat 2026-06-22-12:55:
+    Chat uses the shared ViewHeader so its page chrome matches the other main-content views. The height-sensitive two-pane chat layout remains isolated in .chat-view__body beneath that header, preserving sidebar resize, thread scrolling, and mobile keyboard compensation while moving the desktop New Chat action into the canonical header actions cluster.
     */
     <div className="chat-view">
+      <ViewHeader
+        icon={MessageSquare}
+        title={t("chat.title", "Chat")}
+        actions={
+          !isMobile ? (
+            <button
+              className="btn btn-sm btn-primary chat-view-header-new-chat"
+              onClick={() => setShowNewDialog(true)}
+              data-testid="chat-new-btn"
+            >
+              <Plus size={14} />
+              {t("chat.newChat", "New Chat")}
+            </button>
+          ) : null
+        }
+      />
+      <div className="chat-view__body">
       {/* Sidebar */}
       <div
         className={`chat-sidebar${!sidebarVisible ? " chat-sidebar--hidden" : ""}`}
@@ -3400,16 +3418,18 @@ export function ChatView({ projectId, addToast, experimentalFeatures }: ChatView
             </div>
           ) : null
         ) : (
-          <div className="chat-sidebar-footer">
-            <button
-              className="btn btn-sm btn-primary chat-sidebar-footer-btn"
-              onClick={() => setShowNewDialog(true)}
-              data-testid="chat-new-btn"
-            >
-              <Plus size={14} />
-              {t("chat.newChat", "New Chat")}
-            </button>
-          </div>
+          isMobile ? (
+            <div className="chat-sidebar-footer">
+              <button
+                className="btn btn-sm btn-primary chat-sidebar-footer-btn"
+                onClick={() => setShowNewDialog(true)}
+                data-testid="chat-new-btn"
+              >
+                <Plus size={14} />
+                {t("chat.newChat", "New Chat")}
+              </button>
+            </div>
+          ) : null
         )}
       </div>
 
@@ -3890,17 +3910,6 @@ export function ChatView({ projectId, addToast, experimentalFeatures }: ChatView
                 {showAllAsPlain ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             )}
-            {!isMobile && (
-              <button
-                className="btn btn-sm btn-primary chat-thread-header-new-chat"
-                onClick={() => setShowNewDialog(true)}
-                data-testid="chat-thread-new-chat-btn"
-              >
-                <Plus size={14} />
-                {t("chat.newChat", "New Chat")}
-              </button>
-            )}
-
           </div>
         )}
 
@@ -3953,6 +3962,7 @@ export function ChatView({ projectId, addToast, experimentalFeatures }: ChatView
           }}
         />
       )}
+      </div>
 
       {/* New Chat Dialog (rendered at root level) */}
       {showNewDialog && (

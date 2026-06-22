@@ -2754,20 +2754,6 @@ function InnerEditor({
           </aside>
 
           <section className="wf-editor-canvas-wrap">
-            {sidebarCollapsed && !isMobileMode && (
-              <button
-                type="button"
-                className="wf-sidebar-shell-restore"
-                data-testid="wf-sidebar-restore"
-                aria-expanded="false"
-                aria-label={t("workflows.showSidebar", "Show workflow sidebar")}
-                title={t("workflows.showSidebar", "Show workflow sidebar")}
-                onClick={() => setSidebarCollapsed(false)}
-              >
-                <ChevronRight size={14} aria-hidden />
-                <span>{t("workflows.sidebar", "Workflows")}</span>
-              </button>
-            )}
             <button
               type="button"
               className="wf-editor-mobile-back"
@@ -2783,6 +2769,19 @@ function InnerEditor({
                     plain text (no click affordance); user-owned workflows are
                     click-to-edit (Enter commits, Escape cancels, blur commits). */}
                 <div className="wf-name-strip">
+                  {sidebarCollapsed && !isMobileMode && (
+                    <button
+                      type="button"
+                      className="wf-sidebar-shell-restore"
+                      data-testid="wf-sidebar-restore"
+                      aria-expanded="false"
+                      aria-label={t("workflows.showSidebar", "Show workflow sidebar")}
+                      title={t("workflows.showSidebar", "Show workflow sidebar")}
+                      onClick={() => setSidebarCollapsed(false)}
+                    >
+                      <ChevronRight size={14} aria-hidden />
+                    </button>
+                  )}
                   {isBuiltin ? (
                     <span className="wf-workflow-name wf-workflow-name--readonly" data-testid="wf-workflow-name">
                       {activeWorkflow.name}

@@ -1855,6 +1855,7 @@ describe("MailboxView", () => {
       expect(contentBlock).toContain("min-height: 0;");
       expect(contentBlock).toContain("overflow-y: auto;");
       expect(contentBlock).toContain("max-height: none;");
+      expect(contentBlock).toContain("padding: 0;");
     });
 
     it("defines desktop/tablet split-pane selectors under .mailbox-view scope", async () => {
@@ -1867,19 +1868,25 @@ describe("MailboxView", () => {
       expect(splitPaneBlockMatch).toBeTruthy();
       const splitPaneBlock = splitPaneBlockMatch![1];
       expect(splitPaneBlock).toContain("overflow-y: auto;");
-      expect(splitPaneBlock).toContain("border: var(--btn-border-width) solid var(--border);");
       expect(splitPaneBlock).toContain("background: var(--surface);");
+      expect(splitPaneBlock).not.toContain("border: var(--btn-border-width) solid var(--border);");
+      expect(splitPaneBlock).not.toContain("border-radius: var(--radius-md);");
 
-      // FNXC:Mailbox 2026-06-22-18:05: list pane fixed to inline width; detail pane fills remainder and may shrink below content.
+      // FNXC:MailboxView 2026-06-22-12:58: full-page Mailbox list pane mirrors Chat's left sidebar surface and spacing.
       const listPaneBlockMatch = css.match(/\.mailbox-view\s+\.mailbox-split-list-pane\s*\{([^}]*)\}/);
       expect(listPaneBlockMatch).toBeTruthy();
       expect(listPaneBlockMatch![1]).toContain("flex: 0 0 auto;");
+      expect(listPaneBlockMatch![1]).toContain("min-width: 0;");
+      expect(listPaneBlockMatch![1]).toContain("max-width: 500px;");
+      expect(listPaneBlockMatch![1]).toContain("border-right: var(--btn-border-width) solid var(--border);");
+      expect(listPaneBlockMatch![1]).toContain("background: var(--bg-secondary);");
 
       // Match the standalone detail-pane rule (the one declaring `display: flex;`), not the shared border/background block.
       const detailPaneBlockMatch = css.match(/\.mailbox-view\s+\.mailbox-split-detail-pane\s*\{([^}]*display:\s*flex;[^}]*)\}/);
       expect(detailPaneBlockMatch).toBeTruthy();
       expect(detailPaneBlockMatch![1]).toContain("flex: 1 1 auto;");
       expect(detailPaneBlockMatch![1]).toContain("min-width: 0;");
+      expect(detailPaneBlockMatch![1]).toContain("padding: var(--space-lg);");
 
       const resizeHandleBlockMatch = css.match(/\.mailbox-view\s+\.mailbox-split-resize-handle\s*\{([^}]*)\}/);
       expect(resizeHandleBlockMatch).toBeTruthy();

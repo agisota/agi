@@ -313,23 +313,27 @@ Transient inline toast confirming issue close. Sits directly under the preview h
   align-items: center;
 }
 
-/* Tab styles for GitHub Import Modal */
+/*
+FNXC:ImportTasks 2026-06-22-12:45:
+The Import Tasks sub-header tab bar should match the Artifacts view's button bar: plain body row, tokenized border/surface buttons, todo-accent active state, and no card-like filled strip under the main header.
+*/
 .github-import-tabs {
   display: flex;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0;
+  border-bottom: none;
+  background: transparent;
 }
 
 .github-import-tab {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid transparent;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: transparent;
+  background: var(--surface);
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
@@ -338,14 +342,14 @@ Transient inline toast confirming issue close. Sits directly under the preview h
 }
 
 .github-import-tab:hover:not(:disabled) {
-  background: var(--surface-hover);
+  background: var(--card-hover);
   color: var(--text);
 }
 
 .github-import-tab.active {
-  background: var(--card);
-  border-color: var(--border);
-  color: var(--text);
+  color: var(--todo);
+  border-color: var(--todo);
+  background: color-mix(in srgb, var(--todo) 12%, transparent);
 }
 
 .github-import-tab:disabled {
@@ -1597,5 +1601,4 @@ body. Let the content take its full intrinsic height and hand vertical scrolling
     display: block;
   }
 }
-
 

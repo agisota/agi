@@ -47,12 +47,20 @@ embedded view.
   --wf-editor-touch-target: calc(var(--space-xl) + var(--space-lg) + var(--space-xs));
 }
 
-/* FNXC:WorkflowEditorEmbedding 2026-06-22-01:00: Align the embedded workflows header to the shared ViewHeader metric — --space-lg padding, an icon + 1.125rem title — for cross-view consistency. */
+/*
+FNXC:WorkflowEditorEmbedding 2026-06-22-01:00:
+Align the embedded workflows header to the shared ViewHeader/Insights metric — var(--surface) background, --view-header-min-height, --space-lg/--space-xl padding, a single divider, and a 20px todo-tinted icon + 1.125rem title — so Workflows reads the same size and color as Insights.
+*/
 .wf-editor-header {
+  box-sizing: border-box;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-lg);
+  gap: var(--space-sm);
+  min-height: var(--view-header-min-height);
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
@@ -60,10 +68,23 @@ embedded view.
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  min-width: 0;
   margin: 0;
   font-size: 1.125rem;
   font-weight: 600;
   color: var(--text);
+}
+
+.wf-editor-header h2 svg {
+  flex-shrink: 0;
+  color: var(--todo);
+}
+
+.wf-editor-header h2 span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wf-editor-close {
@@ -134,6 +155,9 @@ FNXC:WorkflowSidebar 2026-06-22-12:00:
 Workflow authors need to reclaim horizontal graph-editing space without leaving
 the workflow view. Hide only the sidebar shell when collapsed and keep the
 restore control attached to the canvas so the state is always reversible.
+
+FNXC:WorkflowSidebar 2026-06-22-12:35:
+When collapsed, the show-sidebar control belongs inline in the workflow name strip before the workflow name. It must be icon-only and in normal document flow so it cannot overlap the header title or workflow name.
 */
 .wf-editor-body--sidebar-collapsed .wf-editor-sidebar {
   display: none;
@@ -179,10 +203,9 @@ restore control attached to the canvas so the state is always reversible.
 }
 
 .wf-sidebar-shell-restore {
-  position: absolute;
-  top: var(--space-sm);
-  left: var(--space-sm);
-  z-index: 6;
+  flex: 0 0 auto;
+  width: 30px;
+  padding-inline: 0;
   white-space: nowrap;
 }
 
@@ -1416,7 +1439,7 @@ Built-in workflow prompts need visible override state and a reset action without
 /* Inline name + description strip (KTD-10). */
 .wf-name-strip {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-sm);
   padding: var(--space-xs) var(--space-sm);
   border-bottom: 1px solid var(--border);

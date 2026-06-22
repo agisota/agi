@@ -6,6 +6,9 @@ The Compound Engineering dashboard view must follow the dashboard design scale s
 /*
 FNXC:CompoundEngineeringUI 2026-06-22-09:40:
 The root .ce-view is a flex column hosting the flex-shrink:0 shared ViewHeader on top and a single scrolling .ce-view-body below. ViewHeader owns the --space-lg top/side padding (so the root no longer pads its own header row); the body re-adds matching side/bottom padding so content keeps the same horizontal rhythm and there is no double top padding.
+
+FNXC:CompoundEngineeringUI 2026-06-22-12:35:
+The shared ViewHeader sits directly above plugin content, so the body needs top padding too; otherwise the first Compound Engineering card/flow row bumps against the header divider. Use the same tokenized vertical rhythm as the dashboard's native artifact and goals views.
 */
 .ce-view {
   display: flex;
@@ -27,7 +30,7 @@ The root .ce-view is a flex column hosting the flex-shrink:0 shared ViewHeader o
   gap: var(--space-lg);
   min-width: 0;
   min-height: 0;
-  padding: 0 calc(var(--space-lg) + var(--space-xs)) var(--space-lg);
+  padding: var(--space-lg) calc(var(--space-lg) + var(--space-xs)) var(--space-lg);
   box-sizing: border-box;
   overflow: auto;
 }

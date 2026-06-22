@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { ScheduledTasksModal } from "../ScheduledTasksModal";
 import type { Routine } from "@fusion/core";
 
@@ -165,6 +167,21 @@ describe("ScheduledTasksModal", () => {
     expect(toolbarLeft?.contains(scopeSelector as Node)).toBe(true);
     expect(header?.contains(scopeSelector as Node)).toBe(false);
     expect(toolbarRight?.contains(newAutomationButton)).toBe(true);
+  });
+
+  it("styles scope controls like the Artifacts button bar", () => {
+    const source = readFileSync(resolve(__dirname, "../ScriptsModal.css"), "utf8");
+    const selectorRule = source.match(/\.scheduling-scope-selector\s*\{[^}]*\}/)?.[0] ?? "";
+    const scopeRule = source.match(/\.scope-btn\s*\{[^}]*\}/)?.[0] ?? "";
+    const activeRule = source.match(/\.scope-btn\.active\s*\{[^}]*\}/)?.[0] ?? "";
+
+    expect(selectorRule).toContain("background: transparent;");
+    expect(selectorRule).toContain("border: none;");
+    expect(scopeRule).toContain("border: 1px solid var(--border);");
+    expect(scopeRule).toContain("background: var(--surface);");
+    expect(activeRule).toContain("color: var(--todo);");
+    expect(activeRule).toContain("border-color: var(--todo);");
+    expect(activeRule).toContain("background: color-mix(in srgb, var(--todo) 12%, transparent);");
   });
 
   it("uses routine APIs with global scope by default", async () => {

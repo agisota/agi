@@ -453,7 +453,10 @@ describe("WorkflowNodeEditor", () => {
     fireEvent.click(screen.getByTestId("wf-sidebar-collapse"));
 
     expect(body!).toHaveClass("wf-editor-body--sidebar-collapsed");
-    expect(screen.getByTestId("wf-sidebar-restore")).toHaveTextContent("Workflows");
+    const restoreButton = screen.getByTestId("wf-sidebar-restore");
+    expect(restoreButton).toHaveAccessibleName("Show workflow sidebar");
+    expect(restoreButton).toHaveTextContent("");
+    expect(screen.getByTestId("wf-workflow-name").previousElementSibling).toBe(restoreButton);
 
     fireEvent.click(screen.getByTestId("wf-sidebar-restore"));
 
