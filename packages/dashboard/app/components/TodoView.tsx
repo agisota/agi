@@ -8,6 +8,7 @@ import {
   X,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
   Loader2,
   ListChecks,
   Bot,
@@ -80,6 +81,12 @@ export function TodoView({
   const agentPickerRef = useRef<HTMLDivElement>(null);
   const { confirm } = useConfirm();
 
+  /*
+  FNXC:Todos 2026-06-22-00:00:
+  TodoView mounts in the narrow right dock (no width prop) where the two side-by-side panels (list selection + items) cannot fit. The layout switch is driven by a CSS container query on `.todo-view` (container-name: todo-view), NOT a prop. In the NARROW container we render a single-panel navigation stack: the master list-selection panel first, and selecting a list navigates forward to its items panel with a Back affordance. `mobileStackView` tracks which panel the narrow stack shows; the WIDE two-panel layout ignores it entirely (both panels always render). Selecting a list pushes to "detail"; Back returns to "list".
+  */
+  const [mobileStackView, setMobileStackView] = useState<"list" | "detail">("list");
+
   const selectedList = useMemo(
     () => lists.find((list) => list.id === selectedListId) ?? null,
     [lists, selectedListId],
@@ -106,6 +113,13 @@ export function TodoView({
     resetListDraftState();
     resetItemDraftState();
     setSelectedListId(listId);
+    // FNXC:Todos 2026-06-22-00:00: Narrow stack navigates forward to the items panel on selection; no-op visually in the wide two-panel layout.
+    setMobileStackView("detail");
+  }
+
+  // FNXC:Todos 2026-06-22-00:00: Narrow-stack Back affordance returns to the master list-selection panel. Inert in the wide layout where both panels are always visible.
+  function handleMobileBack(): void {
+    setMobileStackView("list");
   }
 
   const loadAgents = useCallback(async () => {
@@ -329,7 +343,7 @@ export function TodoView({
   return (
     <div className="todo-view" data-testid="todo-view-root">
       {header}
-      <div className="todo-view-layout">
+      <div className="todo-view-layout" data-mobile-stack-view={mobileStackView}>
         <aside className="todo-view-sidebar" aria-label={t("todo.listsLabel", "Todo lists sidebar")}>
           <div className="todo-sidebar-header">
             <h3 className="todo-sidebar-title">{t("todo.lists", "Lists")}</h3>
@@ -517,6 +531,16 @@ export function TodoView({
           ) : (
             <>
               <div className="todo-items-header">
+                {/* FNXC:Todos 2026-06-22-00:00: Back button is visible only in the narrow container (CSS-gated) to pop the items panel back to the list-selection panel. Hidden in the wide two-panel layout where both panels coexist. */}
+                <button
+                  type="button"
+                  className="btn btn-sm btn-icon todo-icon-btn todo-mobile-back-btn"
+                  onClick={handleMobileBack}
+                  aria-label={t("todo.backToLists", "Back to lists")}
+                  data-testid="todo-mobile-back-button"
+                >
+                  <ChevronLeft />
+                </button>
                 <h3>{selectedList.title}</h3>
               </div>
 

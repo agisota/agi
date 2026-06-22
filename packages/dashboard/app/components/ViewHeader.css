@@ -1,0 +1,42 @@
+/*
+FNXC:Navigation 2026-06-22-01:00:
+Shared main-content view header, modeled after Command Center (.cc-header / .cc-title). Provides the standard --space-lg side/top padding and --space-md bottom gap, an icon + 1.125rem title, and an optional right-aligned actions cluster that wraps below the title on narrow widths so the two never overlap.
+*/
+.view-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+}
+
+.view-header__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.view-header__title svg {
+  flex-shrink: 0;
+}
+
+.view-header__title span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-header__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}

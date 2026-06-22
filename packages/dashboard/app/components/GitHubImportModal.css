@@ -997,6 +997,15 @@ Fix (embedded variant only — modal path untouched): turn the embedded root int
   container-name: github-import-embedded;
 }
 
+/*
+FNXC:RightDockEmbedding 2026-06-22-01:00:
+Embedded Import Tasks must scroll vertically so a long preview is fully reachable. The view body is the scroll container; in the stacked (narrow) layout the preview takes its natural (content) height and the body scrolls, so the preview can be much taller than the viewport. In the wide two-pane layout the preview keeps its own internal scroll.
+*/
+.github-import-modal--embedded .github-import-modal__body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
 /* Default (narrow container): single stacked column. */
 .github-import-modal--embedded .github-import-workspace {
   flex-direction: column;
@@ -1011,7 +1020,7 @@ Fix (embedded variant only — modal path untouched): turn the embedded root int
 }
 
 .github-import-modal--embedded .github-import-preview-pane {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   width: 100%;
   min-width: 0;
 }
