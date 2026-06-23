@@ -68,7 +68,7 @@ describe("WorkflowSwitcher", () => {
         workflows={workflows}
         value="coding"
         onChange={vi.fn()}
-        counts={countMap([["coding", { todo: 3, inProgress: 1, done: 5 }]])}
+        counts={countMap([["coding", { todo: 3, inProgress: 1, done: 5, merging: 0 }]])}
       />,
     );
 
@@ -349,7 +349,7 @@ describe("WorkflowSwitcher", () => {
         workflows={workflows}
         value="coding"
         onChange={vi.fn()}
-        counts={countMap([["coding", { todo: 3, inProgress: 1, done: 5 }]])}
+        counts={countMap([["coding", { todo: 3, inProgress: 1, done: 5, merging: 0 }]])}
       />,
     );
 
@@ -373,6 +373,29 @@ describe("WorkflowSwitcher", () => {
     expect(within(designOption).getByText("0", { selector: ".workflow-switcher-count--done" })).toBeInTheDocument();
   });
 
+  it("shows a merging indicator only for workflows with merging tasks", () => {
+    render(
+      <WorkflowSwitcher
+        workflows={workflows}
+        value="coding"
+        onChange={vi.fn()}
+        counts={countMap([
+          ["coding", { todo: 3, inProgress: 1, done: 5, merging: 1 }],
+          ["design", { todo: 0, inProgress: 2, done: 0, merging: 0 }],
+        ])}
+      />,
+    );
+
+    const trigger = screen.getByTestId("workflow-switcher");
+    expect(trigger.querySelector(".workflow-switcher-merging-indicator")).toBeNull();
+
+    fireEvent.click(trigger);
+
+    expect(trigger.querySelector(".workflow-switcher-merging-indicator")).toBeInTheDocument();
+    expect(screen.getByTestId("workflow-switcher-option-coding").querySelector(".workflow-switcher-merging-indicator")).toBeInTheDocument();
+    expect(screen.getByTestId("workflow-switcher-option-design").querySelector(".workflow-switcher-merging-indicator")).toBeNull();
+  });
+
   it("colors status counts with board column color tokens", () => {
     const css = loadAllAppCssBaseOnly();
     const badgeRules = [
@@ -387,5 +410,16 @@ describe("WorkflowSwitcher", () => {
       expect(rule).not.toMatch(/var\(--(?:text-muted|color-warning|color-success)\)/);
       expect(rule).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba?\(/);
     }
+  });
+
+  it("styles the merging indicator with a flashing animation and reduced-motion fallback", () => {
+    const css = loadAllAppCssBaseOnly();
+    const switcherCss = readFileSync("app/components/WorkflowSwitcher.css", "utf8");
+    const indicatorRule = cssRuleFor(css, ".workflow-switcher-merging-indicator");
+
+    expect(indicatorRule).toContain("background: var(--color-warning);");
+    expect(indicatorRule).toContain("animation: workflow-switcher-merging-pulse");
+    expect(switcherCss).toContain("@keyframes workflow-switcher-merging-pulse");
+    expect(switcherCss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.workflow-switcher-merging-indicator\s*\{[^}]*animation:\s*none;/);
   });
 });

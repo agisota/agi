@@ -93,8 +93,18 @@ function createMockTask(overrides: Partial<Task> = {}): Task {
 }
 
 // Mock store factory
+const withLegacyWorkflowGraphDefault = (settings: Record<string, unknown>) => ({
+  ...settings,
+  experimentalFeatures: {
+    workflowColumns: false,
+    workflowGraphExecutor: false,
+    ...((settings.experimentalFeatures as Record<string, unknown> | undefined) ?? {}),
+  },
+});
+
 function createMockStore(overrides: Partial<TaskStore> = {}): TaskStore {
-  return {
+  const overrideGetSettings = overrides.getSettings;
+  const store = {
     listTasks: vi.fn().mockResolvedValue([]),
     getSettings: vi.fn().mockResolvedValue({}),
     getTask: vi.fn().mockResolvedValue(createMockTask()),
@@ -114,7 +124,14 @@ function createMockStore(overrides: Partial<TaskStore> = {}): TaskStore {
     on: vi.fn(),
     off: vi.fn(),
     ...overrides,
-  } as unknown as TaskStore;
+  };
+  store.getSettings = vi.fn(async (...args: unknown[]) => {
+    const settings = overrideGetSettings === undefined
+      ? {}
+      : await (overrideGetSettings as (...args: unknown[]) => Promise<Record<string, unknown>>)(...args);
+    return withLegacyWorkflowGraphDefault(settings);
+  }) as typeof store.getSettings;
+  return store as unknown as TaskStore;
 }
 
 async function flushAsyncWork(): Promise<void> {

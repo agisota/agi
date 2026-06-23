@@ -4126,9 +4126,12 @@ export class TaskExecutor {
         });
         return true;
       }
-      const hasWorkflowResolver = typeof this.store.getTaskWorkflowSelection === "function";
       const explicitlyEnabled = isExperimentalFeatureEnabled(settings, "workflowGraphExecutor");
-      if (!hasWorkflowResolver && !explicitlyEnabled) return false;
+      /*
+      FNXC:WorkflowExecution 2026-06-22-18:00:
+      workflowGraphExecutor is default-on, but explicit false remains the runtime kill switch for legacy executor paths and tests that verify legacy executor behavior.
+      */
+      if (!explicitlyEnabled) return false;
       settings = {
         ...settings,
         experimentalFeatures: {

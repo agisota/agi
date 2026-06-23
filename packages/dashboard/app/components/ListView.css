@@ -261,7 +261,6 @@ Compact count for the single header row: smaller, dimmer, and non-dominant so th
   width: 100%;
   padding: var(--space-md) var(--space-xl);
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
 }
 
 .list-create-area .quick-entry-box {
@@ -270,12 +269,12 @@ Compact count for the single header row: smaller, dimmer, and non-dominant so th
 }
 
 /* New class for QuickEntryBox positioned above the table in list view.
-   FNXC:ListView 2026-06-23-04:00: Reduced top padding so the quick-add box sits close to the toolbar above it. */
+   FNXC:ListView 2026-06-23-04:00: Reduced top padding so the quick-add box sits close to the toolbar above it.
+   FNXC:ListView 2026-06-22-18:00: Remove the divider between quick add and the table title/columns so quick-create flows into the list header without an extra horizontal rule. */
 .list-quick-entry-above-table {
   width: 100%;
   padding: var(--space-xs) var(--space-xl) var(--space-md);
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
 }
 
 .list-quick-entry-above-table .quick-entry-box {
@@ -425,17 +424,20 @@ Compact count for the single header row: smaller, dimmer, and non-dominant so th
 /*
 FNXC:ListView 2026-06-22-00:40:
 Widen the split resize column so the task-list sidebar is easy to grab and drag (the 4px --space-xs target was hard to hit). The handle shows a centered grip line that brightens on hover/focus.
+
+FNXC:ListView 2026-06-22-18:00:
+List view should not show a wide divider gutter. Collapse the grid handle column to zero width and let the transparent resize handle overlap the single 1px sidebar border, preserving a comfortable touch target without making the visible divider wider.
 */
 .list-split-layout {
   display: grid;
-  grid-template-columns: auto var(--space-sm) minmax(0, 1fr);
+  grid-template-columns: auto 0 minmax(0, 1fr);
   height: 100%;
   min-height: 0;
 }
 
 /*
-FNXC:SidebarDivider 2026-06-23-02:45:
-The static 1px divider line lives on the sidebar pane's right border, IDENTICAL to Chat where `.chat-sidebar` carries `border-right: 1px solid var(--border)`. Previously List painted the visible line via the handle `::after`, which rendered at a different position/edge than Chat's pane border; moving it to the pane border reconciles the two so the 1px var(--border) line matches exactly in thickness, color, and position.
+FNXC:SidebarDivider 2026-06-22-18:00:
+The static 1px divider line lives on the sidebar pane's right border while the resize handle column has no visible width. This keeps one normal divider line between the task list and detail pane without a large gutter.
 */
 .list-split-sidebar {
   min-width: 0;
@@ -445,14 +447,17 @@ The static 1px divider line lives on the sidebar pane's right border, IDENTICAL 
 }
 
 /*
-FNXC:SidebarDivider 2026-06-23-02:45:
-The List split divider is now IDENTICAL to Chat's `.chat-sidebar-resize-handle`: the handle itself is a transparent var(--space-sm)-wide drag hit-area (no persistent background, no persistent visible line). The static 1px var(--border) divider line is drawn by the sibling sidebar pane's border-right (see .list-split-sidebar above), exactly as Chat draws it on .chat-sidebar. A centered var(--space-xs) ::before band tints (color-mix --todo 30%) only on hover/active — matching Chat's ::before tint. focus-visible keeps the keyboard ring (the List handle is a focusable resize control with aria) and also tints the band so keyboard resizers get the same affordance.
+FNXC:SidebarDivider 2026-06-22-18:00:
+The List split resize control is a transparent var(--space-sm)-wide drag hit-area that overlaps the single pane border. It tints a narrow centered band only on hover/active/focus, matching the left sidebar handle's "large target, slim visual" behavior without widening the visible divider.
 */
 .list-split-resize-handle {
   position: relative;
+  left: calc(var(--space-sm) / -2);
+  width: var(--space-sm);
   cursor: col-resize;
   background: transparent;
   touch-action: none;
+  z-index: 2;
   transition: background var(--transition-fast);
 }
 
@@ -478,8 +483,8 @@ The List split divider is now IDENTICAL to Chat's `.chat-sidebar-resize-handle`:
 }
 
 /*
-FNXC:SidebarDivider 2026-06-23-02:45:
-No border-left on the detail pane. Chat draws the single divider line solely on the sidebar pane's border-right; the thread pane is unbordered. Keeping a border-left here would produce a second faint line on the far edge of the handle track (a double divider), so it is removed to make the rendered line match Chat exactly (one 1px var(--border) line at the sidebar's right edge).
+FNXC:SidebarDivider 2026-06-22-18:00:
+No border-left on the detail pane. Keeping a border-left here would produce a second faint line after the overlapping resize handle, so the list/detail split renders as one divider only.
 */
 .list-split-detail {
   min-width: 0;

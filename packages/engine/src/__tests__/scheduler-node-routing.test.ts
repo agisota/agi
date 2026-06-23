@@ -50,10 +50,19 @@ function createMockTask(overrides: Partial<Task> = {}): Task {
   } as Task;
 }
 
+const withLegacyWorkflowGraphDefault = (settings: Record<string, unknown>) => ({
+  ...settings,
+  experimentalFeatures: {
+    workflowColumns: false,
+    workflowGraphExecutor: false,
+    ...((settings.experimentalFeatures as Record<string, unknown> | undefined) ?? {}),
+  },
+});
+
 function createMockStore(task: Task, settings: Record<string, unknown> = {}): TaskStore {
   return {
     listTasks: vi.fn().mockResolvedValue([task]),
-    getSettings: vi.fn().mockResolvedValue(settings),
+    getSettings: vi.fn().mockResolvedValue(withLegacyWorkflowGraphDefault(settings)),
     getTask: vi.fn().mockResolvedValue(task),
     updateTask: vi.fn().mockResolvedValue(undefined),
     moveTask: vi.fn().mockResolvedValue(undefined),

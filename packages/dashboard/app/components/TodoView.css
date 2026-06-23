@@ -405,6 +405,222 @@ The descriptive subtitle renders inside ViewHeader's actions slot; mute it so it
 }
 
 /*
+FNXC:TodosStyling 2026-06-22-17:35:
+Redesign Todos to fit the rest of the dashboard theme: full-height tokenized workspace, surfaced list/detail panes, selected-list metadata, compact modern todo cards, and visible but quiet action bars. Keep the existing two-pane/narrow-stack behavior; this is visual hierarchy and density, not a workflow rewrite.
+*/
+.todo-view {
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background: var(--bg);
+}
+
+.todo-view-layout {
+  gap: var(--space-md);
+  padding: 0;
+}
+
+.todo-view-sidebar,
+.todo-view-main {
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.todo-view-sidebar {
+  width: min(32%, 320px);
+  min-width: 240px;
+  padding: var(--space-md);
+  border-right: 1px solid var(--border);
+}
+
+.todo-view-main {
+  padding: var(--space-md);
+}
+
+.todo-sidebar-header {
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-sm);
+}
+
+.todo-sidebar-title {
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.todo-add-list-btn,
+.todo-icon-btn,
+.todo-item-reorder-btn {
+  border-color: transparent;
+  background: transparent;
+}
+
+.todo-list-items {
+  gap: var(--space-sm);
+}
+
+.todo-list-item {
+  min-height: 42px;
+  padding: var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+
+.todo-list-item:hover {
+  background: var(--card-hover);
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.todo-list-item--active {
+  background: color-mix(in srgb, var(--todo) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--todo) 32%, var(--border));
+  color: var(--text);
+  box-shadow: inset 3px 0 0 var(--todo);
+}
+
+.todo-list-select-btn {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.todo-list-item-name {
+  font-weight: 600;
+}
+
+.todo-list-item-count {
+  padding: 2px var(--space-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.2;
+}
+
+.todo-list-item--active .todo-list-item-count {
+  border-color: color-mix(in srgb, var(--todo) 36%, var(--border));
+  color: var(--todo);
+}
+
+.todo-items-header {
+  align-items: flex-start;
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+}
+
+.todo-items-heading {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.todo-items-heading h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.todo-items-progress {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.todo-add-item-row {
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+
+.todo-add-item-row .input {
+  min-height: 34px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.todo-add-item-row .input:focus {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.todo-add-item-row .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  white-space: nowrap;
+}
+
+.todo-items-list {
+  gap: var(--space-sm);
+}
+
+.todo-item {
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-xs, 0 1px 2px color-mix(in srgb, var(--bg) 70%, transparent));
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.todo-item:hover {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--todo) 28%, var(--border));
+  transform: translateY(-1px);
+}
+
+.todo-item-main-row {
+  align-items: flex-start;
+}
+
+.todo-item-checkbox {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+}
+
+.todo-item-text {
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.todo-item-text--completed {
+  color: var(--text-muted);
+}
+
+.todo-item-actions {
+  align-items: center;
+  margin-left: calc(var(--space-lg) + var(--space-sm));
+  padding-top: var(--space-xs);
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.todo-item-reorder-btns {
+  padding-right: var(--space-xs);
+  border-right: 1px solid var(--border);
+}
+
+.todo-empty-state,
+.todo-loading {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+/*
 FNXC:TodosStyling 2026-06-22-00:00:
 NARROW container (right dock): collapse the side-by-side split into a single-panel navigation stack. Exactly one panel shows at a time, full-width with its own internal scroll and no horizontal overflow. `data-mobile-stack-view` (set by the component from `mobileStackView`) decides which panel is visible: "list" shows the master list-selection panel; "detail" shows the items panel with the Back button revealed. Tap targets are enlarged for touch. 520px is tuned to the content: below it the sidebar's fixed width plus the items pane no longer fit comfortably.
 */

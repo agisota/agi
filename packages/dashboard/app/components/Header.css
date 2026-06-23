@@ -1,14 +1,17 @@
 /* === Header === */
 /*
 FNXC:DashboardHeader 2026-06-22-14:30:
-The dashboard top header should carry the same canonical bottom divider as Missions, Planning, and other view headers. Theme-level CSS may hide this divider for seamless themes such as Air and Shadcn, but the base header must expose the divider for themes that support visible separation.
+Superseded by the 19:00 shell requirement below. View-level headers such as Missions, Planning, Dashboard, and Project Dashboard carry the theme-controlled divider; the global Fusion shell header no longer owns that separator.
+
+FNXC:DashboardHeader 2026-06-22-19:00:
+The global Fusion shell header should not draw a divider between itself and the sidebar/main content row. View-level headers keep their own dividers; this top shell bar blends into the surface above the navigation/content split.
 */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: var(--header-padding);
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
   background: var(--surface);
 }
 
@@ -128,8 +131,59 @@ non-notched devices, so this is a no-op there. Pair with viewport-fit=cover (ind
 }
 
 @media (max-width: 768px) {
+  /*
+  FNXC:WorkflowControls 2026-06-22-18:00:
+  Mobile places the workflow dropdown in the top header beside the logo/project switch. Hide only the text label, clamp the trigger width, and keep the transparent project-selector-style chrome so the row fits without pushing search/usage controls offscreen.
+  */
+  .header-left {
+    min-width: 0;
+    gap: var(--space-xs);
+  }
+
+  .header-brand {
+    min-width: 0;
+    flex-shrink: 0;
+  }
+
   .header-workflow-slot {
+    flex: 1 1 auto;
+    justify-content: flex-start;
+    min-width: 0;
+    max-width: min(42vw, calc(var(--space-2xl) * 4));
+  }
+
+  .header-workflow-slot:empty {
     display: none;
+  }
+
+  .header-workflow-slot .workflow-switcher {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .header-workflow-slot .workflow-switcher-label {
+    display: none;
+  }
+
+  .header-workflow-slot .workflow-switcher-trigger {
+    width: 100%;
+    max-width: 100%;
+    min-height: calc(var(--space-lg) + var(--space-xs));
+    padding: calc(var(--space-xs) / 2) var(--space-xs);
+    font-size: 12px;
+  }
+
+  .header-workflow-slot .workflow-switcher-trigger-main {
+    gap: var(--space-xs);
+  }
+
+  .header-workflow-slot .workflow-switcher-counts {
+    display: none;
+  }
+
+  .header-workflow-slot .workflow-switcher-merging-indicator {
+    width: calc(var(--space-sm) - 2px);
+    height: calc(var(--space-sm) - 2px);
   }
 }
 

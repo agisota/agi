@@ -65,7 +65,7 @@ describe("GlobalSettingsStore", () => {
       const raw = await readFile(join(dir, "settings.json"), "utf-8");
       const parsed = JSON.parse(raw);
       expect(parsed.themeMode).toBe("dark");
-      expect(parsed.colorTheme).toBe("default");
+      expect(parsed.colorTheme).toBe("ocean");
       expect(parsed.ntfyEnabled).toBe(false);
     });
 
@@ -197,7 +197,7 @@ describe("GlobalSettingsStore", () => {
       const updated = await store.updateSettings({ themeMode: "system" });
 
       expect(updated.themeMode).toBe("system");
-      expect(updated.colorTheme).toBe("default"); // unchanged default
+      expect(updated.colorTheme).toBe("ocean"); // unchanged default
 
       // Verify persistence
       const raw = await readFile(join(dir, "settings.json"), "utf-8");
@@ -835,7 +835,7 @@ describe("GlobalSettingsStore", () => {
       const raw = JSON.parse(await readFile(join(dir, "settings.json"), "utf-8"));
       // Only default theme fields should be present
       expect(raw.themeMode).toBe("dark");
-      expect(raw.colorTheme).toBe("default");
+      expect(raw.colorTheme).toBe("ocean");
       // Model fields should not be persisted
       expect(raw.defaultProvider).toBeUndefined();
       expect(raw.defaultModelId).toBeUndefined();

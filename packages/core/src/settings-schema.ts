@@ -64,7 +64,11 @@ type ProjectSettingsSchema = Omit<ProjectSettings, MovedProjectSettingsKey>;
 /** Default values for global (user-level) settings. */
 export const DEFAULT_GLOBAL_SETTINGS = {
   themeMode: "dark",
-  colorTheme: "default",
+  /*
+  FNXC:DashboardTheming 2026-06-22-18:36:
+  New users and unset installs should start on Ocean. Existing users who explicitly stored colorTheme "default" must remain on that legacy theme, so the id stays valid and only the absence/default seed changes to "ocean".
+  */
+  colorTheme: "ocean",
   shadcnCustomColors: undefined,
   dashboardFontScalePct: 100,
   language: undefined,
@@ -230,7 +234,15 @@ export const DEFAULT_GLOBAL_SETTINGS = {
     onFailure: "fail",
   },
   owningNodeHandoffPolicy: "reassign-to-local",
-  experimentalFeatures: {},
+  /*
+  FNXC:WorkflowSettings 2026-06-22-18:05:
+  New installs default to workflow columns + graph execution enabled, while dual-observe parity diagnostics are explicitly off unless an operator opts in outside the normal Settings UI.
+  */
+  experimentalFeatures: {
+    workflowColumns: true,
+    workflowGraphExecutor: true,
+    workflowInterpreterDualObserve: false,
+  },
   cliAgents: {},
 } satisfies CompleteSettings<GlobalSettings>;
 

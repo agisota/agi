@@ -35,6 +35,7 @@ export interface UseAppSettingsResult {
   toggleGlobalPause: () => Promise<void>;
   toggleEnginePause: () => Promise<void>;
   toggleShowQuickChatFAB: () => Promise<void>;
+  setQuickChatButtonModeImmediate: (mode: QuickChatButtonMode) => void;
   toggleAutoReloadOnVersionChange: () => Promise<void>;
   /** Re-fetches settings from the backend to pick up changes made externally (e.g., by SettingsModal). */
   refresh: () => Promise<void>;
@@ -195,6 +196,15 @@ export function useAppSettings(projectId?: string): UseAppSettingsResult {
     }
   }, [showQuickChatFAB, projectId]);
 
+  const setQuickChatButtonModeImmediate = useCallback((mode: QuickChatButtonMode) => {
+    /*
+    FNXC:QuickChat 2026-06-22-18:55:
+    The Quick Chat launcher setting must move the visible launcher immediately between floating FAB, footer button, and off while Settings is still open. Persistence still flows through SettingsModal save; this mirrors the pending selection in the app shell.
+    */
+    setQuickChatButtonMode(mode);
+    setShowQuickChatFAB(mode === "floating");
+  }, []);
+
   const toggleAutoReloadOnVersionChange = useCallback(async () => {
     const next = !autoReloadOnVersionChange;
     setAutoReloadOnVersionChangeState(next);
@@ -236,6 +246,7 @@ export function useAppSettings(projectId?: string): UseAppSettingsResult {
     toggleGlobalPause,
     toggleEnginePause,
     toggleShowQuickChatFAB,
+    setQuickChatButtonModeImmediate,
     toggleAutoReloadOnVersionChange,
     refresh,
   };

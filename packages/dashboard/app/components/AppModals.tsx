@@ -82,6 +82,7 @@ interface AppModalsProps {
     setColorTheme: (theme: ColorTheme) => void;
     setDashboardFontScalePct: (scalePct: number) => void;
     setShadcnCustomColors: (colors: Record<string, string>) => void;
+    setQuickChatButtonModeImmediate: (mode: "floating" | "footer" | "off") => void;
   };
   /** Optional override for the settings modal close handler. When provided, this is called instead of modalManager.closeSettings. */
   onSettingsClose?: () => void;
@@ -332,6 +333,7 @@ export function AppModals({
               resolvedThemeMode={settings.resolvedThemeMode}
               onDashboardFontScaleChange={settings.setDashboardFontScalePct}
               onShadcnCustomColorsChange={settings.setShadcnCustomColors}
+              onQuickChatButtonModeChange={settings.setQuickChatButtonModeImmediate}
               onReopenOnboarding={onReopenOnboarding}
               onOpenApprovals={onOpenApprovals}
               onOpenWorkflowSettings={() => {

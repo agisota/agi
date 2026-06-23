@@ -384,6 +384,29 @@ describe("LeftSidebarNav", () => {
     expect(screen.queryByRole("button", { name: /view$/i })).toBeNull();
   });
 
+  it("pins the Roadmaps plugin destination directly under Missions when registered", () => {
+    const roadmapView: PluginDashboardViewEntry = {
+      pluginId: "fusion-plugin-roadmap",
+      view: {
+        viewId: "roadmaps",
+        label: "Roadmaps",
+        componentPath: "./RoadmapsView",
+        placement: "primary",
+        order: 99,
+      },
+    };
+    renderSidebar({ pluginDashboardViews: [pluginViews[0], roadmapView, pluginViews[1]] });
+
+    const missions = screen.getByTestId("sidebar-nav-missions");
+    const roadmaps = screen.getByTestId("sidebar-nav-plugin-fusion-plugin-roadmap-roadmaps");
+    const agents = screen.getByTestId("sidebar-nav-agents");
+    const navItems = Array.from(screen.getByRole("navigation", { name: "Primary navigation" }).querySelectorAll(".left-sidebar-nav__item"));
+
+    // FNXC:Navigation 2026-06-22-18:20: Roadmaps is a planning surface, so its plugin nav entry must sit immediately below Missions instead of sorting with generic plugin views.
+    expect(navItems.indexOf(roadmaps)).toBe(navItems.indexOf(missions) + 1);
+    expect(navItems.indexOf(agents)).toBe(navItems.indexOf(roadmaps) + 1);
+  });
+
   it("renders mailbox badges without the removed stash recovery destination", () => {
     renderSidebar();
 

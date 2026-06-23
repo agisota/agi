@@ -28,6 +28,7 @@ import {
   Maximize2,
   Minimize2,
   X,
+  Hash,
 } from "lucide-react";
 import { useChat, type ChatMessageInfo, type FailureInfo, type ToolCallInfo } from "../hooks/useChat";
 import { RoomMessageDeliveredButReplyFailedError, useChatRooms } from "../hooks/useChatRooms";
@@ -3219,6 +3220,9 @@ export function ChatView({ projectId, addToast, experimentalFeatures, floating =
   /*
   FNXC:ChatHeader 2026-06-22-16:18:
   Direct/Rooms is a view-level scope switch, so it belongs in Chat's canonical header directly before New Chat instead of consuming the first row of the sidebar. Keep the existing test ids while moving the DOM so direct and room conversations share one header control surface.
+
+  FNXC:ChatHeader 2026-06-22-18:44:
+  Very narrow chat headers collapse Direct/Rooms to icons while retaining aria-selected tabs and text labels for wider headers. The segmented control must stay height-aligned with the ViewHeader action row, so icon+label markup is stable and CSS hides only the label.
   */
   const scopeToggle = chatRoomsEnabled ? (
     <div className="chat-sidebar-scope-toggle chat-view-header-scope-toggle" role="tablist" data-testid="chat-sidebar-scope-toggle">
@@ -3230,7 +3234,8 @@ export function ChatView({ projectId, addToast, experimentalFeatures, floating =
         data-testid="chat-sidebar-scope-direct"
         onClick={() => setChatScope("direct")}
       >
-        {t("chat.scopeDirect", "Direct")}
+        <MessageSquare size={14} aria-hidden="true" />
+        <span>{t("chat.scopeDirect", "Direct")}</span>
       </button>
       <button
         type="button"
@@ -3240,7 +3245,8 @@ export function ChatView({ projectId, addToast, experimentalFeatures, floating =
         data-testid="chat-sidebar-scope-rooms"
         onClick={() => setChatScope("rooms")}
       >
-        {t("chat.scopeRooms", "Rooms")}
+        <Hash size={14} aria-hidden="true" />
+        <span>{t("chat.scopeRooms", "Rooms")}</span>
       </button>
     </div>
   ) : null;

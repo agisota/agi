@@ -24,10 +24,16 @@ function extractRuleBlock(source: string, selector: string): string {
 }
 
 describe("Header CSS", () => {
-  it("keeps the dashboard top header divider visible by default", () => {
+  it("keeps the dashboard top shell header seamless by default", () => {
     const block = extractRuleBlock(css, ".header");
 
     expect(block).toContain("background: var(--surface);");
-    expect(block).toContain("border-bottom: 1px solid var(--border);");
+    expect(block).toContain("border-bottom: none;");
+  });
+
+  it("compacts the workflow portal in the mobile top header", () => {
+    expect(css).toMatch(/@media\s*\(max-width:\s*768px\)[\s\S]*?\.header-workflow-slot\s*\{[^}]*max-width:\s*min\(42vw,\s*calc\(var\(--space-2xl\) \* 4\)\);/);
+    expect(css).toMatch(/@media\s*\(max-width:\s*768px\)[\s\S]*?\.header-workflow-slot \.workflow-switcher-label\s*\{[^}]*display:\s*none;/);
+    expect(css).toMatch(/@media\s*\(max-width:\s*768px\)[\s\S]*?\.header-workflow-slot \.workflow-switcher-counts\s*\{[^}]*display:\s*none;/);
   });
 });

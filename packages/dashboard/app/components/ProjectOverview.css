@@ -18,15 +18,11 @@ FNXC:DashboardHeader 2026-06-22-16:55:
 The Dashboard header itself must remain the same full-width chrome as other main views (surface background, divider, shared padding from ViewHeader). Only the content below is centered/constrained; never put the header inside the 1400px overview body.
 
 FNXC:DashboardHeader 2026-06-22-17:20:
-Keep Dashboard on the canonical header model instead of changing every other view to match a flat Dashboard. Use a low-specificity :where() selector so theme-level Air/shadcn divider suppression can still override the divider color while Dashboard gets the same surface, single bottom divider, and full-width header chrome as the rest of the app.
+Keep Dashboard on the canonical header model instead of changing every other view to match a flat Dashboard. The shared ViewHeader owns the shaded surface and single bottom divider so Dashboard matches Missions and Chat; this file only keeps the header full-width and prevents local overview body constraints from changing that chrome.
 */
 .project-overview > :where(.view-header) {
   width: 100%;
   flex: 0 0 auto;
-  background: var(--surface);
-  border-bottom-style: solid;
-  border-bottom-width: 1px;
-  border-bottom-color: var(--border);
 }
 
 .project-overview__body {
@@ -47,10 +43,6 @@ Keep Dashboard on the canonical header model instead of changing every other vie
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.project-overview--loading {
-  padding: var(--space-xl);
 }
 
 /* --- Overview Header --- */

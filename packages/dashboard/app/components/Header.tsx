@@ -178,6 +178,9 @@ export function Header({
 
   FNXC:WorkflowControls 2026-06-20-00:00:
   The hidden Header view-toggle location becomes the workflow-control portal slot only when left sidebar navigation is active on tablet/desktop. Mobile and flag-off paths keep workflow controls inline so the board/list chrome remains byte-identical.
+
+  FNXC:WorkflowControls 2026-06-22-18:00:
+  Mobile also renders the workflow portal in the top header next to the logo/project switch. The board/list workflow selector stays single-sourced through this slot, while CSS hides the "Workflow" label and compacts the trigger so it fits the mobile header.
   */
   const hideHeaderViewNav = leftSidebarNavActive && !isMobile;
   /*
@@ -460,6 +463,14 @@ export function Header({
           </div>
         )}
 
+        {hideFullNav && (
+          <div
+            id="header-workflow-slot"
+            className="header-workflow-slot header-workflow-slot--mobile"
+            data-testid="header-workflow-slot"
+          />
+        )}
+
         {/* Project Selector - Back button when project selected, dropdown when 2+ projects (tablet + desktop) */}
         {!isMobile && projects.length >= 1 && onViewAllProjects && (
           <StandaloneProjectSelector
@@ -664,8 +675,8 @@ export function Header({
             <button
               className={`view-toggle-btn${view === "command-center" ? " active" : ""}`}
               onClick={() => onChangeView("command-center")}
-              title={t("header.commandCenterView", "Command Center")}
-              aria-label={t("header.commandCenterView", "Command Center")}
+              title={t("header.commandCenterView", "Dashboard")}
+              aria-label={t("header.commandCenterView", "Dashboard")}
               aria-pressed={view === "command-center"}
               data-testid="view-toggle-command-center"
             >

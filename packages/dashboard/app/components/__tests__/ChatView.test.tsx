@@ -3232,8 +3232,15 @@ describe("ChatView CSS — active state edge highlights", () => {
     const headerActiveScopeRule = findRule(".chat-view-header-scope-toggle .chat-sidebar-scope-btn--active");
 
     expect(headerScopeRule).toContain("border: 1px solid var(--border)");
+    expect(headerScopeRule).toContain("height: var(--view-header-content-row, 28px)");
     expect(headerScopeButtonRule).toContain("border: 1px solid transparent");
+    expect(headerScopeButtonRule).toContain("height: 100%");
     expect(headerActiveScopeRule).toContain("border-color: var(--todo)");
+  });
+
+  it("collapses header Direct/Rooms labels to icons at very narrow widths", async () => {
+    expect(css).toMatch(/@media\s*\(max-width:\s*460px\)[\s\S]*?\.chat-view-header-scope-toggle\s*\{[^}]*width:\s*72px/);
+    expect(css).toMatch(/@media\s*\(max-width:\s*460px\)[\s\S]*?\.chat-view-header-scope-toggle \.chat-sidebar-scope-btn span\s*\{[^}]*clip:\s*rect\(0 0 0 0\)/);
   });
 
   it("keeps active chat-row background without the removed left edge or offset", async () => {
@@ -4096,6 +4103,16 @@ describe("Chat pop-out header actions", () => {
     expect(css).toMatch(/\.chat-view--narrow \.chat-view__body\s*\{[^}]*flex-direction:\s*column;/);
     expect(css).toMatch(/\.chat-view--narrow \.chat-sidebar\s*\{[^}]*min-width:\s*100%;[^}]*border-right:\s*none;/);
     expect(css).toMatch(/\.chat-view--narrow \.chat-sidebar:not\(\.chat-sidebar--hidden\) \+ \.chat-thread\s*\{[^}]*display:\s*none;/);
+    expect(css).toMatch(/\.chat-view--narrow \[data-testid="chat-modal-maximize"\]\s*\{[^}]*display:\s*none;/);
+    expect(css).toMatch(/@media\s*\(max-width:\s*768px\)[\s\S]*?\.chat-view \[data-testid="chat-modal-maximize"\]\s*\{[^}]*display:\s*none;/);
+  });
+
+  it("collapses Direct/Rooms labels from ChatView container width so the header title remains visible", async () => {
+    const css = loadAllAppCss();
+
+    expect(css).toMatch(/\.chat-view\s*\{[^}]*container:\s*chat-view \/ inline-size;/);
+    expect(css).toMatch(/@container\s+chat-view\s+\(max-width:\s*560px\)[\s\S]*?\.chat-view-header-scope-toggle\s*\{[^}]*width:\s*72px;/);
+    expect(css).toMatch(/@container\s+chat-view\s+\(max-width:\s*560px\)[\s\S]*?\.chat-view-header-scope-toggle \.chat-sidebar-scope-btn span\s*\{[^}]*clip-path:\s*inset\(50%\);/);
   });
 });
 

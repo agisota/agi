@@ -4483,8 +4483,7 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
   const renderMissionListContent = ({ hideBottomButtons = false }: { hideBottomButtons?: boolean } = {}) => {
     const persistedInterviewMissions = missions.filter((mission) => mission.interviewState === "in_progress");
     const standardMissions = missions.filter((mission) => mission.interviewState !== "in_progress");
-    const showMobileTopPlanButton = isMobile && missions.length > 0 && !isCreatingMission;
-    const showBottomPlanButton = !hideBottomButtons && !showMobileTopPlanButton;
+    const showBottomPlanButton = !hideBottomButtons;
 
     return (
       <div className="mission-list">
@@ -4565,18 +4564,6 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
                       {t("missions.cancelButton", "Cancel")}
                     </button>
                   </div>
-                </div>
-              )}
-
-              {showMobileTopPlanButton && (
-                <div className="mission-list__top-action">
-                  <button
-                    className="btn btn-sm btn-task-create mission-list__primary-cta"
-                    onClick={openNewMissionInterview}
-                  >
-                    <Sparkles size={14} />
-                    {t("missions.planNewMission", "Plan New Mission")}
-                  </button>
                 </div>
               )}
 
@@ -4715,8 +4702,8 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
                 <div className="mission-list__footer">
                   {showBottomPlanButton && (
                     <div className="mission-list__footer-actions">
-                      <button className="mission-add-btn" onClick={openNewMissionInterview}>
-                        <Sparkles size={16} />
+                      <button className="btn btn-sm btn-primary mission-list__primary-cta" onClick={openNewMissionInterview}>
+                        <Sparkles size={14} />
                         {t("missions.planNewMission", "Plan New Mission")}
                       </button>
                     </div>

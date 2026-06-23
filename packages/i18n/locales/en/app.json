@@ -1582,7 +1582,7 @@
       "trendTitle": "Ecosystem trend",
       "uniqueModels": "Active models"
     },
-    "empty": "No usage data yet. Run some agents to populate the Command Center.",
+    "empty": "No usage data yet. Run some agents to populate the Dashboard.",
     "funnel": {
       "ariaLabel": "Tasks per workflow stage",
       "completionRate": "Completion rate",
@@ -1628,7 +1628,7 @@
       "totalsTitle": "GitHub issue flow"
     },
     "heading": "Dashboard",
-    "loading": "Loading command center...",
+    "loading": "Loading dashboard...",
     "missionControl": {
       "activeNodes": "Active nodes",
       "activeRuns": "Active runs",
@@ -1916,6 +1916,7 @@
     "initializingDashboard": "Initializing dashboard...",
     "loadingMessage": "Loading Fusion dashboard",
     "loadingProgress": "Dashboard loading progress",
+    "title": "Project Dashboard",
     "updatingMessage": "Updating Fusion dashboard",
     "updatingVersion": "Updating to a new frontend version..."
   },
@@ -8508,10 +8509,12 @@
     "widgetDefault": "Default"
   },
   "workflowSwitcher": {
-    "countsAria": "{{todoLabel}}: {{todo}}, {{inProgressLabel}}: {{inProgress}}, {{doneLabel}}: {{done}}",
+    "countsAria": "{{todoLabel}}: {{todo}}, {{inProgressLabel}}: {{inProgress}}, {{doneLabel}}: {{done}}{{mergingSuffix}}",
     "done": "Done",
     "inProgress": "In Progress",
     "label": "Workflow",
+    "merging": "Merging",
+    "mergingTitle": "{{count}} merging task{{plural}}",
     "todo": "Todo",
     "triggerAria": "Select workflow. Current workflow: {{name}}",
     "editWorkflow": "Edit workflow",

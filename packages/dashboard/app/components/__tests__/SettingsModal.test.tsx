@@ -853,6 +853,18 @@ describe("SettingsModal", () => {
       });
     });
 
+    it("disables concurrency inputs until their actual values load", async () => {
+      mockFetchGlobalConcurrency.mockReturnValue(new Promise(() => {}));
+      renderModal();
+      await waitForSettingsModalReady();
+
+      await userEvent.click(screen.getByRole("button", { name: /Scheduling/ }));
+
+      expect(screen.getByLabelText("Global Max Concurrent")).toBeDisabled();
+      expect(screen.getByLabelText("Max Concurrent Tasks")).toBeDisabled();
+      expect(screen.getByLabelText("Max Triage Concurrent")).toBeDisabled();
+    });
+
     it("enables memory backend status hook only when Memory section is active", async () => {
       renderModal();
       await waitForSettingsModalReady();
@@ -1048,6 +1060,16 @@ describe("SettingsModal", () => {
       expect(select.value).toBe("off");
       expect(screen.getByRole("option", { name: "Require changeset (.changeset/*.md)" })).toBeInTheDocument();
       expect(screen.getByRole("option", { name: "Require changelog update (existing changelog)" })).toBeInTheDocument();
+    });
+
+    it("reports Quick Chat launcher changes immediately before save", async () => {
+      const onQuickChatButtonModeChange = vi.fn();
+      renderModal({ initialSection: "general", onQuickChatButtonModeChange });
+      await waitForSettingsModalReady();
+
+      await userEvent.selectOptions(screen.getByLabelText("Quick Chat launcher"), "footer");
+
+      expect(onQuickChatButtonModeChange).toHaveBeenCalledWith("footer");
     });
 
     it.each<PersistSettingInput>([
@@ -2988,6 +3010,7 @@ describe("SettingsModal", () => {
 
       const input = screen.getByLabelText("Max Concurrent Tasks") as HTMLInputElement;
       expect(input).toBeDefined();
+      await waitFor(() => expect(input).not.toBeDisabled());
 
       // Clear the input - the input should be empty, not show "0"
       await userEvent.clear(input);
@@ -3003,6 +3026,7 @@ describe("SettingsModal", () => {
 
       const input = screen.getByLabelText("Global Max Concurrent") as HTMLInputElement;
       expect(input).toBeDefined();
+      await waitFor(() => expect(input).not.toBeDisabled());
 
       // Clear the input - the input should be empty, not show "0"
       await userEvent.clear(input);
@@ -3832,6 +3856,8 @@ describe("SettingsModal", () => {
       ]) {
         expect(screen.getByLabelText(featureLabel)).toBeInTheDocument();
       }
+
+      expect(screen.queryByLabelText("Right Dock Panel")).not.toBeInTheDocument();
 
       // Dev Server has a single canonical toggle (no legacy duplicate).
       expect(screen.getAllByLabelText("Dev Server")).toHaveLength(1);

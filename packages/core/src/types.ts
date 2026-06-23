@@ -2959,7 +2959,7 @@ export interface WorktrunkSettings {
 export interface GlobalSettings {
   /** Theme mode preference: dark, light, or system (follows OS). Default: "dark". */
   themeMode?: ThemeMode;
-  /** Color theme preference for accent colors and styling. Default: "default". */
+  /** Color theme preference for accent colors and styling. Default: "ocean"; "default" is the legacy Fusion theme id. */
   colorTheme?: ColorTheme;
   /** Token→hex override map for the customizable shadcn theme. Applied only when `colorTheme === "shadcn-custom"`; dashboard sanitizes keys and values before writing CSS custom properties. */
   shadcnCustomColors?: Record<string, string>;
@@ -3353,9 +3353,9 @@ export interface GlobalSettings {
    *    "another-experiment": false
    *  }
    *
-   *  Default: workflow columns, graph executor, dual-observe, authoritative
-   *  interpreter, and `claudeCliAcp` flags enabled; operators may explicitly set
-   *  individual flags false while rollout controls remain available.
+   *  Default: workflow columns and graph executor enabled; dual-observe remains
+   *  disabled because it runs diagnostic shadow parity observation. Operators may
+   *  explicitly set individual rollout flags false while controls remain available.
    *
    *  `claudeCliAcp` (default ON): routes the Claude CLI provider through the
    *  `claude-code-cli-acp` ACP bridge instead of `claude -p`. Effective only when

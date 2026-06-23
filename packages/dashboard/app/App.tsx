@@ -71,6 +71,11 @@ import { useAuthOnboarding } from "./hooks/useAuthOnboarding";
 import { useMobileKeyboard } from "./hooks/useMobileKeyboard";
 import { isIOS, useMobileKeyboardViewportLock, useMobileViewportRestoreReset } from "./hooks/useMobileScrollLock";
 import { computeMobileBarKeyboardFlags } from "./utils/mobileBarKeyboardFlags";
+import {
+  captureBoardScrollSnapshot,
+  restoreBoardScrollSnapshot,
+  type BoardScrollSnapshot,
+} from "./utils/boardScrollSnapshot";
 import { useSetupReadiness } from "./hooks/useSetupReadiness";
 import { useUpdateCheck } from "./hooks/useUpdateCheck";
 import { useViewState, type TaskView } from "./hooks/useViewState";
@@ -94,7 +99,7 @@ import { NativeShellOnboardingModal } from "./components/NativeShellOnboardingMo
 import { NativeShellConnectionManager } from "./components/NativeShellConnectionManager";
 import { ShellConnectionStatus } from "./components/ShellConnectionStatus";
 import { getShellConnectionNativeResult, type ShellConnectionNativeResult } from "./shell-native";
-import type { AiSessionSummary, DashboardHealthResponse } from "./api";
+import type { AiSessionSummary, DashboardHealthResponse, PluginDashboardViewEntry } from "./api";
 import { api, fetchDashboardHealth, fetchUnreadCount, fetchTaskDetail, fetchWorkflowSteps, refreshDashboardHealth, relaunchCliSession } from "./api";
 import { getScopedItem, removeScopedItem, setScopedItem } from "./utils/projectStorage";
 import { subscribeSse } from "./sse-bus";
@@ -505,10 +510,10 @@ function AppInner() {
     setThemeMode,
   });
 
-  const { views: pluginDashboardViews } = usePluginDashboardViews(currentProject?.id);
+  const { views: rawPluginDashboardViews } = usePluginDashboardViews(currentProject?.id);
   const graphPluginTaskView = useMemo(() => {
     // Prefer API response for the graph view (supports dynamic plugin discovery)
-    const graphView = pluginDashboardViews.find(
+    const graphView = rawPluginDashboardViews.find(
       (entry) => entry.pluginId === "fusion-plugin-dependency-graph" && entry.view.viewId === "graph",
     );
     if (graphView) return `plugin:${graphView.pluginId}:${graphView.view.viewId}` as const;
@@ -518,7 +523,7 @@ function AppInner() {
       return `plugin:fusion-plugin-dependency-graph:graph` as const;
     }
     return null;
-  }, [pluginDashboardViews]);
+  }, [rawPluginDashboardViews]);
 
   // History-aware view change handler — pushes nav entry on back-navigation stack.
   const handleTaskViewChange = useCallback((newView: TaskView) => {
@@ -553,6 +558,41 @@ function AppInner() {
   Snapshot of the task whose detail is shown in the main panel (Board card click → full-panel detail). Kept as a snapshot so the view survives a tasks revalidation; renderMainContent prefers the live row from `tasks` by id and falls back to this snapshot.
   */
   const [mainPanelDetailTask, setMainPanelDetailTask] = useState<Task | TaskDetail | null>(null);
+  const boardScrollSnapshotRef = useRef<BoardScrollSnapshot | null>(null);
+  const pendingBoardScrollRestoreRef = useRef(false);
+
+  const captureCurrentBoardScrollSnapshot = useCallback(() => {
+    boardScrollSnapshotRef.current = captureBoardScrollSnapshot();
+  }, []);
+
+  const restoreCurrentBoardScrollSnapshot = useCallback(() => {
+    if (restoreBoardScrollSnapshot(boardScrollSnapshotRef.current)) {
+      pendingBoardScrollRestoreRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (taskView !== "board" || !pendingBoardScrollRestoreRef.current) return;
+    const scheduleFrame = typeof window.requestAnimationFrame === "function"
+      ? window.requestAnimationFrame.bind(window)
+      : ((callback: FrameRequestCallback) => window.setTimeout(() => callback(performance.now()), 0));
+    const cancelFrame = typeof window.cancelAnimationFrame === "function"
+      ? window.cancelAnimationFrame.bind(window)
+      : window.clearTimeout.bind(window);
+    let firstFrame = 0;
+    let secondFrame = 0;
+    /*
+    FNXC:BoardNavigation 2026-06-22-20:15:
+    Board-card task detail replaces the board instead of overlaying it. Preserve horizontal board scroll and per-column vertical scroll before opening detail, then restore after Back to board remounts the board so users return to the same lane/card context.
+    */
+    firstFrame = scheduleFrame(() => {
+      secondFrame = scheduleFrame(restoreCurrentBoardScrollSnapshot);
+    });
+    return () => {
+      cancelFrame(firstFrame);
+      cancelFrame(secondFrame);
+    };
+  }, [restoreCurrentBoardScrollSnapshot, taskView]);
 
   /*
   FNXC:FloatingWindow 2026-06-22-20:45:
@@ -1003,9 +1043,36 @@ function AppInner() {
     devServerEnabled,
     todosEnabled,
     goalsEnabled,
+    setQuickChatButtonModeImmediate,
     toggleAutoMerge,
     refresh: refreshAppSettings,
   } = useAppSettings(currentProject?.id);
+
+  const pluginDashboardViews = useMemo<PluginDashboardViewEntry[]>(() => {
+    /*
+    FNXC:RoadmapsNavigation 2026-06-22-18:00:
+    Enabling the Roadmaps experiment must make Roadmaps appear under Missions even when the plugin dashboard-view endpoint has not returned the bundled roadmap plugin. Synthesize the bundled view client-side as a fallback; API-provided plugin views still win when present.
+    */
+    if (experimentalFeatures.roadmap !== true) return rawPluginDashboardViews;
+    const hasRoadmaps = rawPluginDashboardViews.some(
+      (entry) => entry.pluginId === "fusion-plugin-roadmap" && entry.view.viewId === "roadmaps",
+    );
+    if (hasRoadmaps) return rawPluginDashboardViews;
+    return [
+      ...rawPluginDashboardViews,
+      {
+        pluginId: "fusion-plugin-roadmap",
+        view: {
+          viewId: "roadmaps",
+          label: "Roadmaps",
+          componentPath: "./dashboard-view",
+          icon: "Map",
+          placement: "primary",
+          order: 30,
+        },
+      },
+    ];
+  }, [experimentalFeatures.roadmap, rawPluginDashboardViews]);
 
   const { stats: agentStats } = useAgents(currentProject?.id);
 
@@ -1076,8 +1143,8 @@ function AppInner() {
   Left sidebar navigation is now the default primary navigation on non-mobile project screens. Keep `leftSidebarNav: false` as the explicit opt-out and keep mobile on the bottom navigation bar.
   */
   const leftSidebarNavEnabled = experimentalFeatures.leftSidebarNav !== false;
-  /* FNXC:Navigation 2026-06-21-00:00: The default-on right dock makes tablet/desktop More views toggle a persistent right panel unless settings store `rightDock: false`; mobile remains legacy. */
-  const rightDockEnabled = experimentalFeatures.rightDock !== false;
+  /* FNXC:Navigation 2026-06-22-18:00: The right dock panel is no longer experimental or user-toggleable; tablet/desktop project screens always support it regardless of any stale persisted `rightDock` setting. */
+  const rightDockEnabled = true;
   const executorFooterVisible = viewMode === "project" && !!currentProject;
   const rightDockActive = rightDockEnabled && !isMobile && executorFooterVisible;
   const sidebarActive = leftSidebarNavEnabled && !isMobile && executorFooterVisible;
@@ -1282,12 +1349,14 @@ function AppInner() {
   Board card clicks open task detail as a full main-content view that replaces the board (design: "Full main panel (replaces board)"), instead of the TaskDetailModal overlay. We store a snapshot of the clicked task and navigate to the registered `task-detail` view; renderMainContent renders TaskDetailContent embedded with a Back-to-board button. Only the Board uses this handler — list-view split-detail, right-dock cards, and other openDetail callers keep the modal behavior.
   */
   const openTaskDetailInMainPanel = useCallback((task: Task | TaskDetail) => {
+    captureCurrentBoardScrollSnapshot();
     setMainPanelDetailTask(task);
     handleTaskViewChange("task-detail");
-  }, [handleTaskViewChange]);
+  }, [captureCurrentBoardScrollSnapshot, handleTaskViewChange]);
 
   // FNXC:Navigation 2026-06-22-00:00: Leaving task-detail clears the snapshot so a stale task never lingers if the view is reopened empty.
   const closeTaskDetailMainPanel = useCallback(() => {
+    pendingBoardScrollRestoreRef.current = true;
     setMainPanelDetailTask(null);
     handleTaskViewChange("board");
   }, [handleTaskViewChange]);
@@ -1588,6 +1657,7 @@ function AppInner() {
               resolvedThemeMode={resolvedThemeMode}
               onDashboardFontScaleChange={setDashboardFontScalePct}
               onShadcnCustomColorsChange={setShadcnCustomColors}
+              onQuickChatButtonModeChange={setQuickChatButtonModeImmediate}
               onReopenOnboarding={reopenOnboardingWithNav}
               onOpenApprovals={() => handleChangeTaskView("mailbox")}
               onOpenWorkflowSettings={() => {
@@ -2609,7 +2679,7 @@ function AppInner() {
         onSubtaskBreakdown={subtaskBreakdownEnabled ? openSubtaskBreakdownWithNav : undefined}
         taskOperations={{ moveTask, deleteTask, mergeTask, archiveTask, retryTask, resetTask, duplicateTask }}
         deepLink={{ handleDetailClose }}
-        settings={{ prAuthAvailable, autoMerge, themeMode, colorTheme, dashboardFontScalePct, shadcnCustomColors, resolvedThemeMode, setThemeMode, setColorTheme, setDashboardFontScalePct, setShadcnCustomColors }}
+        settings={{ prAuthAvailable, autoMerge, themeMode, colorTheme, dashboardFontScalePct, shadcnCustomColors, resolvedThemeMode, setThemeMode, setColorTheme, setDashboardFontScalePct, setShadcnCustomColors, setQuickChatButtonModeImmediate }}
         onSettingsClose={handleSettingsCloseWithNav}
         onReopenOnboarding={reopenOnboardingWithNav}
         onOpenApprovals={(_approvalId) => handleTaskViewChange("mailbox")}

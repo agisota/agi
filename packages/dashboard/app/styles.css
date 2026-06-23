@@ -150,7 +150,8 @@ html {
   /*
   FNXC:ViewHeader 2026-06-23-04:15:
   Canonical main-content view-header height. Headers with btn-sm action buttons render taller (~61px border-box) than title-only headers (~54px), so every canonical header (ViewHeader, Missions, embedded Planning, Goals, Automations, Import Tasks) pins this min-height to stay pixel-identical regardless of whether actions are present.
-  Derivation (border-box): vertical padding var(--space-lg)*2 = 32px + 1px bottom divider + ~28px tallest content row (btn-sm: 4+4 padding + 1+1 border + ~18px 12px-font line) = 61px.
+  FNXC:ViewHeader 2026-06-22-18:00:
+  The 1px reserve remains after removing header dividers so existing header height stays stable while the visible line disappears.
   */
   --view-header-min-height: calc(var(--space-lg) * 2 + 28px + 1px);
   /*
@@ -1244,8 +1245,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: var(--modal-padding);
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--text) 10%, transparent);
+  background: var(--surface);
 }
 .modal-header h3 {
   font-size: 15px;
@@ -1706,7 +1706,6 @@ input[type="range"]:focus-visible {
   padding: var(--space-lg) 0 var(--space-md);
   margin: 0;
   color: var(--text);
-  border-bottom: 1px solid var(--border);
   margin-bottom: var(--space-xs);
 }
 

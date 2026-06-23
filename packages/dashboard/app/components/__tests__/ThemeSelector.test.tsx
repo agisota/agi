@@ -114,7 +114,7 @@ describe("ThemeSelector", () => {
       />
     );
 
-    const oceanBtn = screen.getByLabelText("Ocean theme");
+    const oceanBtn = screen.getByLabelText("Ocean (Default) theme");
     expect(oceanBtn.className).toContain("active");
     expect(oceanBtn.getAttribute("aria-pressed")).toBe("true");
   });
@@ -487,7 +487,7 @@ describe("ThemeSelector", () => {
     );
 
     expect(screen.getByText(/Current theme/)).toBeDefined();
-    expect(screen.getByText(/Dark \/ Ocean/)).toBeDefined();
+    expect(screen.getByText(/Dark \/ Ocean \(Default\)/)).toBeDefined();
   });
 
   it("displays system theme in preview when system mode", () => {
@@ -598,7 +598,7 @@ describe("ThemeSelector", () => {
 
     fireEvent.click(screen.getByLabelText("Reset to default theme"));
     expect(onThemeModeChange).toHaveBeenCalledWith("dark");
-    expect(onColorThemeChange).toHaveBeenCalledWith("default");
+    expect(onColorThemeChange).toHaveBeenCalledWith("ocean");
   });
 
   it("shows the shadcn custom picker only for shadcn-custom", () => {

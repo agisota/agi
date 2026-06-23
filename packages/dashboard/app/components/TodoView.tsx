@@ -95,6 +95,22 @@ export function TodoView({
     () => sortItems(items.filter((item) => item.listId === selectedListId)),
     [items, selectedListId],
   );
+  const listItemStats = useMemo(() => {
+    const stats = new Map<string, { total: number; completed: number }>();
+    for (const list of lists) {
+      stats.set(list.id, { total: 0, completed: 0 });
+    }
+    for (const item of items) {
+      const current = stats.get(item.listId) ?? { total: 0, completed: 0 };
+      current.total += 1;
+      if (item.completed) {
+        current.completed += 1;
+      }
+      stats.set(item.listId, current);
+    }
+    return stats;
+  }, [items, lists]);
+  const selectedListStats = selectedList ? (listItemStats.get(selectedList.id) ?? { total: sortedItems.length, completed: sortedItems.filter((item) => item.completed).length }) : null;
 
   function resetListDraftState(): void {
     setEditingListId(null);
@@ -419,6 +435,7 @@ export function TodoView({
               {lists.map((list) => {
                 const isActive = list.id === selectedListId;
                 const isEditing = list.id === editingListId;
+                const stats = listItemStats.get(list.id) ?? { total: 0, completed: 0 };
 
                 return (
                   <div
@@ -473,6 +490,9 @@ export function TodoView({
                           data-testid={`todo-list-${list.id}`}
                         >
                           <span className="todo-list-item-name">{list.title}</span>
+                          <span className="todo-list-item-count">
+                            {stats.completed}/{stats.total}
+                          </span>
                         </button>
                         <div className="todo-list-item-actions">
                           <button
@@ -535,7 +555,17 @@ export function TodoView({
                 >
                   <ChevronLeft />
                 </button>
-                <h3>{selectedList.title}</h3>
+                <div className="todo-items-heading">
+                  <h3>{selectedList.title}</h3>
+                  {selectedListStats && (
+                    <span className="todo-items-progress">
+                      {t("todo.completedCount", "{{completed}}/{{total}} complete", {
+                        completed: selectedListStats.completed,
+                        total: selectedListStats.total,
+                      })}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="todo-add-item-row">
@@ -561,6 +591,7 @@ export function TodoView({
                     void handleAddItem();
                   }}
                 >
+                  <Plus size={14} />
                   {t("actions.add", "Add")}
                 </button>
               </div>

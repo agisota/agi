@@ -296,7 +296,7 @@ function OverviewTab({
         {controlsSection}
         <div className="cc-loading" data-testid="command-center-overview-loading">
           <div className="cc-chart-skeleton" />
-          <p><LoadingSpinner label={t("commandCenter.loading", "Loading command center...")} /></p>
+          <p><LoadingSpinner label={t("commandCenter.loading", "Loading dashboard...")} /></p>
         </div>
         {throughputSection}
       </div>
@@ -322,7 +322,7 @@ function OverviewTab({
         {controlsSection}
         <div className="cc-empty" data-testid="command-center-empty">
           <Gauge size={28} />
-          <p>{t("commandCenter.empty", "No usage data yet. Run some agents to populate the Command Center.")}</p>
+          <p>{t("commandCenter.empty", "No usage data yet. Run some agents to populate the Dashboard.")}</p>
         </div>
         {throughputSection}
       </div>
@@ -572,7 +572,7 @@ export function CommandCenter({
         {/* FNXC:CommandCenter 2026-06-22-01:00: Icon size aligned to 20 to match the shared ViewHeader (cc-header is the model for ViewHeader; title is already 1.125rem with --space-lg padding). */}
         <h2 className="cc-title">
           <Gauge size={20} />
-          {t("commandCenter.heading", "Command Center")}
+          {t("commandCenter.heading", "Dashboard")}
         </h2>
         <DateRangePicker value={range} onChange={setRange} />
       </header>
@@ -580,7 +580,7 @@ export function CommandCenter({
       <div
         className="cc-tablist"
         role="tablist"
-        aria-label={t("commandCenter.tablistLabel", "Command Center sections")}
+        aria-label={t("commandCenter.tablistLabel", "Dashboard sections")}
       >
         {subViews.map((sub, index) => {
           const selected = sub.id === activeTab;

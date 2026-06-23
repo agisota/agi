@@ -2284,6 +2284,26 @@ describe("App view switching", () => {
     localStorage.removeItem("kb-dashboard-view-mode");
   });
 
+  it("shows Roadmaps under Missions when the roadmap experiment is enabled but the plugin API returns no views", async () => {
+    /*
+    FNXC:RoadmapsNavigation 2026-06-22-18:00:
+    Regression guard for the roadmap experiment: enabling `experimentalFeatures.roadmap` must expose the bundled Roadmaps sidebar destination even when /plugins/dashboard-views returns an empty list.
+    */
+    mockUseViewportMode.mockReturnValue("desktop");
+    (fetchSettings as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ...defaultSettings,
+      experimentalFeatures: { ...defaultSettings.experimentalFeatures, roadmap: true },
+    });
+    (fetchPluginDashboardViews as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+
+    render(<App />);
+
+    const roadmaps = await screen.findByTestId("sidebar-nav-plugin-fusion-plugin-roadmap-roadmaps");
+    const missions = screen.getByTestId("sidebar-nav-missions");
+    const navItems = Array.from(screen.getByRole("navigation", { name: "Primary navigation" }).querySelectorAll(".left-sidebar-nav__item"));
+    expect(navItems.indexOf(roadmaps)).toBe(navItems.indexOf(missions) + 1);
+  });
+
   it("restores board and plugin routes when persisted taskView changes across remounts", async () => {
     localStorage.setItem("kb-dashboard-view-mode", "project");
 

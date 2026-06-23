@@ -15,8 +15,9 @@ export interface GeneralSectionProps extends SectionBaseProps {
     projectTrackingRepoOptions: TrackingRepoOption[];
     projectTrackingRepoLoading: boolean;
     projectTrackingRepoError: string | null;
+    onQuickChatButtonModeChange?: (mode: "floating" | "footer" | "off") => void;
 }
-export function GeneralSection({ scopeBanner, form, setForm, projectId, addToast, prefixError, setPrefixError, projectTrackingRepoOptions, projectTrackingRepoLoading, projectTrackingRepoError, }: GeneralSectionProps) {
+export function GeneralSection({ scopeBanner, form, setForm, projectId, addToast, prefixError, setPrefixError, projectTrackingRepoOptions, projectTrackingRepoLoading, projectTrackingRepoError, onQuickChatButtonModeChange, }: GeneralSectionProps) {
     const { t } = useTranslation("app");
     const [builtinWorkflows, setBuiltinWorkflows] = useState<WorkflowDefinition[]>([]);
     useEffect(() => {
@@ -109,6 +110,7 @@ export function GeneralSection({ scopeBanner, form, setForm, projectId, addToast
         <label htmlFor="quickChatButtonMode">{t("settings.general.quickChatLauncher", "Quick Chat launcher")}</label>
         <select id="quickChatButtonMode" className="select" value={form.quickChatButtonMode ?? (form.showQuickChatFAB ? "floating" : "off")} onChange={(e) => setForm((f) => {
             const mode = e.target.value as "floating" | "footer" | "off";
+            onQuickChatButtonModeChange?.(mode);
             return { ...f, quickChatButtonMode: mode, showQuickChatFAB: mode === "floating" };
         })}>
           <option value="floating">{t("settings.general.quickChatLauncherFloating", "Floating button")}</option>

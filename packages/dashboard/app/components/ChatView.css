@@ -1,6 +1,7 @@
 /* ── Chat View ─────────────────────────────────────────────────────────────── */
 
 .chat-view {
+  container: chat-view / inline-size;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -67,12 +68,17 @@
   display: flex;
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--border);
 }
 
 /*
 FNXC:ChatHeader 2026-06-22-16:18:
 Direct/Rooms now lives in the Chat ViewHeader immediately before New Chat. The control must scale with available header width: bounded flex-basis, minmax grid columns, and truncating labels let it fit desktop, narrow pop-out, and mobile headers without forcing the title/actions to overlap.
+
+FNXC:ChatHeader 2026-06-22-18:44:
+Keep the Direct/Rooms segmented control height-aligned with ViewHeader's action row and collapse labels to icons when Chat is very narrow. Buttons use height:100% inside the padded track so they cannot grow taller than the background.
+
+FNXC:ChatHeader 2026-06-22-20:28:
+When the movable chat popup is resized narrow, collapse Direct/Rooms labels to icon-only from the ChatView container width so the Chat title remains visible even on a wide desktop viewport.
 */
 .chat-view-header-scope-toggle {
   display: grid;
@@ -81,6 +87,8 @@ Direct/Rooms now lives in the Chat ViewHeader immediately before New Chat. The c
   width: clamp(128px, 24vw, 220px);
   min-width: min(128px, 100%);
   max-width: 220px;
+  height: var(--view-header-content-row, 28px);
+  box-sizing: border-box;
   padding: 2px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -99,9 +107,13 @@ Direct/Rooms now lives in the Chat ViewHeader immediately before New Chat. The c
 }
 
 .chat-view-header-scope-toggle .chat-sidebar-scope-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
   min-width: 0;
   min-height: 0;
-  height: var(--view-header-content-row, 28px);
+  height: 100%;
   padding: 0 clamp(var(--space-xs), 1.2vw, var(--space-sm));
   border: 1px solid transparent;
   border-radius: calc(var(--radius-md) - 2px);
@@ -109,6 +121,16 @@ Direct/Rooms now lives in the Chat ViewHeader immediately before New Chat. The c
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
+}
+
+.chat-view-header-scope-toggle .chat-sidebar-scope-btn svg {
+  flex: 0 0 auto;
+}
+
+.chat-view-header-scope-toggle .chat-sidebar-scope-btn span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-sidebar-scope-btn:hover {
@@ -139,7 +161,6 @@ Direct/Rooms now lives in the Chat ViewHeader immediately before New Chat. The c
 
 .chat-sidebar-rooms-header {
   padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--border);
 }
 
 .chat-sidebar-rooms-empty {
@@ -708,6 +729,52 @@ Mobile chat session switching needs a dedicated rename tap target beside each se
   }
 }
 
+@container chat-view (max-width: 560px) {
+  .chat-view-header-scope-toggle {
+    flex: 0 0 72px;
+    width: 72px;
+    min-width: 72px;
+    max-width: 72px;
+  }
+
+  .chat-view-header-scope-toggle .chat-sidebar-scope-btn {
+    padding: 0;
+  }
+
+  .chat-view-header-scope-toggle .chat-sidebar-scope-btn span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 460px) {
+  .chat-view-header-scope-toggle {
+    flex: 0 0 72px;
+    width: 72px;
+    min-width: 72px;
+    max-width: 72px;
+  }
+
+  .chat-view-header-scope-toggle .chat-sidebar-scope-btn {
+    padding: 0;
+  }
+
+  .chat-view-header-scope-toggle .chat-sidebar-scope-btn span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 /*
 FNXC:ChatModal 2026-06-22-13:22:
 The old Quick Chat panel is replaced by the full ChatView inside a movable FloatingWindow. In floating mode ChatView's shared header is the only visible modal header and doubles as the drag handle, with minimize/close controls in the same action row.
@@ -757,6 +824,22 @@ Floating Chat can become narrow while the browser viewport remains desktop-sized
 
 .chat-view--narrow .chat-sidebar:not(.chat-sidebar--hidden) + .chat-thread {
   display: none;
+}
+
+/*
+FNXC:ChatModal 2026-06-22-18:00:
+In the narrow/mobile chat layout there is no room for an expand/maximize affordance in the header. Hide only the expand controls (main Chat pop-out and floating-modal maximize); keep minimize/close visible so the user can still dismiss or dock the chat.
+*/
+.chat-view--narrow [data-testid="chat-pop-out"],
+.chat-view--narrow [data-testid="chat-modal-maximize"] {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .chat-view [data-testid="chat-pop-out"],
+  .chat-view [data-testid="chat-modal-maximize"] {
+    display: none;
+  }
 }
 
 .chat-rename-label {

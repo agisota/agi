@@ -280,7 +280,6 @@ const KNOWN_EXPERIMENTAL_FEATURES: Record<string, string> = {
   /* FNXC:QuickAddSubtaskFlag 2026-06-21-00:00: The AI subtask-breakdown quick-add affordance is exposed only through this default-off experimental flag so missing settings keep every quick-add Subtask button hidden. */
   subtaskBreakdown: "Subtask Breakdown",
   leftSidebarNav: "Left Sidebar Navigation",
-  rightDock: "Right Dock Panel",
   sandbox: "Sandbox (command isolation)",
   chatRooms: "Chat Rooms",
   agentOnboarding: "Planning-style Agent Onboarding",
@@ -289,10 +288,27 @@ const KNOWN_EXPERIMENTAL_FEATURES: Record<string, string> = {
 };
 
 /*
-FNXC:Navigation 2026-06-21-00:00:
-The dashboard owns the left sidebar and right dock default-on rollout because the shared experimental-feature helper must keep default-off semantics for unrelated experiments. Keep this set local to Settings so toggle checked-state matches App's `leftSidebarNav !== false` and `rightDock !== false` derivations without changing core behavior.
+FNXC:SettingsExperimental 2026-06-22-17:55:
+Workflow rollout flags remain supported in persisted settings and engine code, but they are no longer normal user-facing Experimental toggles. Hide workflowColumns, workflowGraphExecutor, and dual-observe from the settings list so operators do not accidentally flip the custom-workflow/runtime diagnostic switches from the product UI.
+
+FNXC:SettingsExperimental 2026-06-22-18:00:
+Right Dock Panel is no longer experimental: keep honoring the dock as always-on in App, but hide any stale persisted `rightDock` setting from the Experimental list.
 */
-const DEFAULT_ON_EXPERIMENTAL_FEATURES = new Set<string>(["leftSidebarNav", "rightDock"]);
+const HIDDEN_EXPERIMENTAL_FEATURE_KEYS = new Set<string>([
+  "rightDock",
+  "workflowColumns",
+  "workflowGraphExecutor",
+  "workflowInterpreterDualObserve",
+]);
+
+/*
+FNXC:Navigation 2026-06-21-00:00:
+The dashboard owns the left sidebar default-on rollout because the shared experimental-feature helper must keep default-off semantics for unrelated experiments. Keep this set local to Settings so toggle checked-state matches App's `leftSidebarNav !== false` derivation without changing core behavior.
+
+FNXC:Navigation 2026-06-22-18:00:
+Only Left Sidebar Navigation remains a default-on experimental toggle; right dock was promoted to always-on app chrome and is hidden from this settings surface.
+*/
+const DEFAULT_ON_EXPERIMENTAL_FEATURES = new Set<string>(["leftSidebarNav"]);
 
 const EXPERIMENTAL_FEATURE_LEGACY_ALIASES: Record<string, string> = {
   devServer: "devServerView",
@@ -369,6 +385,8 @@ interface SettingsModalProps {
   onDashboardFontScaleChange?: (scalePct: number) => void;
   /** Called when shadcn-custom color overrides change */
   onShadcnCustomColorsChange?: (colors: Record<string, string>) => void;
+  /** Mirrors pending Quick Chat launcher changes into the app shell immediately. */
+  onQuickChatButtonModeChange?: (mode: "floating" | "footer" | "off") => void;
   /** Optional callback when user wants to reopen the onboarding guide */
   onReopenOnboarding?: () => void;
   /** Optional callback to open approvals/mailbox view. */
@@ -619,7 +637,7 @@ export function SettingsModal({
   projectId,
   initialSection,
   themeMode = "dark",
-  colorTheme = "default",
+  colorTheme = "ocean",
   onThemeModeChange,
   onColorThemeChange,
   dashboardFontScalePct = 100,
@@ -627,6 +645,7 @@ export function SettingsModal({
   resolvedThemeMode,
   onDashboardFontScaleChange,
   onShadcnCustomColorsChange,
+  onQuickChatButtonModeChange,
   onReopenOnboarding,
   onOpenApprovals,
   onOpenWorkflowSettings,
@@ -883,6 +902,7 @@ export function SettingsModal({
   const initialGlobalMaxConcurrentRef = useRef<number | undefined>(4);
   const hasFetchedGlobalConcurrencyRef = useRef(false);
   const globalConcurrencyDirtyRef = useRef(false);
+  const [globalConcurrencyLoaded, setGlobalConcurrencyLoaded] = useState(false);
 
   // Import/Export state
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -972,9 +992,11 @@ export function SettingsModal({
         }
         initialGlobalMaxConcurrentRef.current = state.globalMaxConcurrent;
         hasFetchedGlobalConcurrencyRef.current = true;
+        setGlobalConcurrencyLoaded(true);
       })
       .catch(() => {
         // Silently fail — global concurrency may not be available
+        setGlobalConcurrencyLoaded(true);
       });
 
     return () => {
@@ -2568,6 +2590,7 @@ export function SettingsModal({
             projectTrackingRepoOptions={projectTrackingRepoOptions}
             projectTrackingRepoLoading={projectTrackingRepoLoading}
             projectTrackingRepoError={projectTrackingRepoError}
+            onQuickChatButtonModeChange={onQuickChatButtonModeChange}
           />
         );
       case "global-general":
@@ -2657,6 +2680,7 @@ export function SettingsModal({
             form={form}
             setForm={setForm}
             globalMaxConcurrent={globalMaxConcurrent}
+            concurrencyLoading={activeSection === "scheduling" && !globalConcurrencyLoaded && !globalConcurrencyDirtyRef.current}
             onGlobalMaxConcurrentChange={(value) => {
               globalConcurrencyDirtyRef.current = true;
               setGlobalMaxConcurrent(value);
@@ -2789,6 +2813,7 @@ export function SettingsModal({
             legacyAliases={EXPERIMENTAL_FEATURE_LEGACY_ALIASES}
             getCanonicalKey={getCanonicalExperimentalFeatureKey}
             isFeatureEnabled={isDashboardExperimentalFeatureEnabled}
+            hiddenFeatureKeys={HIDDEN_EXPERIMENTAL_FEATURE_KEYS}
           />
         );
       case "backups":

@@ -2764,23 +2764,19 @@ export function TaskDetailContent({
             </span>
           </div>
           <div className="modal-header-actions">
-            {/*
-            FNXC:TaskDetail 2026-06-22-18:40:
-            Board-card full-panel "Back to board" affordance lives here on the far right of the gray header (across from the task id on the left), pushed by margin-left:auto so it never overlaps the id and wraps on narrow widths. Only rendered when embedded AND onBackToBoard are supplied (board-card detail), never in ListView split-pane or modal usages.
-            */}
-            {embedded && onBackToBoard && (
+            {!isEditing && canEdit && (
               <button
-                type="button"
-                className="task-detail-header-back-btn"
-                onClick={onBackToBoard}
+                className="modal-edit-btn"
+                onClick={enterEditMode}
+                title={t("taskDetail.header.editTask", "Edit task")}
+                aria-label={t("taskDetail.header.editTask", "Edit task")}
               >
-                <ArrowLeft size={14} aria-hidden="true" />
-                <span>{t("app.taskDetail.backToBoard", "Back to board")}</span>
+                <Pencil size={14} />
               </button>
             )}
             {/*
-            FNXC:FloatingWindow 2026-06-22-20:45:
-            "Pop out" affordance opens this task detail in a movable, resizable, non-blocking FloatingWindow. Rendered whenever onPopOut is wired (List split-pane + board full-panel); App dedupes by task id so re-popping focuses the existing window instead of duplicating.
+            FNXC:FloatingWindow 2026-06-22-20:45 (updated 2026-06-22-18:32):
+            "Pop out" affordance opens this task detail in a movable, resizable, non-blocking FloatingWindow. Header action order is edit, then expand/pop-out, then Back to board pinned far right so board-card detail controls read as edit/resize/navigation.
             */}
             {onPopOut && (
               <button
@@ -2794,14 +2790,18 @@ export function TaskDetailContent({
                 <Maximize2 size={14} />
               </button>
             )}
-            {!isEditing && canEdit && (
+            {/*
+            FNXC:TaskDetail 2026-06-22-18:40 (updated 2026-06-22-18:32):
+            Board-card full-panel "Back to board" must be the far-right header action, after edit and expand/pop-out. margin-left:auto pushes it away from the utility controls while keeping it in the same gray header row. Only rendered when embedded AND onBackToBoard are supplied (board-card detail), never in ListView split-pane or modal usages.
+            */}
+            {embedded && onBackToBoard && (
               <button
-                className="modal-edit-btn"
-                onClick={enterEditMode}
-                title={t("taskDetail.header.editTask", "Edit task")}
-                aria-label={t("taskDetail.header.editTask", "Edit task")}
+                type="button"
+                className="task-detail-header-back-btn"
+                onClick={onBackToBoard}
               >
-                <Pencil size={14} />
+                <ArrowLeft size={14} aria-hidden="true" />
+                <span>{t("app.taskDetail.backToBoard", "Back to board")}</span>
               </button>
             )}
             {embedded && onRequestClose && !onBackToBoard && (

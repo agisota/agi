@@ -167,11 +167,14 @@ describe("Header", () => {
       expect(screen.queryByTitle("List view")).toBeNull();
     });
 
-    it("does not render the workflow portal slot on mobile sidebar nav", () => {
-      renderHeader({ onChangeView: noop, leftSidebarNavActive: true }, "mobile");
-      expect(screen.queryByTestId("header-workflow-slot")).toBeNull();
-      expect(screen.queryByTitle("Board view")).not.toBeNull();
-      expect(screen.queryByTitle("List view")).not.toBeNull();
+    it("renders the workflow portal slot in the mobile top header when mobile nav owns view switching", () => {
+      renderHeader({ onChangeView: noop, leftSidebarNavActive: true, mobileNavEnabled: true }, "mobile");
+      const workflowSlot = screen.getByTestId("header-workflow-slot");
+      expect(workflowSlot).toBeInTheDocument();
+      expect(workflowSlot).toHaveClass("header-workflow-slot--mobile");
+      expect(workflowSlot.closest(".header-left")).toBeInTheDocument();
+      expect(screen.getByTestId("mobile-view-toggle-board")).toBeInTheDocument();
+      expect(screen.getByTestId("mobile-view-toggle-list")).toBeInTheDocument();
     });
 
     it("shows board view as active by default", () => {
@@ -1134,11 +1137,11 @@ describe("Header", () => {
     });
 
     it("can open mobile search when mobileNavEnabled is true", () => {
-      renderHeader({ view: "board", searchQuery: "", onSearchChange: vi.fn(), onChangeView: noop }, "mobile");
+      renderHeader({ view: "board", searchQuery: "", onSearchChange: vi.fn(), onChangeView: noop, mobileNavEnabled: true }, "mobile");
       // Should show the trigger button
       const mobileSearchTrigger = screen.getByTestId("mobile-header-search-btn");
       expect(mobileSearchTrigger).toBeDefined();
-      expect(screen.queryByTestId("header-workflow-slot")).toBeNull();
+      expect(screen.getByTestId("header-workflow-slot")).toBeInTheDocument();
       expect(screen.queryByTestId("desktop-header-search-btn")).toBeNull();
       // Expanded search should not be visible initially, then opens from the unchanged mobile trigger.
       expect(screen.queryByPlaceholderText("Search tasks...")).toBeNull();

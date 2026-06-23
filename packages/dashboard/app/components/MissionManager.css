@@ -56,7 +56,10 @@
 /* ── Header ── */
 /*
 FNXC:MissionManager 2026-06-23-03:00:
-Exactly ONE divider sits under the Missions header — this header's own border-bottom. The scroll body, split, sidebar, and detail-pane add NO border-top, so there is no doubled/extra divider line below the header (verified in DOM: only this element carries a horizontal border in the header region). Planning's embedded header is matched to this single-divider treatment. Do not add a second border-top to the body/split/sidebar.
+Missions previously relied on the header's own border-bottom as the only divider. FNXC:MissionManager 2026-06-22-18:12 updates the main-content embedded view to remove the extra line below the header entirely; internal sidebar/detail pane borders remain, but the area directly under the top header is seamless.
+
+FNXC:MissionManager 2026-06-22-18:00:
+Mission headers define the shared header color: var(--surface), with no bottom divider. Other headers should match this background instead of drawing a separate line after the title row.
 */
 /*
 FNXC:ViewHeader 2026-06-23-04:15:
@@ -70,8 +73,7 @@ Pin the canonical --view-header-min-height (≈61px border-box) + box-sizing so 
   justify-content: space-between;
   min-height: var(--view-header-min-height);
   padding: var(--space-md) var(--space-lg);
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 10%, transparent);
+  background: var(--surface);
 }
 
 /* Inline mode header - matches agents-view-header styling (canonical ViewHeader padding). */
@@ -531,10 +533,10 @@ Title metric matches the shared ViewHeader (1.125rem) so the Missions header rea
   width: auto;
 }
 
-.mission-list__top-action {
-  display: flex;
-}
-
+/*
+FNXC:MissionsMobile 2026-06-22-18:00:
+Narrow/mobile Missions puts Plan New Mission at the bottom of the list, using the same compact primary button proportions as Chat's New Chat action instead of a large top CTA.
+*/
 .mission-list__primary-cta {
   width: 100%;
   justify-content: center;

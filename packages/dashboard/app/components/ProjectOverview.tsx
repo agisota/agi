@@ -238,12 +238,15 @@ export function ProjectOverview({
   const needsInitialSkeleton = loading || (healthLoading && projects.length > 0 && Object.keys(healthMap).length === 0);
   /*
   FNXC:DashboardHeader 2026-06-22-16:42:
-  The Dashboard overview (projects, stats, filters, and charts/overview content) owns the shared top header. The Board view must stay headerless because its columns already consume the full board surface.
+  The Project Dashboard overview (projects, stats, filters, and charts/overview content) owns the shared top header. The Board view must stay headerless because its columns already consume the full board surface.
+
+  FNXC:DashboardNaming 2026-06-22-20:08:
+  The analytics Command Center surface is now labeled Dashboard, so this older projects overview is labeled Project Dashboard to avoid two visible Dashboard destinations.
   */
   const dashboardHeader = (
     <ViewHeader
       icon={LayoutGrid}
-      title={t("dashboard.title", "Dashboard")}
+      title={t("dashboard.title", "Project Dashboard")}
       actions={(
         <button
           className="btn btn-primary btn-sm project-overview__add-btn"
