@@ -1035,6 +1035,8 @@ describe("fast-mode triage", () => {
           defaultModelIdOverride: "gpt-5.5",
           fallbackProvider: "openai-codex",
           fallbackModelId: "gpt-5.5",
+          memoryEnabled: false,
+          agentPrompts: { roleAssignments: { reviewer: "custom-reviewer" } },
         } as Settings),
       });
       const processor = new TriageProcessor(store, rootDir);
@@ -1057,6 +1059,11 @@ describe("fast-mode triage", () => {
         projectDefaultOverrideModelId: "gpt-5.5",
         fallbackProvider: "openai-codex",
         fallbackModelId: "gpt-5.5",
+        agentPrompts: { roleAssignments: { reviewer: "custom-reviewer" } },
+      });
+      expect(reviewOptions.settings).toMatchObject({
+        memoryEnabled: false,
+        agentPrompts: { roleAssignments: { reviewer: "custom-reviewer" } },
       });
     } finally {
       mockReviewStep.mockReset();
