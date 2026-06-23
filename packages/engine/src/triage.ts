@@ -1890,6 +1890,9 @@ export class TriageProcessor {
               // Project-level validator fallback
               projectValidatorFallbackProvider: currentSettings.validatorFallbackProvider,
               projectValidatorFallbackModelId: currentSettings.validatorFallbackModelId,
+              // Global/default fallback, used when no validator-specific fallback is configured
+              fallbackProvider: currentSettings.fallbackProvider,
+              fallbackModelId: currentSettings.fallbackModelId,
               // Global validator lane
               globalValidatorProvider: currentSettings.validatorGlobalProvider,
               globalValidatorModelId: currentSettings.validatorGlobalModelId,
