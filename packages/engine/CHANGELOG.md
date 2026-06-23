@@ -1,5 +1,14 @@
 # @fusion/engine
 
+## 0.45.0
+
+### Patch Changes
+
+- Updated dependencies [26ebb92]
+- Updated dependencies [7e7eb62]
+  - @fusion/core@0.45.0
+  - @fusion/pi-claude-cli@0.45.0
+
 ## 0.44.0
 
 ### Patch Changes
