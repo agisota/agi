@@ -2051,7 +2051,49 @@
     "valuesSaved": "Значения настроек сохранены",
     "valuesTab": "Значения",
     "widget": "Виджет",
-    "widgetDefault": "По умолчанию"
+    "widgetDefault": "По умолчанию",
+    "settingLabel": {
+      "planningProvider": "Провайдер плана/триажа",
+      "planningModelId": "Модель плана/триажа",
+      "planningFallbackProvider": "Резервный провайдер плана/триажа",
+      "planningFallbackModelId": "Резервная модель плана/триажа",
+      "executionProvider": "Провайдер исполнителя",
+      "executionModelId": "Модель исполнителя",
+      "validatorProvider": "Провайдер ревьюера",
+      "validatorModelId": "Модель ревьюера",
+      "validatorFallbackProvider": "Резервный провайдер ревьюера",
+      "validatorFallbackModelId": "Резервная модель ревьюера",
+      "requirePrApproval": "Требовать одобрение PR",
+      "requirePlanApproval": "Требовать одобрения плана",
+      "reviewHandoffPolicy": "Политика передачи на ревью",
+      "maxReviewerContextRetries": "Повторы контекста ревьюера",
+      "maxReviewerFallbackRetries": "Резервные повторы ревьюера",
+      "reflectionEnabled": "Рефлексия включена",
+      "workflowStepTimeoutMs": "Таймаут шага",
+      "workflowStepScopeEnforcement": "Контроль области шага",
+      "planOnlyScopeLeakEnforcement": "Контроль утечки области (только план)",
+      "workflowRevisionForkOnScopeMismatch": "Форк ревизии при несоответствии области",
+      "strictScopeEnforcement": "Строгий контроль области",
+      "runStepsInNewSessions": "Запускать шаги в новых сессиях",
+      "maxParallelSteps": "Макс. параллельных шагов",
+      "buildRetryCount": "Число повторов сборки",
+      "verificationFixRetries": "Повторы исправления при проверке",
+      "maxPostReviewFixes": "Проходы исправлений после ревью"
+    },
+    "settingDescription": {
+      "planningProvider": "Провайдер, используемый при планировании или триаже задач.",
+      "planningModelId": "Модель, используемая при планировании или триаже задач.",
+      "executionProvider": "Провайдер, используемый агентами реализации задач.",
+      "executionModelId": "Модель, используемая агентами реализации задач.",
+      "validatorProvider": "Провайдер, используемый агентами ревью и валидации.",
+      "validatorModelId": "Модель, используемая агентами ревью и валидации."
+    },
+    "group": {
+      "models": "Модели",
+      "review": "Ревью и одобрение",
+      "steps": "Выполнение шагов",
+      "advanced": "Дополнительно"
+    }
   },
   "appName": "agi",
   "cli": {
@@ -3225,7 +3267,8 @@
     "header": {
       "back": "Назад",
       "backToList": "Назад к списку задач",
-      "editTask": "Редактировать задачу"
+      "editTask": "Редактировать задачу",
+      "popOut": "Открыть в отдельном окне"
     },
     "inputTokens": "Ввод",
     "lastUsed": "Последнее использование",
@@ -3692,7 +3735,7 @@
     "scanning": "Сканирование…",
     "scanQr": "Сканировать QR",
     "serverUrl": "URL сервера",
-    "serverUrlPlaceholder": "https://your-fusion-host",
+    "serverUrlPlaceholder": "https://your-agi-host",
     "stepContinue": ". Продолжите с того места, где остановились, чтобы завершить настройку панели.",
     "welcome": "Добро пожаловать в agi"
   },
@@ -4050,7 +4093,7 @@
     "selectedAgentTemplate": "{{name}} выбран",
     "selectedModel": "Выбрано:",
     "serverUrl": "URL сервера",
-    "serverUrlPlaceholder": "https://your-fusion-host",
+    "serverUrlPlaceholder": "https://your-agi-host",
     "setUpAi": "Настроить AI",
     "setupComplete": "Настройка завершена! Перейдите на доску, чтобы создать свою первую задачу, или изучите панель, чтобы увидеть, что доступно.",
     "setupMode": "Режим настройки",
@@ -5219,7 +5262,8 @@
     "subtask": "Подзадача",
     "toggleOptionalWorkflowStep": "Переключить необязательный шаг рабочего процесса: {{name}}",
     "useDefault": "Использовать по умолчанию",
-    "whatNeedsToBeDone": "Что нужно сделать?"
+    "whatNeedsToBeDone": "Что нужно сделать?",
+    "workflowLabel": "Рабочий процесс"
   },
   "plugins": {
     "addItem": "Добавить элемент",
@@ -5333,7 +5377,39 @@
     "unknownError": "неизвестная ошибка",
     "updateFailed": "Не удалось обновить плагин: {{error}}",
     "version": "Версия:",
-    "viewUnavailable": "Представление плагина недоступно"
+    "viewUnavailable": "Представление плагина недоступно",
+    "builtin": {
+      "hermesRuntime": {
+        "description": "Провайдер среды выполнения для исполнения через Hermes CLI."
+      },
+      "paperclipRuntime": {
+        "description": "Провайдер среды выполнения для подключений агентов Paperclip."
+      },
+      "openclawRuntime": {
+        "description": "Провайдер среды выполнения для исполнения OpenClaw."
+      },
+      "droidRuntime": {
+        "description": "Провайдер среды выполнения для исполнения через Droid CLI."
+      },
+      "dependencyGraph": {
+        "description": "Плагин дашборда для визуализации графа зависимостей задач."
+      },
+      "reports": {
+        "description": "Просмотр истории отчётов, сравнение прогонов бок о бок и экспорт автономных HTML-сводок."
+      },
+      "whatsappChat": {
+        "description": "Подключается к WhatsApp Web (мультиустройство) по QR или коду сопряжения и связывает личные чаты с агентом."
+      },
+      "cliPrintingPress": {
+        "description": "Пошаговый мастер для создания определений CLI внешних сервисов."
+      },
+      "compoundEngineering": {
+        "description": "Отдельный раздел дашборда для артефактов compound-engineering и интерактивных сессий ce-*."
+      },
+      "agentBrowser": {
+        "description": "Метаданные встроенной интеграции. Поддержка установки пакета появится в FN-3101."
+      }
+    }
   },
   "projects": {
     "actions": {
@@ -6097,7 +6173,10 @@
     "verification": "Проверка:",
     "verificationCriteria": "Критерии проверки",
     "viewMissionFailures": "Просмотреть сбои миссии",
-    "whatToBuild": "Что вы хотите создать?"
+    "whatToBuild": "Что вы хотите создать?",
+    "restoreQuestionError": "Не удалось восстановить вопрос сессии.",
+    "restoreResultError": "Не удалось восстановить результат сессии.",
+    "resumeSessionError": "Не удалось возобновить сессию."
   },
   "modalManager": {
     "createdFromPlanning": "Создано {{id}} из режима планирования",
@@ -6449,7 +6528,7 @@
     "engineOptions": "Параметры движка",
     "evalsView": "Оценки",
     "fusionLogo": "Логотип agi",
-    "gitManager": "Git Manager",
+    "gitManager": "Менеджер Git",
     "goalsView": "Цели",
     "importFromGitHub": "Импорт из GitHub",
     "insightsView": "Аналитика",
@@ -6655,7 +6734,7 @@
     "evals": "Оценки",
     "expandSidebar": "Развернуть боковую панель",
     "files": "Файлы",
-    "gitManager": "Git Manager",
+    "gitManager": "Менеджер Git",
     "goals": "Цели",
     "importFromGitHub": "Импорт из GitHub",
     "insights": "Аналитика",
@@ -7844,7 +7923,10 @@
     "weekly": "Еженедельно",
     "workingOn": "Работает над",
     "zoomIn": "Приблизить",
-    "zoomOut": "Отдалить"
+    "zoomOut": "Отдалить",
+    "skillsLabel": "Навыки",
+    "uploadFileAriaLabel": "Загрузить файл манифеста агента",
+    "selectDirectoryAriaLabel": "Выбрать каталог"
   },
   "settings": {
     "actions": {
@@ -7987,7 +8069,25 @@
     "experimental": {
       "experimentalFeatures": "Экспериментальные функции",
       "experimentalFeaturesAreEarlyCapabilitiesThatAreNot": " Экспериментальные функции — это ранние возможности, ещё не полностью стабильные. Включайте их, чтобы протестировать новую функциональность, но учитывайте, что они могут измениться или быть удалены. ",
-      "featureFlags": "Флаги функций"
+      "featureFlags": "Флаги функций",
+      "feature": {
+        "insights": "Аналитика",
+        "memoryView": "Редактор памяти",
+        "remoteAccess": "Удалённый доступ",
+        "skillsView": "Представление навыков",
+        "nodesView": "Представление узлов",
+        "devServerView": "Dev-сервер",
+        "todoView": "Список задач",
+        "researchView": "Представление исследований",
+        "evalsView": "Представление оценок",
+        "goalsView": "Представление целей",
+        "subtaskBreakdown": "Разбивка на подзадачи",
+        "leftSidebarNav": "Навигация в левой боковой панели",
+        "sandbox": "Песочница (изоляция команд)",
+        "chatRooms": "Чат-комнаты",
+        "agentOnboarding": "Онбординг агента в стиле планирования",
+        "workflowInterpreterDualObserve": "Движок графа рабочих процессов — паритет двойного наблюдения (диагностика)"
+      }
     },
     "footer": {
       "help": "Помощь",
@@ -8467,9 +8567,9 @@
       "testRoomReply": "Тестовый ответ в комнате",
       "tk": "tk_...",
       "topicMustBe164AlphanumericHyphenOr": " Тема должна содержать 1–64 символа: буквы, цифры, дефис или подчёркивание ",
-      "webhook": "Webhook",
-      "webhookNotifications": " Уведомления через webhook ",
-      "webhookURL": "URL webhook",
+      "webhook": "Вебхук",
+      "webhookNotifications": " Уведомления через вебхук ",
+      "webhookURL": "URL вебхука",
       "yourNtfyShTopicName164Alphanumeric": " Имя вашей темы ntfy.sh (1–64 символа: буквы, цифры, дефис или подчёркивание)."
     },
     "plugins": {
@@ -8775,5 +8875,12 @@
       "currentDirectory": "Текущий каталог:",
       "projectRoot": "(корень проекта)"
     }
+  },
+  "floatingWindow": {
+    "resizeAriaLabel": "Изменить размер плавающего окна",
+    "closeAriaLabel": "Закрыть плавающее окно"
+  },
+  "previewIframe": {
+    "title": "Предпросмотр dev-сервера"
   }
 }

@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /*
 FNXC:Markdown 2026-06-23-03:15:
@@ -39,6 +40,8 @@ export const MermaidDiagram = memo(function MermaidDiagram({
   chart,
   testId,
 }: MermaidDiagramProps) {
+  // FNXC:i18n-Finalize 2026-06-24-04:30: the rendered diagram's accessible name is localized ('Mermaid' is a library token, but the screen-reader name shown to users should read 'Диаграмма'/'Diagram').
+  const { t } = useTranslation("common");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [errored, setErrored] = useState(false);
 
@@ -89,7 +92,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
       ref={containerRef}
       className="mailbox-mermaid"
       data-testid={testId}
-      aria-label="Mermaid diagram"
+      aria-label={t("diagramAriaLabel", "Diagram")}
     />
   );
 });

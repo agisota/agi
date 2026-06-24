@@ -93,7 +93,8 @@ function logInstallResult(result: InstallResult, options: { verbose: boolean }):
       break;
     case "already-installed":
       if (options.verbose) {
-        console.log(`  ✓ Fusion skill already present at ${result.target}`);
+        // FNXC:i18n-Finalize 2026-06-24-04:30: brand rebrand — printed skills-runner output uses the 'agi' brand noun, not 'Fusion'.
+        console.log(`  ✓ agi skill already present at ${result.target}`);
       }
       break;
     case "failed":

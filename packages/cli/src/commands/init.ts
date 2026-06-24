@@ -97,7 +97,8 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
   // Get or generate project name
   const projectName = options.name ?? await detectProjectName(cwd);
 
-  console.log(`Initializing fn project: "${projectName}"`);
+  // FNXC:i18n-Finalize 2026-06-24-04:30: brand rebrand — printed init line uses the canonical 'agi' command/brand, not the legacy 'fn' token.
+  console.log(`Initializing agi project: "${projectName}"`);
   console.log(`  Path: ${cwd}`);
 
   // Create .fusion/ directory

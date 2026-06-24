@@ -203,7 +203,8 @@ export async function runUpdate(options: RunUpdateOptions = {}): Promise<void> {
 
   const currentVersion = readOwnCliVersion();
   if (!currentVersion) {
-    console.error("Error: Could not determine current Fusion CLI version.");
+    // FNXC:i18n-Finalize 2026-06-24-04:30: brand rebrand — printed CLI error uses the 'agi' brand noun, not 'Fusion'.
+    console.error("Error: Could not determine current agi CLI version.");
     process.exit(1);
     return;
   }

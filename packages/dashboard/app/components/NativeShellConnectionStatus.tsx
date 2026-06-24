@@ -10,7 +10,8 @@ export function NativeShellConnectionStatus({ state, onManage }: NativeShellConn
   const activeProfile = state.profiles.find((profile) => profile.id === state.activeProfileId) ?? null;
   const label =
     state.host === "desktop-shell" && state.desktopMode === "local"
-      ? "Local Fusion"
+      ? // FNXC:i18n-Finalize 2026-06-24-04:30: brand rebrand — desktop local connection label uses the 'agi' brand noun, not 'Fusion'.
+        "Local agi"
       : activeProfile?.name ?? "Disconnected";
 
   return (

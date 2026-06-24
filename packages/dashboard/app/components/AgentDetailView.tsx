@@ -4609,7 +4609,7 @@ function ConfigTab({
           <div className="config-field">
             <SkillMultiselect
               id="agent-skills"
-              label="Skills"
+              label={t("agents.skillsLabel", "Skills")}
               value={selectedSkills}
               onChange={(nextSkills) => {
                 setSelectedSkills(nextSkills);

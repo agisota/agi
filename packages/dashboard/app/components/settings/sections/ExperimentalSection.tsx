@@ -50,7 +50,8 @@ export function ExperimentalSection({ scopeBanner, form, setForm, knownFeatures,
                     };
                 });
             }}/>
-              <span>{knownFeatures[key] ?? key}</span>
+              {/* FNXC:i18n-Finalize 2026-06-24-04:30: experimental-feature labels are localized at render time via t(`settings.experimental.feature.${key}`); the English KNOWN_EXPERIMENTAL_FEATURES value is the i18next defaultValue fallback. Unknown/custom keys (absent from the catalog) degrade to the raw key, as before. */}
+              <span>{knownFeatures[key] ? t(`settings.experimental.feature.${key}`, knownFeatures[key]) : key}</span>
             </label>))}
         </div>
       </div>

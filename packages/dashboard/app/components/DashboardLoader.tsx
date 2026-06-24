@@ -80,8 +80,8 @@ export function DashboardLoader({ stage }: DashboardLoaderProps) {
    * FN-6822 requires the loader status region accessible name to carry inline English defaults so backend-less test i18next and pre-catalog first paint render the localized label instead of the raw key.
    */
   const statusLabel = isVersionUpdate
-    ? t("dashboard.updatingMessage", "Updating Fusion dashboard")
-    : t("dashboard.loadingMessage", "Loading Fusion dashboard");
+    ? t("dashboard.updatingMessage", "Updating agi dashboard")
+    : t("dashboard.loadingMessage", "Loading agi dashboard");
 
   return (
     <div
@@ -93,7 +93,7 @@ export function DashboardLoader({ stage }: DashboardLoaderProps) {
       data-version-update={isVersionUpdate ? "true" : undefined}
     >
       <div className="dashboard-loader__content">
-        <h1 className="dashboard-loader__logo">{t("appName", "Fusion")}</h1>
+        <h1 className="dashboard-loader__logo">{t("appName", "agi")}</h1>
         {isVersionUpdate ? (
           <p className="dashboard-loader__message dashboard-loader__message--update">
             {t("dashboard.updatingVersion", "Updating to a new frontend version...")}

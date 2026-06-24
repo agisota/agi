@@ -496,7 +496,7 @@ export function AgentImportModal({ isOpen, onClose, onImported, projectId, initi
                   accept=".md,.txt"
                   onChange={handleFileChange}
                   className="agent-import-file-input"
-                  aria-label="Upload agent manifest file"
+                  aria-label={t("agents.uploadFileAriaLabel", "Upload agent manifest file")}
                 />
                 <input
                   ref={directoryInputRef}
@@ -506,7 +506,7 @@ export function AgentImportModal({ isOpen, onClose, onImported, projectId, initi
                   multiple
                   onChange={handleDirectoryChange}
                   className="agent-import-file-input"
-                  aria-label="Select directory"
+                  aria-label={t("agents.selectDirectoryAriaLabel", "Select directory")}
                 />
                 <button
                   type="button"

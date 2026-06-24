@@ -53,7 +53,7 @@ export function DbCorruptionBanner({
       </div>
 
       <p className="db-corruption-banner__body">
-        {t("dbBanner.body", "Fusion's background SQLite integrity check reported corruption. Review the failing objects below before continuing critical operations.")}
+        {t("dbBanner.body", "Фоновая проверка целостности SQLite в agi обнаружила повреждение. Просмотрите проблемные объекты ниже, прежде чем продолжать критические операции.")}
       </p>
 
       <ul className="db-corruption-banner__list">

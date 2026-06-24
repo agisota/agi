@@ -1090,7 +1090,7 @@ export function InlineCreateCard({
               onChange={(id) => setSelectedWorkflowId(id)}
               projectId={projectId}
               addToast={addToast}
-              label="Workflow"
+              label={t("inline.workflowLabel", "Workflow")}
               disabled={submitting}
             />
 

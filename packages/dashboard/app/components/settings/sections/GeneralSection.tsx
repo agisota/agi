@@ -92,7 +92,7 @@ export function GeneralSection({ scopeBanner, form, setForm, projectId, addToast
       <div className="form-group">
         <label htmlFor="ephemeralAgentsEnabled" className="checkbox-label">
           <input id="ephemeralAgentsEnabled" type="checkbox" checked={form.ephemeralAgentsEnabled !== false} onChange={(e) => setForm((f) => ({ ...f, ephemeralAgentsEnabled: e.target.checked }))}/>{t("settings.general.useEphemeralTaskWorkerAgents", " Use ephemeral task-worker agents ")}</label>
-        <small>{t("settings.general.whenEnabledDefaultFusionSpawnsShortLived", " When enabled (default), Fusion spawns short-lived ")}<code>executor-FN-XXXX</code>{t("settings.general.agentsToRunEachTaskWhenDisabledOnly", " agents to run each task. When disabled, only permanent agents execute tasks and the scheduler auto-assigns work using the agent reporting chain. Tasks with no eligible permanent agent stay queued. ")}</small>
+        <small>{t("settings.general.whenEnabledDefaultFusionSpawnsShortLived", " When enabled (default), agi spawns short-lived ")}<code>executor-FN-XXXX</code>{t("settings.general.agentsToRunEachTaskWhenDisabledOnly", " agents to run each task. When disabled, only permanent agents execute tasks and the scheduler auto-assigns work using the agent reporting chain. Tasks with no eligible permanent agent stay queued. ")}</small>
       </div>
       <div className="form-group">
         <label htmlFor="completionDocumentationMode">{t("settings.general.completionDocumentationAutomation", "Completion Documentation Automation")}</label>
@@ -207,7 +207,7 @@ export function GeneralSection({ scopeBanner, form, setForm, projectId, addToast
           literal "&apos;" instead of an apostrophe. Use a real apostrophe so the copy
           reads correctly in both modal and embedded presentations.
         */}
-        <small>{t("settings.general.trackingIssuesUseThisTaskAposSTitle", " Tracking issues use this task's title. If a task has no title yet, Fusion can summarize its description using the title summarization model in Project Models. ")}{!form.autoSummarizeTitles && !form.useAiMergeCommitSummary && !form.githubTrackingEnabledByDefault
+        <small>{t("settings.general.trackingIssuesUseThisTaskAposSTitle", " Tracking issues use this task's title. If a task has no title yet, agi can summarize its description using the title summarization model in Project Models. ")}{!form.autoSummarizeTitles && !form.useAiMergeCommitSummary && !form.githubTrackingEnabledByDefault
             ? t("settings.general.enableSummarizationInProjectModelsToConfigureThatModel", " Enable summarization in Project Models to configure that model.")
             : ""}
         </small>
@@ -220,7 +220,7 @@ export function GeneralSection({ scopeBanner, form, setForm, projectId, addToast
       <div className="form-group">
         <label htmlFor="githubTrackingDedupEnabled" className="checkbox-label">
           <input id="githubTrackingDedupEnabled" type="checkbox" checked={form.githubTrackingDedupEnabled !== false} onChange={(e) => setForm((f) => ({ ...f, githubTrackingDedupEnabled: e.target.checked }))}/>{t("settings.general.searchTheTrackingRepoForLikelyDuplicatesBefore", " Search the tracking repo for likely duplicates before opening a new issue ")}</label>
-        <small>{t("settings.general.whenEnabledFusionChecksOpenAndClosedIssues", " When enabled, Fusion checks open and closed issues in the target repo for likely duplicates (using File Scope paths and key symptoms) before creating a new tracking issue. Uncheck to always create a new issue. ")}</small>
+        <small>{t("settings.general.whenEnabledFusionChecksOpenAndClosedIssues", " When enabled, agi checks open and closed issues in the target repo for likely duplicates (using File Scope paths and key symptoms) before creating a new tracking issue. Uncheck to always create a new issue. ")}</small>
       </div>
     </>);
 }

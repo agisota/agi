@@ -158,7 +158,7 @@ export const BUILTIN_PLUGINS: BuiltinPlugin[] = [
   {
     id: "fusion-plugin-whatsapp-chat",
     name: "WhatsApp Chat",
-    description: "Pairs to WhatsApp Web (multi-device) with QR or pairing code, then bridges direct chats to a Fusion agent.",
+    description: "Pairs to WhatsApp Web (multi-device) with QR or pairing code, then bridges direct chats to an agi agent.",
     category: "integration",
     path: "./plugins/fusion-plugin-whatsapp-chat",
   },
@@ -184,6 +184,16 @@ export const BUILTIN_PLUGINS: BuiltinPlugin[] = [
     hasSetup: true,
   },
 ];
+
+/*
+FNXC:i18n-Finalize 2026-06-24-04:30:
+BUILTIN_PLUGINS lives at module scope and is built before i18next initializes, so its `description` strings stay English and act as the i18next defaultValue fallback. They are localized at render time via t(`plugins.builtin.${key}.description`, builtinPlugin.description) where `key` is the plugin id minus the `fusion-plugin-` prefix, camel-cased (e.g. fusion-plugin-cli-printing-press -> cliPrintingPress). Product/library names (Dependency Graph, WhatsApp, Compound Engineering) stay in the rendered `name`; technical tokens like compound-engineering and ce-* are preserved verbatim inside the RU catalog values.
+*/
+export function builtinPluginDescriptionKey(pluginId: string): string {
+  const stem = pluginId.replace(/^fusion-plugin-/, "");
+  const camel = stem.replace(/-([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+  return `plugins.builtin.${camel}.description`;
+}
 
 export const STATE_COLORS: Record<string, string> = {
   started: "var(--color-success)",
@@ -1084,7 +1094,7 @@ export function PluginManager({ addToast, projectId }: PluginManagerProps) {
                 {setupStatusDeferred && (
                   <span className="plugin-builtins-setup-status plugin-builtins-setup-status--deferred">{t("plugins.startPluginToCheckSetup", "Start plugin to check setup")}</span>
                 )}
-                <span className="plugin-builtins-description-text">{builtinPlugin.description}</span>
+                <span className="plugin-builtins-description-text">{t(builtinPluginDescriptionKey(builtinPlugin.id), builtinPlugin.description)}</span>
               </div>
               {metadataOnly ? (
                 isInstalled && requiresSetupAction ? (

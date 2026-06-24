@@ -213,7 +213,7 @@
     "taskDetailScrollHints": "↑↓/j/k прокрутка · PgUp/PgDn полстраницы · g вверх · G вниз · Esc назад",
     "taskDetailStepsSectionHeader": "── Шаги ──────────────────────────────────────",
     "taskDetailUnavailable": "Задача больше недоступна — Esc для возврата",
-    "updateAvailable": "Доступно обновление: v{{currentVersion}} → v{{latestVersion}}. Выполните `fn update` для установленного CLI или обновите этот исходный checkout.",
+    "updateAvailable": "Доступно обновление: v{{currentVersion}} → v{{latestVersion}}. Выполните `agi update` для установленного CLI или обновите этот исходный checkout.",
     "utilitiesAdjustThreshold": "Изменить порог ({{pct}}%)",
     "utilitiesAutoKillVitest": "Авто-остановка vitest >{{pct}}% памяти: {{state}}",
     "utilitiesClearLogs": "Очистить логи",

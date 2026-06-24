@@ -213,7 +213,7 @@
     "taskDetailScrollHints": "↑↓/j/k scroll · PgUp/PgDn half-page · g top · G bottom · Esc back",
     "taskDetailStepsSectionHeader": "── Steps ──────────────────────────────────────",
     "taskDetailUnavailable": "Task no longer available — Esc to go back",
-    "updateAvailable": "Update available: v{{currentVersion}} → v{{latestVersion}}. Run `fn update` for an installed CLI, or pull this source checkout.",
+    "updateAvailable": "Update available: v{{currentVersion}} → v{{latestVersion}}. Run `agi update` for an installed CLI, or pull this source checkout.",
     "utilitiesAdjustThreshold": "Adjust Threshold ({{pct}}%)",
     "utilitiesAutoKillVitest": "Auto-Kill Vitest >{{pct}}% Mem: {{state}}",
     "utilitiesClearLogs": "Clear Logs",

@@ -2980,8 +2980,8 @@ export function SettingsModal({
               target="_blank"
               rel="noopener noreferrer"
               className="settings-github-star-btn"
-              aria-label={t("settings.header.starFusion", "Star Fusion on GitHub")}
-              title={t("settings.header.starFusion", "Star Fusion on GitHub")}
+              aria-label={t("settings.header.starFusion", "Star agi on GitHub")}
+              title={t("settings.header.starFusion", "Star agi on GitHub")}
               onClick={markStarClicked}
               data-clicked={starClicked ? "true" : "false"}
             >

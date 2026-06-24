@@ -289,14 +289,14 @@ export function SetupWizardModal({
         {/* Header */}
         <div className="setup-wizard-header">
           <div className="setup-wizard-heading">
-            <div className="setup-wizard-brand" aria-label={t("setup.brandName", "Fusion")}>
+            <div className="setup-wizard-brand" aria-label={t("setup.brandName", "agi")}>
               <svg
                 className="setup-wizard-brand-logo"
                 width={28}
                 height={28}
                 viewBox="0 0 128 128"
                 fill="none"
-                aria-label={t("setup.brandLogo", "Fusion logo")}
+                aria-label={t("setup.brandLogo", "agi logo")}
                 role="img"
               >
                 <circle
@@ -311,10 +311,10 @@ export function SetupWizardModal({
                   fill="currentColor"
                 />
               </svg>
-              <span className="setup-wizard-brand-name">{t("setup.brandName", "Fusion")}</span>
+              <span className="setup-wizard-brand-name">{t("setup.brandName", "agi")}</span>
             </div>
             <h2 id="wizard-title" className="setup-wizard-title">
-              {state.step === "manual" && t("setup.welcomeToFusion", "Welcome to Fusion")}
+              {state.step === "manual" && t("setup.welcomeToFusion", "Welcome to agi")}
               {state.step === "agent" && t("setup.firstAgentTitle", "Create your first agent")}
               {state.step === "complete" && t("setup.setupCompleteTitle", "Setup Complete!")}
             </h2>
@@ -364,7 +364,7 @@ export function SetupWizardModal({
                 />
                 <p className="form-hint">
                   {isCloneMode
-                    ? t("setup.clonePathHint", "Select or type an absolute destination path. Fusion will clone into this directory.")
+                    ? t("setup.clonePathHint", "Select or type an absolute destination path. agi will clone into this directory.")
                     : t("setup.projectPathHint", "Select or type the absolute path to your project")}
                 </p>
               </div>
@@ -420,7 +420,7 @@ export function SetupWizardModal({
                           placeholder={t("setup.repositoryUrlPlaceholder", "https://github.com/owner/repo.git")}
                         />
                         <p className="form-hint">
-                          {t("setup.cloneGitHint", "Fusion will run git clone into the destination directory, then register that cloned folder.")}
+                          {t("setup.cloneGitHint", "agi will run git clone into the destination directory, then register that cloned folder.")}
                         </p>
                       </div>
                     )}
@@ -500,7 +500,7 @@ export function SetupWizardModal({
           {state.step === "agent" && (
             <div className="setup-wizard-agent-step">
               <p className="setup-wizard-agent-intro">
-                {t("setup.firstAgentIntro", "Agents are optional. Fusion can build tasks without one by starting temporary agents for planning, coding, review, and merge. Create an agent only if you want help coordinating tasks and direction.")}
+                {t("setup.firstAgentIntro", "Agents are optional. agi can build tasks without one by starting temporary agents for planning, coding, review, and merge. Create an agent only if you want help coordinating tasks and direction.")}
               </p>
 
               <div className="setup-wizard-agent-layout">

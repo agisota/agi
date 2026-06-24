@@ -45,9 +45,10 @@ function getSourceClass(source: PiExtensionEntry["source"]): string {
 /** Get display label for extension source */
 function getSourceLabel(source: PiExtensionEntry["source"]): string {
   const labels: Record<PiExtensionEntry["source"], string> = {
-    "fusion-global": "Fusion Global",
+    // FNXC:i18n-Finalize 2026-06-24-04:30: brand rebrand — non-i18n source labels render verbatim; use the 'agi' brand noun, not 'Fusion'. The source keys ("fusion-global"/"fusion-project") are stable identifiers and stay.
+    "fusion-global": "agi Global",
     "pi-global": "Pi Global",
-    "fusion-project": "Fusion Project",
+    "fusion-project": "agi Project",
     "pi-project": "Pi Project",
     package: "Package",
   };
@@ -164,9 +165,9 @@ export function PiExtensionsManager({ addToast, projectId }: PiExtensionsManager
       setReinstallingFusion(true);
       await reinstallFusionPiPackage(projectId);
       await Promise.all([loadSettings(), loadExtensions()]);
-      addToast(t("piManager.reinstallSuccess", "Fusion skill reinstalled successfully"), "success");
+      addToast(t("piManager.reinstallSuccess", "agi skill reinstalled successfully"), "success");
     } catch (err) {
-      addToast(t("piManager.reinstallFailed", "Failed to reinstall Fusion skill: {{error}}", { error: err instanceof Error ? err.message : String(err) }), "error");
+      addToast(t("piManager.reinstallFailed", "Failed to reinstall agi skill: {{error}}", { error: err instanceof Error ? err.message : String(err) }), "error");
     } finally {
       setReinstallingFusion(false);
     }
@@ -289,7 +290,7 @@ export function PiExtensionsManager({ addToast, projectId }: PiExtensionsManager
                 onClick={handleReinstallFusion}
                 disabled={reinstallingFusion}
               >
-                {reinstallingFusion ? t("piManager.reinstalling", "Reinstalling Fusion…") : t("piManager.reinstallButton", "Reinstall Fusion skill")}
+                {reinstallingFusion ? t("piManager.reinstalling", "Reinstalling agi…") : t("piManager.reinstallButton", "Reinstall agi skill")}
               </button>
             </div>
           </div>

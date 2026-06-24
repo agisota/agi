@@ -162,7 +162,7 @@ export function GlobalModelsSection({ scopeBanner, form, setForm, availableModel
                 title: e.target.value,
             },
         }))}/>
-          <small>{t("settings.globalModels.leaveEmptyToOmitThisHeaderDefaultFusion", "Leave empty to omit this header. Default: Fusion.")}</small>
+          <small>{t("settings.globalModels.leaveEmptyToOmitThisHeaderDefaultFusion", "Leave empty to omit this header. Default: agi.")}</small>
         </div>
         <div className="form-group">
           <label htmlFor="openrouterModelFiltersSupportedParameters">{t("settings.globalModels.openRouterSupportedParametersFilter", "OpenRouter supported_parameters filter")}</label>

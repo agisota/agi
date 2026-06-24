@@ -1103,7 +1103,10 @@
     "weekly": "每週",
     "workingOn": "正在處理：",
     "zoomIn": "放大",
-    "zoomOut": "縮小"
+    "zoomOut": "縮小",
+    "skillsLabel": "",
+    "uploadFileAriaLabel": "",
+    "selectDirectoryAriaLabel": ""
   },
   "app": {
     "backendError": {
@@ -3029,7 +3032,8 @@
     "subtask": "子工作",
     "toggleOptionalWorkflowStep": "",
     "useDefault": "使用預設值",
-    "whatNeedsToBeDone": "需要做什麼？"
+    "whatNeedsToBeDone": "需要做什麼？",
+    "workflowLabel": ""
   },
   "insights": {
     "allInsights": "所有洞察",
@@ -3850,7 +3854,10 @@
     "verification": "驗證：",
     "verificationCriteria": "驗證標準",
     "viewMissionFailures": "查看任務失敗",
-    "whatToBuild": "您想要建置什麼？"
+    "whatToBuild": "您想要建置什麼？",
+    "restoreQuestionError": "",
+    "restoreResultError": "",
+    "resumeSessionError": ""
   },
   "modalManager": {
     "createdFromPlanning": "在規劃模式中創建了 {{id}}",
@@ -4705,7 +4712,39 @@
     "unknownError": "未知錯誤",
     "updateFailed": "更新插件失敗：{{error}}",
     "version": "版本：",
-    "viewUnavailable": ""
+    "viewUnavailable": "",
+    "builtin": {
+      "hermesRuntime": {
+        "description": ""
+      },
+      "paperclipRuntime": {
+        "description": ""
+      },
+      "openclawRuntime": {
+        "description": ""
+      },
+      "droidRuntime": {
+        "description": ""
+      },
+      "dependencyGraph": {
+        "description": ""
+      },
+      "reports": {
+        "description": ""
+      },
+      "whatsappChat": {
+        "description": ""
+      },
+      "cliPrintingPress": {
+        "description": ""
+      },
+      "compoundEngineering": {
+        "description": ""
+      },
+      "agentBrowser": {
+        "description": ""
+      }
+    }
   },
   "pr": {
     "authFail": "執行 gh auth login 並重試。",
@@ -5707,7 +5746,25 @@
     "experimental": {
       "experimentalFeatures": "",
       "experimentalFeaturesAreEarlyCapabilitiesThatAreNot": "",
-      "featureFlags": ""
+      "featureFlags": "",
+      "feature": {
+        "insights": "",
+        "memoryView": "",
+        "remoteAccess": "",
+        "skillsView": "",
+        "nodesView": "",
+        "devServerView": "",
+        "todoView": "",
+        "researchView": "",
+        "evalsView": "",
+        "goalsView": "",
+        "subtaskBreakdown": "",
+        "leftSidebarNav": "",
+        "sandbox": "",
+        "chatRooms": "",
+        "agentOnboarding": "",
+        "workflowInterpreterDualObserve": ""
+      }
     },
     "footer": {
       "help": "說明",
@@ -7285,7 +7342,8 @@
     "header": {
       "back": "返回",
       "backToList": "返回任務清單",
-      "editTask": "編輯任務"
+      "editTask": "編輯任務",
+      "popOut": ""
     },
     "inputTokens": "輸入",
     "lastUsed": "最後使用",
@@ -8533,7 +8591,49 @@
     "valuesSaved": "",
     "valuesTab": "",
     "widget": "",
-    "widgetDefault": ""
+    "widgetDefault": "",
+    "settingLabel": {
+      "planningProvider": "",
+      "planningModelId": "",
+      "planningFallbackProvider": "",
+      "planningFallbackModelId": "",
+      "executionProvider": "",
+      "executionModelId": "",
+      "validatorProvider": "",
+      "validatorModelId": "",
+      "validatorFallbackProvider": "",
+      "validatorFallbackModelId": "",
+      "requirePrApproval": "",
+      "requirePlanApproval": "",
+      "reviewHandoffPolicy": "",
+      "maxReviewerContextRetries": "",
+      "maxReviewerFallbackRetries": "",
+      "reflectionEnabled": "",
+      "workflowStepTimeoutMs": "",
+      "workflowStepScopeEnforcement": "",
+      "planOnlyScopeLeakEnforcement": "",
+      "workflowRevisionForkOnScopeMismatch": "",
+      "strictScopeEnforcement": "",
+      "runStepsInNewSessions": "",
+      "maxParallelSteps": "",
+      "buildRetryCount": "",
+      "verificationFixRetries": "",
+      "maxPostReviewFixes": ""
+    },
+    "settingDescription": {
+      "planningProvider": "",
+      "planningModelId": "",
+      "executionProvider": "",
+      "executionModelId": "",
+      "validatorProvider": "",
+      "validatorModelId": ""
+    },
+    "group": {
+      "models": "",
+      "review": "",
+      "steps": "",
+      "advanced": ""
+    }
   },
   "workflowSwitcher": {
     "countsAria": "{{todoLabel}}: {{todo}}, {{inProgressLabel}}: {{inProgress}}, {{doneLabel}}: {{done}}",
@@ -8607,5 +8707,12 @@
     "toolResult": "",
     "you": "",
     "youMessage": ""
+  },
+  "floatingWindow": {
+    "resizeAriaLabel": "",
+    "closeAriaLabel": ""
+  },
+  "previewIframe": {
+    "title": ""
   }
 }

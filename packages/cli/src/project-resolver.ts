@@ -645,7 +645,8 @@ export async function registerProjectInteractive(
       if (subRepos.length > 0) {
         console.log(`\n  Found ${subRepos.length} git repositories in ${absPath}:`);
         subRepos.forEach((r: string) => console.log(`    • ${r}`));
-        console.log(`\n  Initializing as a Fusion workspace...\n`);
+        // FNXC:i18n-Finalize 2026-06-24-04:30: brand rebrand — printed init message uses the 'agi' brand noun (RU copy), not 'Fusion'.
+        console.log(`\n  Инициализация как рабочее пространство agi...\n`);
         detectedSubRepos = subRepos;
         // workspace.json is written below, only after a confirmed store.init() succeeds.
       }

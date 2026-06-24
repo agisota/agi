@@ -83,7 +83,7 @@ export default function MergeAdvanceNotice({ projectId, apiBase = "/api" }: Merg
                 : pushStatus.disabledReason === "no-upstream"
                   ? t("merge.disabledNoUpstream", "Branch has no upstream on origin.")
                   : pushStatus.disabledReason === "merge-locked"
-                    ? t("merge.disabledMergeLocked", "Push paused — a Fusion merge is in progress.")
+                    ? t("merge.disabledMergeLocked", "Push paused — an agi merge is in progress.")
                     : null}
             </span>
           ) : null}

@@ -239,5 +239,6 @@
     "summarySeamReview": "Review (engine)",
     "summarySeamStepExecute": "Step execute (engine)",
     "summarySeamUnknown": "Seam: {{seam}}"
-  }
+  },
+  "diagramAriaLabel": "Diagram"
 }

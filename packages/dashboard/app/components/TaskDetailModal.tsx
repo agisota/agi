@@ -2790,7 +2790,7 @@ export function TaskDetailContent({
                 className="modal-edit-btn"
                 onClick={() => onPopOut(task)}
                 title={t("taskDetail.header.popOut", "Pop out")}
-                aria-label="Pop out"
+                aria-label={t("taskDetail.header.popOut", "Pop out")}
                 data-testid="task-detail-pop-out"
               >
                 <Maximize2 size={14} />

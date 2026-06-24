@@ -972,6 +972,7 @@ export default interface Resources {
       "selectAnAgent": "Select an agent",
       "selectCompany": "Please select a company from the catalog",
       "selectDirectory": "Select Directory",
+      "selectDirectoryAriaLabel": "Select directory",
       "selectMemoryFile": "Select a memory file",
       "selectModel": "Model",
       "selectModelPlaceholder": "Select a model…",
@@ -996,6 +997,7 @@ export default interface Resources {
       "skillsHint": "Optional skills to assign to this agent",
       "skillsImported_one": "{{count}} skill{{plural}} imported",
       "skillsImported_other": "{{count}} skill{{plural}} imported",
+      "skillsLabel": "Skills",
       "skillsNone": "No skills assigned",
       "skillsSelected_one": "{{count}} skill selected",
       "skillsSelected_other": "{{count}} skills selected",
@@ -1087,6 +1089,7 @@ export default interface Resources {
       "upgradeToDefaultAriaLabel": "Upgrade heartbeat procedure to default",
       "upgrading": "Upgrading...",
       "uploadAvatar": "Upload avatar",
+      "uploadFileAriaLabel": "Upload agent manifest file",
       "usageThresholdHint": "Send a warning when usage reaches this percentage of the budget.",
       "usageThresholdLabel": "Usage Warning Threshold (%)",
       "useGlobalDefault": "Use global default",
@@ -2408,6 +2411,10 @@ export default interface Resources {
       "taskHeader": "Tasks",
       "taskMatches": "Task matches"
     },
+    "floatingWindow": {
+      "closeAriaLabel": "Close floating window",
+      "resizeAriaLabel": "Resize floating window"
+    },
     "git": {
       "add": "Add",
       "addRemote": "Add Remote",
@@ -3031,7 +3038,8 @@ export default interface Resources {
       "subtask": "Subtask",
       "toggleOptionalWorkflowStep": "Toggle optional workflow step: {{name}}",
       "useDefault": "Use default",
-      "whatNeedsToBeDone": "What needs to be done?"
+      "whatNeedsToBeDone": "What needs to be done?",
+      "workflowLabel": "Workflow"
     },
     "insights": {
       "allInsights": "All Insights",
@@ -3748,9 +3756,12 @@ export default interface Resources {
       "removeMilestone": "Remove milestone",
       "removeSlice": "Remove slice",
       "resizeSidebar": "Resize mission sidebar",
+      "restoreQuestionError": "Failed to restore session question.",
+      "restoreResultError": "Failed to restore session result.",
       "resumeFailed": "Failed to resume mission",
       "resumeInterviewAriaLabel": "Resume interview {{title}}",
       "resumeMission": "Resume mission",
+      "resumeSessionError": "Failed to resume session.",
       "resumed": "Mission resumed",
       "retries": "retries",
       "retry": "retry",
@@ -4315,7 +4326,7 @@ export default interface Resources {
       "scanQr": "Scan QR",
       "scanning": "Scanning…",
       "serverUrl": "Server URL",
-      "serverUrlPlaceholder": "https://your-fusion-host",
+      "serverUrlPlaceholder": "https://your-agi-host",
       "stepContinue": "step. Continue where you left off to complete your dashboard setup.",
       "welcome": "Welcome to agi"
     },
@@ -4603,6 +4614,38 @@ export default interface Resources {
       "author": "Author:",
       "backToList": "Back to plugin list",
       "browseRegistry": "Browse Registry",
+      "builtin": {
+        "agentBrowser": {
+          "description": "Built-in integration metadata. Package install support lands in FN-3101."
+        },
+        "cliPrintingPress": {
+          "description": "Guided wizard for drafting external service CLI definitions."
+        },
+        "compoundEngineering": {
+          "description": "A dedicated dashboard surface for compound-engineering artifacts and interactive ce-* sessions."
+        },
+        "dependencyGraph": {
+          "description": "Dashboard plugin for task dependency graph visualization."
+        },
+        "droidRuntime": {
+          "description": "Runtime provider for Droid CLI execution."
+        },
+        "hermesRuntime": {
+          "description": "Runtime provider for Hermes CLI-backed execution."
+        },
+        "openclawRuntime": {
+          "description": "Runtime provider for OpenClaw execution."
+        },
+        "paperclipRuntime": {
+          "description": "Runtime provider for Paperclip agent connections."
+        },
+        "reports": {
+          "description": "View report history, compare runs side-by-side, and export standalone HTML summaries."
+        },
+        "whatsappChat": {
+          "description": "Pairs to WhatsApp Web (multi-device) with QR or pairing code, then bridges direct chats to an agi agent."
+        }
+      },
       "builtinInstallFailed": "Failed to install {{name}}: {{error}}",
       "builtinInstalledGlobally": "{{name}} installed globally",
       "builtinMetadataOnly": "Built-in metadata only",
@@ -4798,6 +4841,9 @@ export default interface Resources {
       "errorTitle": "Unable to load preview",
       "loading": "Loading preview...",
       "openInNewTab": "Open in new tab"
+    },
+    "previewIframe": {
+      "title": "Dev server preview"
     },
     "projectCard": {
       "activeTasks": "Active Tasks",
@@ -5709,6 +5755,24 @@ export default interface Resources {
       "experimental": {
         "experimentalFeatures": "Experimental Features",
         "experimentalFeaturesAreEarlyCapabilitiesThatAreNot": " Experimental features are early capabilities that are not yet fully stable. Enable them to test new functionality, but be aware they may change or be removed. ",
+        "feature": {
+          "agentOnboarding": "Planning-style Agent Onboarding",
+          "chatRooms": "Chat Rooms",
+          "devServerView": "Dev Server",
+          "evalsView": "Evals View",
+          "goalsView": "Goals View",
+          "insights": "Insights",
+          "leftSidebarNav": "Left Sidebar Navigation",
+          "memoryView": "Memory Editor",
+          "nodesView": "Nodes View",
+          "remoteAccess": "Remote Access",
+          "researchView": "Research View",
+          "sandbox": "Sandbox (command isolation)",
+          "skillsView": "Skills View",
+          "subtaskBreakdown": "Subtask Breakdown",
+          "todoView": "Todo List",
+          "workflowInterpreterDualObserve": "Workflow Graph Engine — dual-observe parity (diagnostic)"
+        },
         "featureFlags": "Feature Flags"
       },
       "fileBrowser": {
@@ -6764,7 +6828,7 @@ export default interface Resources {
       "selectedAgentTemplate": "{{name}} selected",
       "selectedModel": "Selected:",
       "serverUrl": "Server URL",
-      "serverUrlPlaceholder": "https://your-fusion-host",
+      "serverUrlPlaceholder": "https://your-agi-host",
       "setUpAi": "Set Up AI",
       "setUpProject": "Set Up Project",
       "setupComplete": "Setup complete! Head to the board to create your first task, or explore the dashboard to see what's available.",
@@ -7332,7 +7396,8 @@ export default interface Resources {
       "header": {
         "back": "Back",
         "backToList": "Back to task list",
-        "editTask": "Edit task"
+        "editTask": "Edit task",
+        "popOut": "Pop out"
       },
       "inputTokens": "Input",
       "lastUsed": "Last used",
@@ -8475,6 +8540,12 @@ export default interface Resources {
       "duplicateId": "A setting with that id already exists",
       "editId": "Edit id",
       "empty": "No settings declared yet. Add a setting to expose a typed, per-project knob.",
+      "group": {
+        "advanced": "Advanced",
+        "models": "Models",
+        "review": "Review & Approval",
+        "steps": "Step Execution"
+      },
       "idLabel": "Setting id",
       "idWarn": "Changing the id discards values stored under the old id (remove + add).",
       "loadFailed": "Failed to load setting values",
@@ -8502,6 +8573,42 @@ export default interface Resources {
       "saveFailed": "Failed to save setting values",
       "saveValues": "Save values",
       "selectModel": "Select a model…",
+      "settingDescription": {
+        "executionModelId": "Model used by task implementation agents.",
+        "executionProvider": "Provider used by task implementation agents.",
+        "planningModelId": "Model used when planning or triaging tasks.",
+        "planningProvider": "Provider used when planning or triaging tasks.",
+        "validatorModelId": "Model used by review and validation agents.",
+        "validatorProvider": "Provider used by review and validation agents."
+      },
+      "settingLabel": {
+        "buildRetryCount": "Build retry count",
+        "executionModelId": "Executor model",
+        "executionProvider": "Executor provider",
+        "maxParallelSteps": "Max parallel steps",
+        "maxPostReviewFixes": "Post-review fix passes",
+        "maxReviewerContextRetries": "Reviewer context retries",
+        "maxReviewerFallbackRetries": "Reviewer fallback retries",
+        "planOnlyScopeLeakEnforcement": "Plan-only scope leak enforcement",
+        "planningFallbackModelId": "Plan/Triage fallback model",
+        "planningFallbackProvider": "Plan/Triage fallback provider",
+        "planningModelId": "Plan/Triage model",
+        "planningProvider": "Plan/Triage provider",
+        "reflectionEnabled": "Reflection enabled",
+        "requirePlanApproval": "Require plan approval",
+        "requirePrApproval": "Require PR approval",
+        "reviewHandoffPolicy": "Review handoff policy",
+        "runStepsInNewSessions": "Run steps in new sessions",
+        "strictScopeEnforcement": "Strict scope enforcement",
+        "validatorFallbackModelId": "Reviewer fallback model",
+        "validatorFallbackProvider": "Reviewer fallback provider",
+        "validatorModelId": "Reviewer model",
+        "validatorProvider": "Reviewer provider",
+        "verificationFixRetries": "Verification fix retries",
+        "workflowRevisionForkOnScopeMismatch": "Fork revision on scope mismatch",
+        "workflowStepScopeEnforcement": "Step scope enforcement",
+        "workflowStepTimeoutMs": "Step timeout"
+      },
       "staleContext": "Values shown are for project {{project}} — reopen the editor to edit values for the current project.",
       "title": "Settings",
       "typeLabel": "Type",
@@ -8826,7 +8933,7 @@ export default interface Resources {
       "taskDetailScrollHints": "↑↓/j/k scroll · PgUp/PgDn half-page · g top · G bottom · Esc back",
       "taskDetailStepsSectionHeader": "── Steps ──────────────────────────────────────",
       "taskDetailUnavailable": "Task no longer available — Esc to go back",
-      "updateAvailable": "Update available: v{{currentVersion}} → v{{latestVersion}}. Run `fn update` for an installed CLI, or pull this source checkout.",
+      "updateAvailable": "Update available: v{{currentVersion}} → v{{latestVersion}}. Run `agi update` for an installed CLI, or pull this source checkout.",
       "utilitiesAdjustThreshold": "Adjust Threshold ({{pct}}%)",
       "utilitiesAutoKillVitest": "Auto-Kill Vitest >{{pct}}% Mem: {{state}}",
       "utilitiesClearLogs": "Clear Logs",
@@ -8906,6 +9013,7 @@ export default interface Resources {
         "last7d": "Last 7 days"
       }
     },
+    "diagramAriaLabel": "Diagram",
     "health": {
       "anomaly": {
         "duplicateActiveId": "Duplicate active task ID",

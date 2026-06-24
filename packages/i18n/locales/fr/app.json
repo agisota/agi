@@ -1103,7 +1103,10 @@
     "weekly": "Hebdomadaire",
     "workingOn": "En cours :",
     "zoomIn": "Zoomer",
-    "zoomOut": "Dézoomer"
+    "zoomOut": "Dézoomer",
+    "skillsLabel": "",
+    "uploadFileAriaLabel": "",
+    "selectDirectoryAriaLabel": ""
   },
   "app": {
     "backendError": {
@@ -3029,7 +3032,8 @@
     "subtask": "Sous-tâche",
     "toggleOptionalWorkflowStep": "",
     "useDefault": "Utiliser par défaut",
-    "whatNeedsToBeDone": "Qu'est-ce qui doit être fait?"
+    "whatNeedsToBeDone": "Qu'est-ce qui doit être fait?",
+    "workflowLabel": ""
   },
   "insights": {
     "allInsights": "Tous les Insights",
@@ -3850,7 +3854,10 @@
     "verification": "Vérification :",
     "verificationCriteria": "Critères de vérification",
     "viewMissionFailures": "Voir les échecs de la mission",
-    "whatToBuild": "Qu'est-ce que tu veux construire?"
+    "whatToBuild": "Qu'est-ce que tu veux construire?",
+    "restoreQuestionError": "",
+    "restoreResultError": "",
+    "resumeSessionError": ""
   },
   "modalManager": {
     "createdFromPlanning": "Créé {{id}} à partir du mode planification",
@@ -4705,7 +4712,39 @@
     "unknownError": "erreur inconnue",
     "updateFailed": "Échec de la mise à jour du plugin : {{error}}",
     "version": "Version :",
-    "viewUnavailable": ""
+    "viewUnavailable": "",
+    "builtin": {
+      "hermesRuntime": {
+        "description": ""
+      },
+      "paperclipRuntime": {
+        "description": ""
+      },
+      "openclawRuntime": {
+        "description": ""
+      },
+      "droidRuntime": {
+        "description": ""
+      },
+      "dependencyGraph": {
+        "description": ""
+      },
+      "reports": {
+        "description": ""
+      },
+      "whatsappChat": {
+        "description": ""
+      },
+      "cliPrintingPress": {
+        "description": ""
+      },
+      "compoundEngineering": {
+        "description": ""
+      },
+      "agentBrowser": {
+        "description": ""
+      }
+    }
   },
   "pr": {
     "authFail": "Exécutez gh auth login et réessayez.",
@@ -5707,7 +5746,25 @@
     "experimental": {
       "experimentalFeatures": "",
       "experimentalFeaturesAreEarlyCapabilitiesThatAreNot": "",
-      "featureFlags": ""
+      "featureFlags": "",
+      "feature": {
+        "insights": "",
+        "memoryView": "",
+        "remoteAccess": "",
+        "skillsView": "",
+        "nodesView": "",
+        "devServerView": "",
+        "todoView": "",
+        "researchView": "",
+        "evalsView": "",
+        "goalsView": "",
+        "subtaskBreakdown": "",
+        "leftSidebarNav": "",
+        "sandbox": "",
+        "chatRooms": "",
+        "agentOnboarding": "",
+        "workflowInterpreterDualObserve": ""
+      }
     },
     "footer": {
       "help": "Aide",
@@ -7285,7 +7342,8 @@
     "header": {
       "back": "Retour",
       "backToList": "Retour à la liste des tâches",
-      "editTask": "Modifier la tâche"
+      "editTask": "Modifier la tâche",
+      "popOut": ""
     },
     "inputTokens": "Entrée",
     "lastUsed": "Dernière utilisation",
@@ -8533,7 +8591,49 @@
     "valuesSaved": "",
     "valuesTab": "",
     "widget": "",
-    "widgetDefault": ""
+    "widgetDefault": "",
+    "settingLabel": {
+      "planningProvider": "",
+      "planningModelId": "",
+      "planningFallbackProvider": "",
+      "planningFallbackModelId": "",
+      "executionProvider": "",
+      "executionModelId": "",
+      "validatorProvider": "",
+      "validatorModelId": "",
+      "validatorFallbackProvider": "",
+      "validatorFallbackModelId": "",
+      "requirePrApproval": "",
+      "requirePlanApproval": "",
+      "reviewHandoffPolicy": "",
+      "maxReviewerContextRetries": "",
+      "maxReviewerFallbackRetries": "",
+      "reflectionEnabled": "",
+      "workflowStepTimeoutMs": "",
+      "workflowStepScopeEnforcement": "",
+      "planOnlyScopeLeakEnforcement": "",
+      "workflowRevisionForkOnScopeMismatch": "",
+      "strictScopeEnforcement": "",
+      "runStepsInNewSessions": "",
+      "maxParallelSteps": "",
+      "buildRetryCount": "",
+      "verificationFixRetries": "",
+      "maxPostReviewFixes": ""
+    },
+    "settingDescription": {
+      "planningProvider": "",
+      "planningModelId": "",
+      "executionProvider": "",
+      "executionModelId": "",
+      "validatorProvider": "",
+      "validatorModelId": ""
+    },
+    "group": {
+      "models": "",
+      "review": "",
+      "steps": "",
+      "advanced": ""
+    }
   },
   "workflowSwitcher": {
     "countsAria": "{{todoLabel}}: {{todo}}, {{inProgressLabel}}: {{inProgress}}, {{doneLabel}}: {{done}}",
@@ -8607,5 +8707,12 @@
     "toolResult": "",
     "you": "",
     "youMessage": ""
+  },
+  "floatingWindow": {
+    "resizeAriaLabel": "",
+    "closeAriaLabel": ""
+  },
+  "previewIframe": {
+    "title": ""
   }
 }

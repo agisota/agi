@@ -389,7 +389,7 @@ export function Header({
               fill="currentColor"
             />
           </svg>
-          <h1 className="logo">{t("appName", "Fusion")}</h1>
+          <h1 className="logo">{t("appName", "agi")}</h1>
         </div>
 
         {/* Mobile Project Switch - dropdown trigger next to logo when at least one project exists (mobile only) */}

@@ -1103,7 +1103,10 @@
     "weekly": "Weekly",
     "workingOn": "Working on",
     "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out"
+    "zoomOut": "Zoom out",
+    "skillsLabel": "Skills",
+    "uploadFileAriaLabel": "Upload agent manifest file",
+    "selectDirectoryAriaLabel": "Select directory"
   },
   "app": {
     "backendError": {
@@ -3029,7 +3032,8 @@
     "subtask": "Subtask",
     "toggleOptionalWorkflowStep": "Toggle optional workflow step: {{name}}",
     "useDefault": "Use default",
-    "whatNeedsToBeDone": "What needs to be done?"
+    "whatNeedsToBeDone": "What needs to be done?",
+    "workflowLabel": "Workflow"
   },
   "insights": {
     "allInsights": "All Insights",
@@ -3850,7 +3854,10 @@
     "verification": "Verification:",
     "verificationCriteria": "Verification Criteria",
     "viewMissionFailures": "View mission failures",
-    "whatToBuild": "What do you want to build?"
+    "whatToBuild": "What do you want to build?",
+    "restoreQuestionError": "Failed to restore session question.",
+    "restoreResultError": "Failed to restore session result.",
+    "resumeSessionError": "Failed to resume session."
   },
   "modalManager": {
     "createdFromPlanning": "Created {{id}} from planning mode",
@@ -4313,7 +4320,7 @@
     "scanning": "Scanning…",
     "scanQr": "Scan QR",
     "serverUrl": "Server URL",
-    "serverUrlPlaceholder": "https://your-fusion-host",
+    "serverUrlPlaceholder": "https://your-agi-host",
     "stepContinue": "step. Continue where you left off to complete your dashboard setup.",
     "welcome": "Welcome to agi"
   },
@@ -4705,7 +4712,39 @@
     "unknownError": "unknown error",
     "updateFailed": "Failed to update plugin: {{error}}",
     "version": "Version:",
-    "viewUnavailable": "Plugin view unavailable"
+    "viewUnavailable": "Plugin view unavailable",
+    "builtin": {
+      "hermesRuntime": {
+        "description": "Runtime provider for Hermes CLI-backed execution."
+      },
+      "paperclipRuntime": {
+        "description": "Runtime provider for Paperclip agent connections."
+      },
+      "openclawRuntime": {
+        "description": "Runtime provider for OpenClaw execution."
+      },
+      "droidRuntime": {
+        "description": "Runtime provider for Droid CLI execution."
+      },
+      "dependencyGraph": {
+        "description": "Dashboard plugin for task dependency graph visualization."
+      },
+      "reports": {
+        "description": "View report history, compare runs side-by-side, and export standalone HTML summaries."
+      },
+      "whatsappChat": {
+        "description": "Pairs to WhatsApp Web (multi-device) with QR or pairing code, then bridges direct chats to an agi agent."
+      },
+      "cliPrintingPress": {
+        "description": "Guided wizard for drafting external service CLI definitions."
+      },
+      "compoundEngineering": {
+        "description": "A dedicated dashboard surface for compound-engineering artifacts and interactive ce-* sessions."
+      },
+      "agentBrowser": {
+        "description": "Built-in integration metadata. Package install support lands in FN-3101."
+      }
+    }
   },
   "pr": {
     "authFail": "Run gh auth login and try again.",
@@ -5707,7 +5746,25 @@
     "experimental": {
       "experimentalFeatures": "Experimental Features",
       "experimentalFeaturesAreEarlyCapabilitiesThatAreNot": " Experimental features are early capabilities that are not yet fully stable. Enable them to test new functionality, but be aware they may change or be removed. ",
-      "featureFlags": "Feature Flags"
+      "featureFlags": "Feature Flags",
+      "feature": {
+        "insights": "Insights",
+        "memoryView": "Memory Editor",
+        "remoteAccess": "Remote Access",
+        "skillsView": "Skills View",
+        "nodesView": "Nodes View",
+        "devServerView": "Dev Server",
+        "todoView": "Todo List",
+        "researchView": "Research View",
+        "evalsView": "Evals View",
+        "goalsView": "Goals View",
+        "subtaskBreakdown": "Subtask Breakdown",
+        "leftSidebarNav": "Left Sidebar Navigation",
+        "sandbox": "Sandbox (command isolation)",
+        "chatRooms": "Chat Rooms",
+        "agentOnboarding": "Planning-style Agent Onboarding",
+        "workflowInterpreterDualObserve": "Workflow Graph Engine — dual-observe parity (diagnostic)"
+      }
     },
     "footer": {
       "help": "Help",
@@ -6760,7 +6817,7 @@
     "selectedAgentTemplate": "{{name}} selected",
     "selectedModel": "Selected:",
     "serverUrl": "Server URL",
-    "serverUrlPlaceholder": "https://your-fusion-host",
+    "serverUrlPlaceholder": "https://your-agi-host",
     "setUpAi": "Set Up AI",
     "setupComplete": "Setup complete! Head to the board to create your first task, or explore the dashboard to see what's available.",
     "setupMode": "Setup Mode",
@@ -7285,7 +7342,8 @@
     "header": {
       "back": "Back",
       "backToList": "Back to task list",
-      "editTask": "Edit task"
+      "editTask": "Edit task",
+      "popOut": "Pop out"
     },
     "inputTokens": "Input",
     "lastUsed": "Last used",
@@ -8533,7 +8591,49 @@
     "valuesSaved": "Setting values saved",
     "valuesTab": "Values",
     "widget": "Widget",
-    "widgetDefault": "Default"
+    "widgetDefault": "Default",
+    "settingLabel": {
+      "planningProvider": "Plan/Triage provider",
+      "planningModelId": "Plan/Triage model",
+      "planningFallbackProvider": "Plan/Triage fallback provider",
+      "planningFallbackModelId": "Plan/Triage fallback model",
+      "executionProvider": "Executor provider",
+      "executionModelId": "Executor model",
+      "validatorProvider": "Reviewer provider",
+      "validatorModelId": "Reviewer model",
+      "validatorFallbackProvider": "Reviewer fallback provider",
+      "validatorFallbackModelId": "Reviewer fallback model",
+      "requirePrApproval": "Require PR approval",
+      "requirePlanApproval": "Require plan approval",
+      "reviewHandoffPolicy": "Review handoff policy",
+      "maxReviewerContextRetries": "Reviewer context retries",
+      "maxReviewerFallbackRetries": "Reviewer fallback retries",
+      "reflectionEnabled": "Reflection enabled",
+      "workflowStepTimeoutMs": "Step timeout",
+      "workflowStepScopeEnforcement": "Step scope enforcement",
+      "planOnlyScopeLeakEnforcement": "Plan-only scope leak enforcement",
+      "workflowRevisionForkOnScopeMismatch": "Fork revision on scope mismatch",
+      "strictScopeEnforcement": "Strict scope enforcement",
+      "runStepsInNewSessions": "Run steps in new sessions",
+      "maxParallelSteps": "Max parallel steps",
+      "buildRetryCount": "Build retry count",
+      "verificationFixRetries": "Verification fix retries",
+      "maxPostReviewFixes": "Post-review fix passes"
+    },
+    "settingDescription": {
+      "planningProvider": "Provider used when planning or triaging tasks.",
+      "planningModelId": "Model used when planning or triaging tasks.",
+      "executionProvider": "Provider used by task implementation agents.",
+      "executionModelId": "Model used by task implementation agents.",
+      "validatorProvider": "Provider used by review and validation agents.",
+      "validatorModelId": "Model used by review and validation agents."
+    },
+    "group": {
+      "models": "Models",
+      "review": "Review & Approval",
+      "steps": "Step Execution",
+      "advanced": "Advanced"
+    }
   },
   "workflowSwitcher": {
     "countsAria": "{{todoLabel}}: {{todo}}, {{inProgressLabel}}: {{inProgress}}, {{doneLabel}}: {{done}}{{mergingSuffix}}",
@@ -8607,5 +8707,12 @@
     "toolResult": "Tool result",
     "you": "You",
     "youMessage": "You message"
+  },
+  "floatingWindow": {
+    "resizeAriaLabel": "Resize floating window",
+    "closeAriaLabel": "Close floating window"
+  },
+  "previewIframe": {
+    "title": "Dev server preview"
   }
 }

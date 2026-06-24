@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import { nextFloatingZ, currentFloatingZ } from "./floatingWindowStack";
 import "./FloatingWindow.css";
@@ -148,6 +149,8 @@ export function FloatingWindow({
   className,
   persistGeometryKey,
 }: FloatingWindowProps) {
+  // FNXC:i18n-Finalize 2026-06-24-04:30: resize/close handles carry screen-reader-only aria-labels; localize them so assistive tech announces the controls in the active language.
+  const { t } = useTranslation("app");
   const resolvedMinSize: FloatingWindowSize = minSize ?? { width: DEFAULT_MIN_WIDTH, height: DEFAULT_MIN_HEIGHT };
   const initialGeometry = useRef<{ size: FloatingWindowSize; position: FloatingWindowPosition } | null>(null);
   if (!initialGeometry.current) {
@@ -366,7 +369,7 @@ export function FloatingWindow({
             className={`floating-window__resize-handle floating-window__resize-handle--${direction}`}
             data-testid={`floating-window-resize-${direction}`}
             role="separator"
-            aria-label="Resize floating window"
+            aria-label={t("floatingWindow.resizeAriaLabel", "Resize floating window")}
             onPointerDown={(event) => handleResizePointerDown(event, direction)}
           />
         ))}
@@ -381,7 +384,7 @@ export function FloatingWindow({
               type="button"
               className="floating-window__close"
               onClick={onClose}
-              aria-label="Close floating window"
+              aria-label={t("floatingWindow.closeAriaLabel", "Close floating window")}
               data-testid={`floating-window-close-${windowKey}`}
             >
               <X size={18} />

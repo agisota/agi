@@ -577,7 +577,7 @@ export function AgentPromptsManager({
             <div className="prompt-template-section" data-testid="builtin-templates">
               <h4 className="prompt-template-section-title">{t("agentPrompts.sections.builtinTemplates", "Built-in Templates")}</h4>
               <p className="prompt-template-section-desc">
-                {t("agentPrompts.descriptions.builtinTemplates", "These templates are provided by Fusion and cannot be modified.")}
+                {t("agentPrompts.descriptions.builtinTemplates", "These templates are provided by agi and cannot be modified.")}
               </p>
               <div className="prompt-template-list">
                 {BUILTIN_AGENT_PROMPTS.map((template) => (

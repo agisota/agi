@@ -44,7 +44,7 @@ export function UpdateAvailableBanner({ latestVersion, currentVersion, onDismiss
         <p className="update-available-banner__text">
           <Trans
             i18nKey="app:updateBanner.message"
-            defaults="Update available: v{{latestVersion}} (current: v{{currentVersion}}). Run <code>fn update</code> for an installed CLI, or pull this source checkout."
+            defaults="Update available: v{{latestVersion}} (current: v{{currentVersion}}). Run <code>agi update</code> for an installed CLI, or pull this source checkout."
             values={{ latestVersion, currentVersion }}
             components={{ code: <code /> }}
           />{" "}
@@ -64,7 +64,7 @@ export function UpdateAvailableBanner({ latestVersion, currentVersion, onDismiss
         <div className="update-available-banner__actions">
           {installSucceeded ? (
             <span className="update-available-banner__install-status update-available-banner__install-status--success" aria-live="polite">
-              {t("updateBanner.updateSuccess", "Updated to v{{version}} — restart Fusion to apply", {
+              {t("updateBanner.updateSuccess", "Updated to v{{version}} — restart agi to apply", {
                 version: installResult.latestVersion ?? latestVersion,
               })}
             </span>

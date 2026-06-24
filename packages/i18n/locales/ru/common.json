@@ -239,5 +239,6 @@
     "summarySeamReview": "Ревью (движок)",
     "summarySeamStepExecute": "Исполнение шага (движок)",
     "summarySeamUnknown": "Шов: {{seam}}"
-  }
+  },
+  "diagramAriaLabel": "Диаграмма"
 }

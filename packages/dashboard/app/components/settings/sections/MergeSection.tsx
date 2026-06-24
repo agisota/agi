@@ -168,7 +168,7 @@ export function MergeSection({ scopeBanner, form, setForm, integrationBranchOpti
         </select>
         <details className="settings-option-details">
           <summary>{t("settings.merge.moreDetails", "More details")}</summary>
-          <small>{t("settings.merge.controlsWhatHappensAfterATaskReachesIn", " Controls what happens after a task reaches In Review. Direct mode merges into the current branch locally. Pull request mode keeps the task in In Review while Fusion waits for GitHub reviews and required checks before merging the PR. ")}</small>
+          <small>{t("settings.merge.controlsWhatHappensAfterATaskReachesIn", " Controls what happens after a task reaches In Review. Direct mode merges into the current branch locally. Pull request mode keeps the task in In Review while agi waits for GitHub reviews and required checks before merging the PR. ")}</small>
         </details>
       </div>
       <div className="form-group">
@@ -212,7 +212,7 @@ export function MergeSection({ scopeBanner, form, setForm, integrationBranchOpti
         })()}
         <details className="settings-option-details">
           <summary>{t("settings.merge.moreDetails", "More details")}</summary>
-          <small>{t("settings.merge.theCanonicalBranchFusionMergesTasksIntoAnd", " The canonical branch Fusion merges tasks into and uses as the reference for all ahead/behind / overlap / pre-rebase computations. Leave on ")}<em>{t("settings.merge.autoDetect", "auto-detect")}</em>{t("settings.merge.toResolveViaTheStandardCascade", " to resolve via the standard cascade (")}<code>integrationBranch</code>{t("settings.merge.legacy", " \u2192 legacy ")}<code>baseBranch</code> →
+          <small>{t("settings.merge.theCanonicalBranchFusionMergesTasksIntoAnd", " The canonical branch agi merges tasks into and uses as the reference for all ahead/behind / overlap / pre-rebase computations. Leave on ")}<em>{t("settings.merge.autoDetect", "auto-detect")}</em>{t("settings.merge.toResolveViaTheStandardCascade", " to resolve via the standard cascade (")}<code>integrationBranch</code>{t("settings.merge.legacy", " \u2192 legacy ")}<code>baseBranch</code> →
             <code>origin/HEAD</code>{t("settings.merge.symbolicRefFallback", " symbolic ref \u2192 fallback ")}<code>main</code>{t("settings.merge.pickALocalBranchFromTheDropdownCommon", "). Pick a local branch from the dropdown \u2014 common integration names like ")}<code>main</code>,
             <code>master</code>, <code>trunk</code>{t("settings.merge.and", ", and ")}<code>develop</code>{t("settings.merge.areListedFirstOrChoose", " are listed first \u2014 or choose ")}<em>{t("settings.merge.custom", "Custom\u2026")}</em>{t("settings.merge.toTypeABranchThatDoesnAposT", " to type a branch that doesn&apos;t exist locally yet. Applies to both direct merges and pull-request mode; individual tasks can still override via task metadata. ")}</small>
         </details>
@@ -245,7 +245,7 @@ export function MergeSection({ scopeBanner, form, setForm, integrationBranchOpti
             </select>
             <small>{t("settings.merge.autoMergeRunsInTheTaskWorktreeBy", " Auto-merge runs in the task worktree by default. Switch to the legacy project-root path only if you need the pre-FN-5279 fallback; worktrunk-managed projects still defer to worktrunk. ")}</small>
             {(form.mergeIntegrationWorktree ?? "reuse-task-worktree") !== "reuse-task-worktree" && (<div className="settings-warning-banner" role="alert" aria-live="polite" data-testid="merge-integration-worktree-warning">
-                <strong>{t("settings.merge.legacyIntegrationBranchMode", "Legacy integration-branch mode.")}</strong>{" "}{t("settings.merge.autoMergeWillRunRebaseConflictResolutionAnd", " Auto-merge will run rebase, conflict resolution, and squash commits inside the project root (the user&apos;s checked-out integration-branch worktree) instead of the task worktree. Fusion assumes that directory is already on the integration branch and clean; if it isn&apos;t, merges may fail or touch the user&apos;s working tree. Reuse-task-worktree is the recommended default (FN-5279). Switch back unless you have a specific reason to opt in (FN-5348). ")}</div>)}
+                <strong>{t("settings.merge.legacyIntegrationBranchMode", "Legacy integration-branch mode.")}</strong>{" "}{t("settings.merge.autoMergeWillRunRebaseConflictResolutionAnd", " Auto-merge will run rebase, conflict resolution, and squash commits inside the project root (the user&apos;s checked-out integration-branch worktree) instead of the task worktree. agi assumes that directory is already on the integration branch and clean; if it isn&apos;t, merges may fail or touch the user&apos;s working tree. Reuse-task-worktree is the recommended default (FN-5279). Switch back unless you have a specific reason to opt in (FN-5348). ")}</div>)}
           </div>
           <div className="form-group">
             <label htmlFor="mergeAdvanceAutoSync">{t("settings.merge.autoSyncProjectCheckoutAfterMerge", "Auto-sync project checkout after merge")}</label>
@@ -259,7 +259,7 @@ export function MergeSection({ scopeBanner, form, setForm, integrationBranchOpti
             </select>
             <details className="settings-option-details">
               <summary>{t("settings.merge.moreDetails", "More details")}</summary>
-              <small>{t("settings.merge.afterFusionAdvancesTheIntegrationBranchRefThe", " After Fusion advances the integration branch ref, the merger can auto-sync other worktrees still checked out on that branch (typically your project-root checkout). ")}<code>Stash + fast-forward</code>{t("settings.merge.snapshotsRealLocalEditsAsAPatchAgainst", " snapshots real local edits as a patch against the previous tip, snaps the worktree to the new tip, then reapplies the patch \u2014 untracked files that collide with newly-tracked paths are left in a temp dir for manual recovery. ")}<code>Fast-forward only</code>{t("settings.merge.snapsCleanlyWhenTheWorktreeHasNoEdits", " snaps cleanly when the worktree has no edits and skips otherwise. ")}<code>Off</code>{t("settings.merge.isTheLegacyBehavior", " is the legacy behavior: ")}<code>git status</code>{t("settings.merge.inYourProjectRootWillShowTheNew", " in your project root will show the new commits inverted as &quot;staged changes&quot; until you pull manually. Only applies to direct merges. ")}</small>
+              <small>{t("settings.merge.afterFusionAdvancesTheIntegrationBranchRefThe", " After agi advances the integration branch ref, the merger can auto-sync other worktrees still checked out on that branch (typically your project-root checkout). ")}<code>Stash + fast-forward</code>{t("settings.merge.snapshotsRealLocalEditsAsAPatchAgainst", " snapshots real local edits as a patch against the previous tip, snaps the worktree to the new tip, then reapplies the patch \u2014 untracked files that collide with newly-tracked paths are left in a temp dir for manual recovery. ")}<code>Fast-forward only</code>{t("settings.merge.snapsCleanlyWhenTheWorktreeHasNoEdits", " snaps cleanly when the worktree has no edits and skips otherwise. ")}<code>Off</code>{t("settings.merge.isTheLegacyBehavior", " is the legacy behavior: ")}<code>git status</code>{t("settings.merge.inYourProjectRootWillShowTheNew", " in your project root will show the new commits inverted as &quot;staged changes&quot; until you pull manually. Only applies to direct merges. ")}</small>
             </details>
           </div>
         </>)}
@@ -285,17 +285,17 @@ export function MergeSection({ scopeBanner, form, setForm, integrationBranchOpti
       </div>
       <div className="form-group">
         <label htmlFor="commitAuthorEnabled" className="checkbox-label">
-          <input id="commitAuthorEnabled" type="checkbox" checked={form.commitAuthorEnabled !== false} onChange={(e) => setForm((f) => ({ ...f, commitAuthorEnabled: e.target.checked }))}/>{t("settings.merge.addFusionAsCoAuthorOnCommits", " Add Fusion as co-author on commits ")}</label>
+          <input id="commitAuthorEnabled" type="checkbox" checked={form.commitAuthorEnabled !== false} onChange={(e) => setForm((f) => ({ ...f, commitAuthorEnabled: e.target.checked }))}/>{t("settings.merge.addFusionAsCoAuthorOnCommits", " Add agi as co-author on commits ")}</label>
         <details className="settings-option-details">
           <summary>{t("settings.merge.moreDetails", "More details")}</summary>
-          <small>{t("settings.merge.whenEnabledCommitsMadeByFusionKeepYour", " When enabled, commits made by Fusion keep your git identity as the primary author and append a ")}<code>Co-authored-by</code>{t("settings.merge.trailerCreditingFusionRecognizedByGitHubForShared", " trailer crediting Fusion (recognized by GitHub for shared attribution). ")}</small>
+          <small>{t("settings.merge.whenEnabledCommitsMadeByFusionKeepYour", " When enabled, commits made by agi keep your git identity as the primary author and append a ")}<code>Co-authored-by</code>{t("settings.merge.trailerCreditingFusionRecognizedByGitHubForShared", " trailer crediting agi (recognized by GitHub for shared attribution). ")}</small>
         </details>
       </div>
 
       {form.commitAuthorEnabled !== false && (<>
           <div className="form-group">
             <label htmlFor="commitAuthorName">{t("settings.merge.coAuthorName", "Co-author Name")}</label>
-            <input id="commitAuthorName" type="text" value={form.commitAuthorName ?? ""} placeholder={t("settings.merge.fusion", "Fusion")} onChange={(e) => setForm((f) => ({
+            <input id="commitAuthorName" type="text" value={form.commitAuthorName ?? ""} placeholder={t("settings.merge.fusion", "agi")} onChange={(e) => setForm((f) => ({
                 ...f,
                 commitAuthorName: e.target.value || undefined,
             }))}/>

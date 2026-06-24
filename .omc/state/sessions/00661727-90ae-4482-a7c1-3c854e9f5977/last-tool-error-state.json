@@ -1,0 +1,7 @@
+{
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"/home/ubuntu/Projects/agi/packages/i18n/locales/ru/app.json\"}",
+  "error": "File content (632.3KB) exceeds maximum allowed size (256KB). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-06-24T07:44:18.742Z",
+  "retry_count": 1
+}

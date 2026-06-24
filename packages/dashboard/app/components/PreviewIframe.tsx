@@ -87,7 +87,7 @@ export function PreviewIframe({
         ref={iframeRef}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
         className={className}
-        title="Dev server preview"
+        title={t("previewIframe.title", "Dev server preview")}
         onLoad={handleLoad}
         onError={handleError}
         onErrorCapture={handleError}

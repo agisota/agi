@@ -108,7 +108,7 @@ export function CliBinaryInstallBanner({ onOpenSettings }: Props) {
   const isMismatch = status.state === "version-mismatch";
   const installedVersion = status.binary.version;
   const targetVersion = status.expectedVersion;
-  const title = isMismatch ? t("cli.updateTitle", "Update the Fusion CLI") : t("cli.installTitle", "Install the Fusion CLI");
+  const title = isMismatch ? t("cli.updateTitle", "Update the agi CLI") : t("cli.installTitle", "Install the agi CLI");
   const body = isMismatch ? (
     <>
       {t("cli.versionMismatchPrefix", "Your installed")} <code>fn</code>/<code>fusion</code> CLI is{" "}
@@ -117,7 +117,7 @@ export function CliBinaryInstallBanner({ onOpenSettings }: Props) {
     </>
   ) : (
     <>
-      {t("cli.installBody", "Get the {{fn}} and {{fusion}} commands on your terminal so you can drive Fusion from anywhere. One click below or copy the command into your shell.", { fn: "fn", fusion: "fusion" })}
+      {t("cli.installBody", "Get the {{fn}} and {{fusion}} commands on your terminal so you can drive agi from anywhere. One click below or copy the command into your shell.", { fn: "fn", fusion: "fusion" })}
     </>
   );
   const idleLabel = isMismatch ? t("cli.updateButton", "Update with npm") : t("cli.installButton", "Install with npm");

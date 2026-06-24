@@ -97,7 +97,7 @@ export function DesktopLaunchGate({ children }: PropsWithChildren) {
             setPhase({ kind: "ready", serverBaseUrl: params.get("serverBaseUrl") ?? undefined });
             return;
           }
-          setPhase({ kind: "starting-local", message: t("desktop.startingLocalRuntime", "Starting local Fusion runtime…") });
+          setPhase({ kind: "starting-local", message: t("desktop.startingLocalRuntime", "Starting local agi runtime…") });
           const { baseUrl } = await waitForLocalRuntime(shell);
           if (cancelled) return;
           applyServerBaseUrl(baseUrl);
@@ -141,7 +141,7 @@ export function DesktopLaunchGate({ children }: PropsWithChildren) {
   }, []);
 
   if (phase.kind === "loading" || phase.kind === "starting-local") {
-    const message = phase.kind === "loading" ? t("desktop.loading", "Loading Fusion…") : phase.message;
+    const message = phase.kind === "loading" ? t("desktop.loading", "Loading agi…") : phase.message;
     return (
       <div className="desktop-launch-gate" role="status" aria-live="polite">
         <div className="desktop-launch-gate__panel">
@@ -155,7 +155,7 @@ export function DesktopLaunchGate({ children }: PropsWithChildren) {
     return (
       <div className="desktop-launch-gate" role="alert">
         <div className="desktop-launch-gate__panel">
-          <h2>{t("desktop.couldNotStart", "Couldn't start local Fusion")}</h2>
+          <h2>{t("desktop.couldNotStart", "Couldn't start local agi")}</h2>
           <p>{phase.message}</p>
           <button
             type="button"
@@ -179,7 +179,7 @@ export function DesktopLaunchGate({ children }: PropsWithChildren) {
           if (!shell) return;
           setPhase({
             kind: "starting-local",
-            message: mode === "local" ? t("desktop.startingLocalRuntime", "Starting local Fusion runtime…") : t("desktop.settingUpRemote", "Setting up remote connection…"),
+            message: mode === "local" ? t("desktop.startingLocalRuntime", "Starting local agi runtime…") : t("desktop.settingUpRemote", "Setting up remote connection…"),
           });
           try {
             await shell.setDesktopMode(mode);
@@ -212,9 +212,10 @@ function DesktopModeChooser({ onPick }: { onPick: (mode: "local" | "remote") => 
   return (
     <div className="desktop-launch-gate" role="dialog" aria-labelledby="desktop-launch-gate-title">
       <div className="desktop-launch-gate__panel">
-        <h1 id="desktop-launch-gate-title">{t("desktop.chooseMode", "How do you want to run Fusion?")}</h1>
+        {/* FNXC:i18n-Finalize 2026-06-24-04:30: brand rebrand — launch-gate inline defaults use the 'agi' brand noun, not 'Fusion'. RU values live in the catalog. */}
+        <h1 id="desktop-launch-gate-title">{t("desktop.chooseMode", "How do you want to run agi?")}</h1>
         <p>
-          {t("desktop.chooseModeDescription", "Run Fusion locally in this app, or connect to a Fusion server you're already running somewhere else.")}
+          {t("desktop.chooseModeDescription", "Запустите agi локально в этом приложении или подключитесь к серверу agi, который уже запущен в другом месте.")}
         </p>
         <div className="desktop-launch-gate__actions">
           <button
@@ -226,7 +227,7 @@ function DesktopModeChooser({ onPick }: { onPick: (mode: "local" | "remote") => 
               onPick("local");
             }}
           >
-            {pending === "local" ? t("desktop.starting", "Starting…") : t("desktop.runLocalButton", "Run Fusion Locally")}
+            {pending === "local" ? t("desktop.starting", "Starting…") : t("desktop.runLocalButton", "Run agi Locally")}
           </button>
           <button
             type="button"
@@ -237,7 +238,7 @@ function DesktopModeChooser({ onPick }: { onPick: (mode: "local" | "remote") => 
               onPick("remote");
             }}
           >
-            {pending === "remote" ? t("desktop.opening", "Opening…") : t("desktop.connectRemoteButton", "Connect to Remote Fusion")}
+            {pending === "remote" ? t("desktop.opening", "Opening…") : t("desktop.connectRemoteButton", "Connect to Remote agi")}
           </button>
         </div>
       </div>

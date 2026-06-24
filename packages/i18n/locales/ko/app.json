@@ -1103,7 +1103,10 @@
     "weekly": "주간",
     "workingOn": "작업 중",
     "zoomIn": "확대",
-    "zoomOut": "축소"
+    "zoomOut": "축소",
+    "skillsLabel": "",
+    "uploadFileAriaLabel": "",
+    "selectDirectoryAriaLabel": ""
   },
   "app": {
     "backendError": {
@@ -3029,7 +3032,8 @@
     "subtask": "하위 작업",
     "toggleOptionalWorkflowStep": "",
     "useDefault": "기본값 사용",
-    "whatNeedsToBeDone": "무엇을 해야 하나요?"
+    "whatNeedsToBeDone": "무엇을 해야 하나요?",
+    "workflowLabel": ""
   },
   "insights": {
     "allInsights": "모든 인사이트",
@@ -3850,7 +3854,10 @@
     "verification": "검증:",
     "verificationCriteria": "검증 기준",
     "viewMissionFailures": "미션 실패 보기",
-    "whatToBuild": "무엇을 만들고 싶으신가요?"
+    "whatToBuild": "무엇을 만들고 싶으신가요?",
+    "restoreQuestionError": "",
+    "restoreResultError": "",
+    "resumeSessionError": ""
   },
   "modalManager": {
     "createdFromPlanning": "계획 모드에서 {{id}}를 생성했습니다",
@@ -4705,7 +4712,39 @@
     "unknownError": "알 수 없는 오류",
     "updateFailed": "플러그인 업데이트 실패: {{error}}",
     "version": "버전:",
-    "viewUnavailable": ""
+    "viewUnavailable": "",
+    "builtin": {
+      "hermesRuntime": {
+        "description": ""
+      },
+      "paperclipRuntime": {
+        "description": ""
+      },
+      "openclawRuntime": {
+        "description": ""
+      },
+      "droidRuntime": {
+        "description": ""
+      },
+      "dependencyGraph": {
+        "description": ""
+      },
+      "reports": {
+        "description": ""
+      },
+      "whatsappChat": {
+        "description": ""
+      },
+      "cliPrintingPress": {
+        "description": ""
+      },
+      "compoundEngineering": {
+        "description": ""
+      },
+      "agentBrowser": {
+        "description": ""
+      }
+    }
   },
   "pr": {
     "authFail": "gh auth login을 실행한 후 다시 시도하세요.",
@@ -5707,7 +5746,25 @@
     "experimental": {
       "experimentalFeatures": "",
       "experimentalFeaturesAreEarlyCapabilitiesThatAreNot": "",
-      "featureFlags": ""
+      "featureFlags": "",
+      "feature": {
+        "insights": "",
+        "memoryView": "",
+        "remoteAccess": "",
+        "skillsView": "",
+        "nodesView": "",
+        "devServerView": "",
+        "todoView": "",
+        "researchView": "",
+        "evalsView": "",
+        "goalsView": "",
+        "subtaskBreakdown": "",
+        "leftSidebarNav": "",
+        "sandbox": "",
+        "chatRooms": "",
+        "agentOnboarding": "",
+        "workflowInterpreterDualObserve": ""
+      }
     },
     "footer": {
       "help": "도움말",
@@ -7285,7 +7342,8 @@
     "header": {
       "back": "뒤로",
       "backToList": "작업 목록으로 돌아가기",
-      "editTask": "작업 편집"
+      "editTask": "작업 편집",
+      "popOut": ""
     },
     "inputTokens": "입력",
     "lastUsed": "마지막 사용",
@@ -8533,7 +8591,49 @@
     "valuesSaved": "",
     "valuesTab": "",
     "widget": "",
-    "widgetDefault": ""
+    "widgetDefault": "",
+    "settingLabel": {
+      "planningProvider": "",
+      "planningModelId": "",
+      "planningFallbackProvider": "",
+      "planningFallbackModelId": "",
+      "executionProvider": "",
+      "executionModelId": "",
+      "validatorProvider": "",
+      "validatorModelId": "",
+      "validatorFallbackProvider": "",
+      "validatorFallbackModelId": "",
+      "requirePrApproval": "",
+      "requirePlanApproval": "",
+      "reviewHandoffPolicy": "",
+      "maxReviewerContextRetries": "",
+      "maxReviewerFallbackRetries": "",
+      "reflectionEnabled": "",
+      "workflowStepTimeoutMs": "",
+      "workflowStepScopeEnforcement": "",
+      "planOnlyScopeLeakEnforcement": "",
+      "workflowRevisionForkOnScopeMismatch": "",
+      "strictScopeEnforcement": "",
+      "runStepsInNewSessions": "",
+      "maxParallelSteps": "",
+      "buildRetryCount": "",
+      "verificationFixRetries": "",
+      "maxPostReviewFixes": ""
+    },
+    "settingDescription": {
+      "planningProvider": "",
+      "planningModelId": "",
+      "executionProvider": "",
+      "executionModelId": "",
+      "validatorProvider": "",
+      "validatorModelId": ""
+    },
+    "group": {
+      "models": "",
+      "review": "",
+      "steps": "",
+      "advanced": ""
+    }
   },
   "workflowSwitcher": {
     "countsAria": "{{todoLabel}}: {{todo}}, {{inProgressLabel}}: {{inProgress}}, {{doneLabel}}: {{done}}",
@@ -8607,5 +8707,12 @@
     "toolResult": "",
     "you": "",
     "youMessage": ""
+  },
+  "floatingWindow": {
+    "resizeAriaLabel": "",
+    "closeAriaLabel": ""
+  },
+  "previewIframe": {
+    "title": ""
   }
 }

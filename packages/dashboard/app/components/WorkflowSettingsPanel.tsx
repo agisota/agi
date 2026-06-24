@@ -805,10 +805,13 @@ function ValuesTab({
     const error = rejections[setting.id]?.message;
     const customized = isCustomized(setting);
     const display = getWorkflowSettingDisplay(setting);
+    // FNXC:i18n-Finalize 2026-06-24-04:30: workflow-setting labels/descriptions are localized at the render site (not at module load) using per-setting catalog keys, mirroring the group-label pattern below (workflowSettings.group.*). The English DISPLAY map value is the i18next defaultValue/fallback; unknown custom settings fall back to setting.name/description because their keys are absent from the catalog.
     const descriptor = {
       key: setting.id,
-      label: display.label,
-      help: display.description ?? setting.description,
+      label: t(`workflowSettings.settingLabel.${setting.id}`, display.label),
+      help: display.description
+        ? t(`workflowSettings.settingDescription.${setting.id}`, display.description)
+        : setting.description,
       scope: "project" as const,
     };
     const clearable = customized;

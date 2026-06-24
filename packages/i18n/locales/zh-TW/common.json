@@ -239,5 +239,6 @@
     "summarySeamReview": "",
     "summarySeamStepExecute": "",
     "summarySeamUnknown": ""
-  }
+  },
+  "diagramAriaLabel": ""
 }

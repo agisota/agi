@@ -415,7 +415,7 @@ export function MissionInterviewModal({
           setHasProgress(true);
           setView({ type: "question", sessionId: session.id, question });
         } catch {
-          setError("Failed to restore session question.");
+          setError(t("missions.restoreQuestionError", "Failed to restore session question."));
         }
       } else if (session.status === "complete" && session.result) {
         try {
@@ -426,7 +426,7 @@ export function MissionInterviewModal({
           setEditedSummary(summary);
           setView({ type: "summary", sessionId: session.id, summary });
         } catch {
-          setError("Failed to restore session result.");
+          setError(t("missions.restoreResultError", "Failed to restore session result."));
         }
       } else if (session.status === "generating") {
         currentSessionIdRef.current = session.id;
@@ -447,7 +447,7 @@ export function MissionInterviewModal({
         });
       }
     }).catch(() => {
-      if (!cancelled) setError("Failed to resume session.");
+      if (!cancelled) setError(t("missions.resumeSessionError", "Failed to resume session."));
     });
 
     return () => {
@@ -841,7 +841,7 @@ export function MissionInterviewModal({
                   </label>
                   <CustomModelDropdown
                     id="mission-interview-modal-model"
-                    label="Planning Model"
+                    label={t("missions.planningModel", "Planning Model")}
                     value={modelSelectionValue}
                     onChange={(value) => {
                       const { provider, modelId: selectedModelId } = parseModelSelection(value);

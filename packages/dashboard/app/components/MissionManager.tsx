@@ -2694,7 +2694,7 @@ export function MissionManager({ isOpen, isInline = false, onClose, addToast, pr
                       </span>
                     </div>
                     <span className="mission-detail__autopilot-description">
-                      {t("missions.autopilotDescription", "When on, Fusion automatically activates the next slice and plans its features as work completes.")}
+                      {t("missions.autopilotDescription", "When on, agi automatically activates the next slice and plans its features as work completes.")}
                     </span>
                     {autopilotActivitySummary && (
                       <span className="mission-detail__autopilot-activity mission-relative-time">

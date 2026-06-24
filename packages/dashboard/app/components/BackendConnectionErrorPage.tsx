@@ -36,9 +36,10 @@ export function BackendConnectionErrorPage({
   const showChangeLaunchMode = isDesktopShell();
   return (
     <div className="project-overview-empty" role="alert" aria-live="polite">
-      <h2>{t("backend.connectionError", "Can't reach the Fusion backend")}</h2>
+      {/* FNXC:i18n-Finalize 2026-06-24-04:30: brand rebrand — backend-error copy uses the 'agi' brand noun, not 'Fusion'. */}
+      <h2>{t("backend.connectionError", "Не удаётся подключиться к бэкенду agi")}</h2>
       <p className="settings-muted">
-        {t("backend.couldNotLoad", "Fusion couldn't load your projects right now. Please make sure the backend is running and try again.")}
+        {t("backend.couldNotLoad", "agi couldn't load your projects right now. Please make sure the backend is running and try again.")}
       </p>
       <p className="settings-muted">{t("backend.error", "Error: {{error}}", { error: errorMessage })}</p>
       <div className="modal-actions">

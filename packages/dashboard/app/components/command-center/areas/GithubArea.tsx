@@ -114,8 +114,8 @@ export function GithubArea({ range }: { range: DateRange }) {
   */
   const issueFlowPieData = useMemo(
     () => [
-      { label: t("commandCenter.github.filed", "Filed by Fusion"), value: data?.filed ?? 0 },
-      { label: t("commandCenter.github.fixed", "Fixed by Fusion"), value: data?.fixed ?? 0 },
+      { label: t("commandCenter.github.filed", "Filed by agi"), value: data?.filed ?? 0 },
+      { label: t("commandCenter.github.fixed", "Fixed by agi"), value: data?.fixed ?? 0 },
     ],
     [data?.filed, data?.fixed, t],
   );

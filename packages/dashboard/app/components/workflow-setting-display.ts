@@ -12,6 +12,10 @@ export interface WorkflowSettingDisplay {
 FNXC:WorkflowSettings 2026-06-17-09:13:
 Title summarization is project/global-scoped and configured in Project Models, so this workflow display map intentionally omits titleSummarizer* keys. If a custom workflow declares a same-named key, render it as Advanced instead of implying Fusion will execute it as a workflow model lane.
 */
+/*
+FNXC:i18n-Finalize 2026-06-24-04:30:
+The English label/description strings in DISPLAY and in WORKFLOW_SETTING_GROUP_LABELS are the i18next defaultValue fallbacks, not the rendered copy. WorkflowSettingsPanel localizes them at render time: labels via t(`workflowSettings.settingLabel.${id}`), descriptions via t(`workflowSettings.settingDescription.${id}`), and group headers via t(`workflowSettings.group.${group}`). RU (and other) translations live in the @fusion/i18n catalogs. Do NOT call t() here — this map is a module-level const evaluated before i18next initializes, so a t() call at load would resolve against an empty bundle. Keep these values in English so a missing catalog key degrades to readable English instead of a raw key.
+*/
 const DISPLAY: Record<string, WorkflowSettingDisplay> = {
   planningProvider: {
     group: "models",
