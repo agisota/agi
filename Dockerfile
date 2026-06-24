@@ -53,8 +53,17 @@ LABEL org.opencontainers.image.description="AI-orchestrated task board"
 ENV NODE_ENV=production
 ENV PORT=4040
 
+# FNXC:Hosting 2026-06-24-10:05: Install the GitHub CLI (`gh`) in the runtime image so the GitHub integration works in hosted/headless deploys. With GH_TOKEN set, `gh auth status` reports authenticated, so the dashboard shows "Connected via GitHub CLI" and engine PR/issue paths (which shell out to gh) succeed instead of erroring with "Run `gh auth login`".
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends git \
+  && apt-get install -y --no-install-recommends git ca-certificates curl gnupg \
+  && mkdir -p -m 755 /etc/apt/keyrings \
+  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends gh \
+  && apt-get purge -y gnupg \
+  && apt-get autoremove -y \
   && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
