@@ -39,16 +39,19 @@ export async function resolveCapturedBaseCommitSha(
   integrationBranch: string = "main",
 ): Promise<string | undefined> {
   const branch = integrationBranch.trim() || "main";
-  // FNXC:Workspace 2026-06-22-00:00:
-  // Shell-quote with POSIX single quotes, NOT JSON.stringify. JSON.stringify wraps
-  // in double quotes, under which the shell expands `$VAR`/backticks — a branch like
-  // `release/$2.0` would expand `$2` to a positional. Admin-configured integration
-  // branch names are not guaranteed to exclude `$`, and `$` is valid in git refs, so
-  // double-quoting is an injection/correctness risk. Single-quoting (with the embedded
-  // `'` → `'\''` escape) is literal and safe for slashes (e.g. "release/2026-06") too.
-  const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
-  const localRef = shellQuote(branch);
-  const originRef = shellQuote(`origin/${branch}`);
+  /*
+  FNXC:Workspace 2026-06-22-09:00:
+  Shell-quote with a real single-quoted POSIX literal, NOT JSON.stringify. A
+  JSON double-quoted string still lets bash expand `$(...)`, backticks, and `$VAR`
+  inside it; JSON.stringify is not a shell-quoting function. Git ref names can't
+  legally contain backticks so there's no live injection path today, but
+  single-quoting is the idiomatic safe form and stays correct if a caller ever
+  passes a less-constrained string. A single quote inside the value is escaped as
+  the standard `'\''` close-reopen sequence.
+  */
+  const shellSingleQuote = (value: string): string => `'${value.replace(/'/g, "'\\''")}'`;
+  const localRef = shellSingleQuote(branch);
+  const originRef = shellSingleQuote(`origin/${branch}`);
   let baseCommitSha: string | undefined;
   try {
     const { stdout } = await execAsync(
