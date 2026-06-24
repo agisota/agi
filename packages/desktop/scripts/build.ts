@@ -5,11 +5,18 @@ import { buildDashboardClient, packageRoot, workspaceRoot } from "./workspace-to
 const dashboardClientDir = join(workspaceRoot, "packages", "dashboard", "dist", "client");
 const desktopDistDir = join(packageRoot, "dist");
 const desktopClientDistDir = join(desktopDistDir, "client");
+// FNXC:DesktopBuild 2026-06-24-03:11: Native addons (node-pty, keytar) ship platform ".node"
+// binaries that esbuild cannot bundle ("No loader is configured for .node files") and are loaded
+// optionally at runtime (they are intentionally NOT in electron-builder.yml `files`). Mark them
+// external for the main bundle so the desktop build succeeds instead of trying to inline the addon.
 const sharedExternals = [
   "electron",
   "@fusion/core",
   "@fusion/dashboard",
   "better-sqlite3",
+  "node-pty",
+  "@homebridge/node-pty-prebuilt-multiarch",
+  "keytar",
 ];
 const mainExternals = sharedExternals;
 const preloadExternals = sharedExternals;
