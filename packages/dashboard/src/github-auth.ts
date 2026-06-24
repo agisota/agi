@@ -30,11 +30,23 @@ export function resolveGithubTrackingAuth(
   deps: ResolveGithubTrackingAuthDeps,
 ): GithubTrackingAuthResolution {
   const global = (deps.globalSettings ?? {}) as Record<string, unknown>;
+  const env = deps.env ?? process.env;
+  /*
+  FNXC:GitHubAuth 2026-06-24-09:45:
+  Default to "token" mode whenever a GitHub token is actually configured (project/global githubAuthToken, projectGithubAuthToken, or env GITHUB_TOKEN) instead of always falling back to "gh-cli".
+  The old unconditional "gh-cli" default broke hosted/headless deploys (Docker/Render images have no `gh` binary and no interactive login), surfacing "Not authenticated with GitHub. Run `gh auth login`" and "GitHub not connected" even when GITHUB_TOKEN was set in the environment.
+  gh-cli stays the default only when no token is available anywhere, preserving the original local-dev behavior.
+  */
+  const tokenConfigured = !!(
+    deps.projectSettings.githubAuthToken?.trim()
+    || pickString(global, "githubAuthToken")?.trim()
+    || pickString(global, "projectGithubAuthToken")?.trim()
+    || env.GITHUB_TOKEN?.trim()
+  );
   const requestedMode = deps.projectSettings.githubAuthMode
     ?? pickString(global, "githubAuthMode")
     ?? pickString(global, "projectGithubAuthMode")
-    ?? "gh-cli";
-  const env = deps.env ?? process.env;
+    ?? (tokenConfigured ? "token" : "gh-cli");
 
   if (requestedMode === "token") {
     const token = deps.projectSettings.githubAuthToken?.trim()
