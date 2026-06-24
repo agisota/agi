@@ -67,6 +67,31 @@
       "last7d": ""
     }
   },
+  "diagramAriaLabel": "",
+  "documents": {
+    "artifactAudioLabel": "",
+    "artifactVideoLabel": "",
+    "noArtifactPreview": "",
+    "openArtifactMedia": ""
+  },
+  "git": {
+    "commentAvatarAlt": "",
+    "commentBot": "",
+    "commentFilterAll": "",
+    "commentFilterBot": "",
+    "commentFilterHuman": "",
+    "commentHuman": "",
+    "commentNavAriaLabel": "",
+    "commentNavPosition": "",
+    "commentNextAriaLabel": "",
+    "commentPrevAriaLabel": "",
+    "commentsHeading": "",
+    "filterCommentsAriaLabel": "",
+    "loadingComments": "",
+    "noCommentBody": "",
+    "noComments": "",
+    "noCommentsForFilter": ""
+  },
   "health": {
     "anomaly": {
       "duplicateActiveId": "",
@@ -240,5 +265,15 @@
     "summarySeamStepExecute": "",
     "summarySeamUnknown": ""
   },
-  "diagramAriaLabel": ""
+  "workflowSettings": {
+    "group": {
+      "${group}": ""
+    },
+    "settingDescription": {
+      "${id}": ""
+    },
+    "settingLabel": {
+      "${id}": ""
+    }
+  }
 }

@@ -67,6 +67,31 @@
       "last7d": "Last 7 days"
     }
   },
+  "diagramAriaLabel": "Diagram",
+  "documents": {
+    "artifactAudioLabel": "Audio artifact: {{title}}",
+    "artifactVideoLabel": "Video artifact: {{title}}",
+    "noArtifactPreview": "No preview available.",
+    "openArtifactMedia": "Open artifact media"
+  },
+  "git": {
+    "commentAvatarAlt": "{{author}} avatar",
+    "commentBot": "Bot",
+    "commentFilterAll": "All",
+    "commentFilterBot": "Bot",
+    "commentFilterHuman": "Human",
+    "commentHuman": "Human",
+    "commentNavAriaLabel": "Navigate comments",
+    "commentNavPosition": "{{current}} / {{total}}",
+    "commentNextAriaLabel": "Next comment",
+    "commentPrevAriaLabel": "Previous comment",
+    "commentsHeading": "Comments",
+    "filterCommentsAriaLabel": "Filter comments by author type",
+    "loadingComments": "Loading comments…",
+    "noCommentBody": "(empty comment)",
+    "noComments": "No comments",
+    "noCommentsForFilter": "No comments match the filter"
+  },
   "health": {
     "anomaly": {
       "duplicateActiveId": "Duplicate active task ID",
@@ -240,5 +265,15 @@
     "summarySeamStepExecute": "Step execute (engine)",
     "summarySeamUnknown": "Seam: {{seam}}"
   },
-  "diagramAriaLabel": "Diagram"
+  "workflowSettings": {
+    "group": {
+      "${group}": ""
+    },
+    "settingDescription": {
+      "${id}": ""
+    },
+    "settingLabel": {
+      "${id}": ""
+    }
+  }
 }

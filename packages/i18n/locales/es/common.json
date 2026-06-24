@@ -17,18 +17,24 @@
     },
     "time": {
       "daysAgo_one": "",
+      "daysAgo_many": "",
       "daysAgo_other": "",
       "hoursAgo_one": "",
+      "hoursAgo_many": "",
       "hoursAgo_other": "",
       "inAMoment": "",
       "inDays_one": "",
+      "inDays_many": "",
       "inDays_other": "",
       "inHours_one": "",
+      "inHours_many": "",
       "inHours_other": "",
       "inMinutes_one": "",
+      "inMinutes_many": "",
       "inMinutes_other": "",
       "justNow": "",
       "minutesAgo_one": "",
+      "minutesAgo_many": "",
       "minutesAgo_other": ""
     }
   },
@@ -51,6 +57,7 @@
     "toolCallArgsPrefix": "",
     "toolCallResultPrefix": "",
     "toolCallsCount_one": "",
+    "toolCallsCount_many": "",
     "toolCallsCount_other": "",
     "toolCallsHeader": "",
     "toolCallStatusCompleted": "",
@@ -66,6 +73,31 @@
       "last30d": "",
       "last7d": ""
     }
+  },
+  "diagramAriaLabel": "",
+  "documents": {
+    "artifactAudioLabel": "",
+    "artifactVideoLabel": "",
+    "noArtifactPreview": "",
+    "openArtifactMedia": ""
+  },
+  "git": {
+    "commentAvatarAlt": "",
+    "commentBot": "",
+    "commentFilterAll": "",
+    "commentFilterBot": "",
+    "commentFilterHuman": "",
+    "commentHuman": "",
+    "commentNavAriaLabel": "",
+    "commentNavPosition": "",
+    "commentNextAriaLabel": "",
+    "commentPrevAriaLabel": "",
+    "commentsHeading": "",
+    "filterCommentsAriaLabel": "",
+    "loadingComments": "",
+    "noCommentBody": "",
+    "noComments": "",
+    "noCommentsForFilter": ""
   },
   "health": {
     "anomaly": {
@@ -228,6 +260,7 @@
     "summaryGateBlocks": "",
     "summaryHoldRelease": "",
     "summaryLoopIterations_one": "",
+    "summaryLoopIterations_many": "",
     "summaryLoopIterations_other": "",
     "summaryLoopUntilContains": "",
     "summaryLoopUntilMatches": "",
@@ -240,5 +273,15 @@
     "summarySeamStepExecute": "",
     "summarySeamUnknown": ""
   },
-  "diagramAriaLabel": ""
+  "workflowSettings": {
+    "group": {
+      "${group}": ""
+    },
+    "settingDescription": {
+      "${id}": ""
+    },
+    "settingLabel": {
+      "${id}": ""
+    }
+  }
 }

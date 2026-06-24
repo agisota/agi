@@ -17,18 +17,30 @@
     },
     "time": {
       "daysAgo_one": "{{count}} дн. назад",
+      "daysAgo_few": "",
+      "daysAgo_many": "",
       "daysAgo_other": "{{count}} дн. назад",
       "hoursAgo_one": "{{count}} ч назад",
+      "hoursAgo_few": "",
+      "hoursAgo_many": "",
       "hoursAgo_other": "{{count}} ч назад",
       "inAMoment": "сейчас",
       "inDays_one": "через {{count}} дн.",
+      "inDays_few": "",
+      "inDays_many": "",
       "inDays_other": "через {{count}} дн.",
       "inHours_one": "через {{count}} ч",
+      "inHours_few": "",
+      "inHours_many": "",
       "inHours_other": "через {{count}} ч",
       "inMinutes_one": "через {{count}} мин",
+      "inMinutes_few": "",
+      "inMinutes_many": "",
       "inMinutes_other": "через {{count}} мин",
       "justNow": "только что",
       "minutesAgo_one": "{{count}} мин назад",
+      "minutesAgo_few": "",
+      "minutesAgo_many": "",
       "minutesAgo_other": "{{count}} мин назад"
     }
   },
@@ -51,6 +63,8 @@
     "toolCallArgsPrefix": "аргументы",
     "toolCallResultPrefix": "результат",
     "toolCallsCount_one": "{{count}} вызов инструмента",
+    "toolCallsCount_few": "",
+    "toolCallsCount_many": "",
     "toolCallsCount_other": "{{count}} вызовов инструментов",
     "toolCallsHeader": "Вызовы инструментов",
     "toolCallStatusCompleted": "завершено",
@@ -66,6 +80,31 @@
       "last30d": "Последние 30 дней",
       "last7d": "Последние 7 дней"
     }
+  },
+  "diagramAriaLabel": "Диаграмма",
+  "documents": {
+    "artifactAudioLabel": "Аудиоартефакт: {{title}}",
+    "artifactVideoLabel": "Видео-артефакт: {{title}}",
+    "noArtifactPreview": "Предпросмотр недоступен.",
+    "openArtifactMedia": "Открыть медиа артефакта"
+  },
+  "git": {
+    "commentAvatarAlt": "Аватар {{author}}",
+    "commentBot": "Бот",
+    "commentFilterAll": "Все",
+    "commentFilterBot": "Бот",
+    "commentFilterHuman": "Человек",
+    "commentHuman": "Человек",
+    "commentNavAriaLabel": "Навигация по комментариям",
+    "commentNavPosition": "{{current}} / {{total}}",
+    "commentNextAriaLabel": "Следующий комментарий",
+    "commentPrevAriaLabel": "Предыдущий комментарий",
+    "commentsHeading": "Комментарии",
+    "filterCommentsAriaLabel": "Фильтровать комментарии по типу автора",
+    "loadingComments": "Загрузка комментариев…",
+    "noCommentBody": "(пустой комментарий)",
+    "noComments": "Нет комментариев",
+    "noCommentsForFilter": "Нет комментариев, соответствующих фильтру"
   },
   "health": {
     "anomaly": {
@@ -228,6 +267,8 @@
     "summaryGateBlocks": "Шлюз (блокирует)",
     "summaryHoldRelease": "Релиз: {{release}}",
     "summaryLoopIterations_one": "{{count}}x",
+    "summaryLoopIterations_few": "",
+    "summaryLoopIterations_many": "",
     "summaryLoopIterations_other": "{{count}}x",
     "summaryLoopUntilContains": "пока содержит \"{{value}}\"",
     "summaryLoopUntilMatches": "пока совпадает с /{{pattern}}/",
@@ -240,5 +281,15 @@
     "summarySeamStepExecute": "Исполнение шага (движок)",
     "summarySeamUnknown": "Шов: {{seam}}"
   },
-  "diagramAriaLabel": "Диаграмма"
+  "workflowSettings": {
+    "group": {
+      "${group}": ""
+    },
+    "settingDescription": {
+      "${id}": ""
+    },
+    "settingLabel": {
+      "${id}": ""
+    }
+  }
 }
