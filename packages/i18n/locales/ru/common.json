@@ -1,0 +1,243 @@
+{
+  "actions": {
+    "send": "Отправить"
+  },
+  "agents": {
+    "ratings": {
+      "trendDeclining": "↓ Снижается",
+      "trendImproving": "↑ Улучшается",
+      "trendInsufficient": "Недостаточно данных",
+      "trendStable": "→ Стабильно"
+    },
+    "reflections": {
+      "triggerManual": "Вручную",
+      "triggerPeriodic": "Периодически",
+      "triggerPostTask": "После задачи",
+      "triggerUserRequested": "По запросу пользователя"
+    },
+    "time": {
+      "daysAgo_one": "{{count}} дн. назад",
+      "daysAgo_other": "{{count}} дн. назад",
+      "hoursAgo_one": "{{count}} ч назад",
+      "hoursAgo_other": "{{count}} ч назад",
+      "inAMoment": "сейчас",
+      "inDays_one": "через {{count}} дн.",
+      "inDays_other": "через {{count}} дн.",
+      "inHours_one": "через {{count}} ч",
+      "inHours_other": "через {{count}} ч",
+      "inMinutes_one": "через {{count}} мин",
+      "inMinutes_other": "через {{count}} мин",
+      "justNow": "только что",
+      "minutesAgo_one": "{{count}} мин назад",
+      "minutesAgo_other": "{{count}} мин назад"
+    }
+  },
+  "board": {
+    "rejection": {
+      "capacityExhausted": "Колонка заполнена. Повторите, когда освободится место.",
+      "guardRejected": "Это перемещение не разрешено рабочим процессом.",
+      "mergeBlocked": "Завершение этой задачи заблокировано до окончания её шага слияния.",
+      "unknownColumn": "Такой колонки нет в рабочем процессе этой задачи.",
+      "workflowMismatch": "Перетаскиванием нельзя перенести карточку между рабочими процессами. Используйте переключатель рабочих процессов."
+    }
+  },
+  "chat": {
+    "failedToGetResponse": "Не удалось получить ответ",
+    "failureReferenceId": "ID",
+    "failureReferenceKind": "Тип",
+    "failureReferenceLabel": "Ссылка",
+    "failureReferenceMetaLabel": "Метка",
+    "openMailboxMessage": "Открыть сообщение почтового ящика",
+    "toolCallArgsPrefix": "аргументы",
+    "toolCallResultPrefix": "результат",
+    "toolCallsCount_one": "{{count}} вызов инструмента",
+    "toolCallsCount_other": "{{count}} вызовов инструментов",
+    "toolCallsHeader": "Вызовы инструментов",
+    "toolCallStatusCompleted": "завершено",
+    "toolCallStatusError": "ошибка",
+    "toolCallStatusErrors": "ошибки",
+    "toolCallStatusRunning": "выполняется",
+    "viewFailureDetails": "Показать детали ошибки"
+  },
+  "commandCenter": {
+    "range": {
+      "allTime": "За всё время",
+      "last24h": "Последние 24 ч",
+      "last30d": "Последние 30 дней",
+      "last7d": "Последние 7 дней"
+    }
+  },
+  "health": {
+    "anomaly": {
+      "duplicateActiveId": "Дублирующийся ID активной задачи",
+      "idInBothStorages": "ID задачи присутствует и в активном, и в архивном хранилище",
+      "sequenceOverlap": "Следующий номер аллокатора пересекается с существующим ID задачи",
+      "unknownPrefix": "В строке задачи используется префикс вне состояния аллокатора"
+    }
+  },
+  "inline": {
+    "connecting": "Подключение",
+    "error": "Ошибка",
+    "offline": "Не в сети",
+    "online": "В сети"
+  },
+  "labels": {
+    "name": "Название"
+  },
+  "merge": {
+    "unknown": "Неизвестно"
+  },
+  "missions": {
+    "autopilotStateActivating": "Активация среза",
+    "autopilotStateCompleting": "Завершение",
+    "autopilotStateInactive": "Выкл.",
+    "autopilotStateUnknown": "Неизвестно",
+    "autopilotStateWatching": "Наблюдение",
+    "interviewStatusAwaitingInput": "Ожидание ввода",
+    "interviewStatusComplete": "План готов",
+    "interviewStatusError": "Требуется повтор",
+    "interviewStatusGenerating": "Генерация плана",
+    "runHelperActive": "Остановка приостанавливает связанные задачи и помечает миссию заблокированной.",
+    "runHelperBlocked": "Возобновление повторно активирует миссию и продолжает исполнение.",
+    "runHelperPlanning": "Запуск активирует первый срез, чтобы можно было начать работу."
+  },
+  "models": {
+    "messages": {
+      "modelSetTo": "Модель {{label}} установлена на {{provider}}/{{modelId}}",
+      "modelSetToDefault": "Модель {{label}} установлена по умолчанию"
+    }
+  },
+  "nodes": {
+    "auth": {
+      "differ": "Учётные данные аутентификации различаются",
+      "differProviders": "Учётные данные аутентификации различаются: {{providers}}",
+      "match": "Учётные данные аутентификации совпадают",
+      "notSynced": "Аутентификация не синхронизирована"
+    },
+    "status": {
+      "connecting": "Подключение",
+      "creating": "Создание",
+      "deleting": "Удаление",
+      "error": "Ошибка",
+      "exited": "Завершён",
+      "offline": "Не в сети",
+      "online": "В сети",
+      "recreating": "Пересоздание",
+      "running": "Выполняется",
+      "stopped": "Остановлен"
+    }
+  },
+  "nodeStatus": {
+    "connecting": "Подключение",
+    "error": "Ошибка",
+    "offline": "Не в сети",
+    "online": "В сети",
+    "unknown": "Неизвестно"
+  },
+  "research": {
+    "providerGitHub": "GitHub",
+    "providerLlmSynthesis": "LLM-синтез",
+    "providerLocalDocs": "Локальные документы",
+    "providerPageFetch": "Загрузка страницы",
+    "providerWebSearch": "Веб-поиск"
+  },
+  "routing": {
+    "policyLabel": {
+      "block": "Блокировать исполнение",
+      "fallback": "Откатиться на локальный",
+      "notConfigured": "Не настроено"
+    }
+  },
+  "settings": {
+    "nodeRouting": {
+      "statusConnecting": "Подключение",
+      "statusError": "Ошибка",
+      "statusOffline": "Не в сети",
+      "statusOnline": "В сети"
+    }
+  },
+  "setup": {
+    "apiKeyFormatError": "Ключи {{providerName}} должны соответствовать формату: {{hint}} (например, {{example}})",
+    "apiKeyLabel": {
+      "fallback": "API-ключ",
+      "kimiCoding": "API-ключ Kimi",
+      "minimax": "API-ключ MiniMax",
+      "ollama": "Эндпоинт Ollama",
+      "openai": "API-ключ OpenAI",
+      "openrouter": "API-ключ OpenRouter",
+      "zai": "API-ключ Zhipu AI"
+    },
+    "apiKeyPlaceholder": {
+      "fallback": "Введите API-ключ",
+      "kimiCoding": "Введите ваш API-ключ Kimi",
+      "minimax": "Введите ваш API-ключ MiniMax",
+      "zai": "Введите ваш API-ключ Zhipu AI"
+    },
+    "apiKeyRequired": "API-ключ обязателен",
+    "apiKeySetup": {
+      "fallback": "Введите ваш API-ключ для этого провайдера.",
+      "kimiCoding": "Создайте API-ключ в настройках аккаунта платформы Moonshot.",
+      "minimax": "Сгенерируйте API-ключ в консоли разработчика платформы MiniMax.",
+      "ollama": "Введите URL эндпоинта Ollama (например, http://localhost:11434).",
+      "openai": "Создайте API-ключ в панели OpenAI в разделе API keys.",
+      "openrouter": "Создайте API-ключ на странице управления ключами вашего аккаунта OpenRouter.",
+      "zai": "Создайте API-ключ в настройках аккаунта открытой платформы Zhipu AI."
+    },
+    "apiKeyUsage": {
+      "fallback": "Используется agi для аутентификации запросов к этому провайдеру",
+      "kimiCoding": "Используется для моделей Kimi/Moonshot AI при исполнении и планировании задач",
+      "minimax": "Используется для моделей MiniMax при исполнении задач",
+      "ollama": "Подключается к вашему локальному экземпляру Ollama",
+      "openai": "Используется для моделей GPT при исполнении и планировании задач",
+      "openrouter": "Маршрутизирует к нескольким провайдерам моделей ИИ через один ключ",
+      "zai": "Используется для моделей GLM при исполнении задач"
+    },
+    "providerDesc": {
+      "anthropic": "Модели Claude — сильны в рассуждении, анализе и коде",
+      "fallback": "Провайдер ИИ — подключитесь, чтобы начать использовать модели ИИ",
+      "gemini": "Модели Gemini — мультимодальны, с сильным рассуждением",
+      "google": "Модели Gemini — мультимодальны, с сильным рассуждением",
+      "kimi": "Kimi от Moonshot AI — возможности длинного контекста",
+      "kimiCoding": "Kimi от Moonshot AI — возможности длинного контекста",
+      "minimax": "Модели MiniMax — экономичны при больших объёмах использования",
+      "moonshot": "Kimi от Moonshot AI — возможности длинного контекста",
+      "ollama": "Запускайте модели с открытым исходным кодом локально на вашей машине",
+      "openai": "Модели GPT — универсальны для широкого круга задач",
+      "openaiCodex": "Модели Codex от OpenAI — оптимизированы для задач программирования",
+      "openrouter": "OpenRouter — маршрутизация запросов между несколькими провайдерами ИИ",
+      "zai": "Модели GLM от Zhipu AI — сильная многоязычная поддержка"
+    }
+  },
+  "taskForm": {
+    "nodeStatusConnecting": "Подключение",
+    "nodeStatusError": "Ошибка",
+    "nodeStatusOffline": "Не в сети",
+    "nodeStatusOnline": "В сети"
+  },
+  "taskReview": {
+    "never": "Никогда",
+    "refreshSourceBackground": "В фоне",
+    "refreshSourceInitialLoad": "Первичная загрузка",
+    "refreshSourceManual": "Вручную"
+  },
+  "workflowNodes": {
+    "summaryAwaitInput": "Ожидает ввода пользователя",
+    "summaryCodeDefault": "TypeScript",
+    "summaryDefaultModel": "Модель по умолчанию",
+    "summaryGateAdvisory": "Рекомендательный",
+    "summaryGateBlocks": "Шлюз (блокирует)",
+    "summaryHoldRelease": "Релиз: {{release}}",
+    "summaryLoopIterations_one": "{{count}}x",
+    "summaryLoopIterations_other": "{{count}}x",
+    "summaryLoopUntilContains": "пока содержит \"{{value}}\"",
+    "summaryLoopUntilMatches": "пока совпадает с /{{pattern}}/",
+    "summaryNotConfigured": "Не настроено",
+    "summaryReviewType": "Ревью типа «{{type}}»",
+    "summarySeamExecute": "Исполнение (движок)",
+    "summarySeamMerge": "Граница слияния",
+    "summarySeamPlanning": "Планирование (движок)",
+    "summarySeamReview": "Ревью (движок)",
+    "summarySeamStepExecute": "Исполнение шага (движок)",
+    "summarySeamUnknown": "Шов: {{seam}}"
+  }
+}

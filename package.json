@@ -3,13 +3,13 @@
   "version": "0.46.0",
   "private": true,
   "license": "MIT",
-  "homepage": "https://github.com/Runfusion/Fusion#readme",
+  "homepage": "https://github.com/agisota/agi#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Runfusion/Fusion"
+    "url": "https://github.com/agisota/agi"
   },
   "bugs": {
-    "url": "https://github.com/Runfusion/Fusion/issues"
+    "url": "https://github.com/agisota/agi/issues"
   },
   "type": "module",
   "packageManager": "pnpm@10.33.0",

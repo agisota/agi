@@ -1,0 +1,16 @@
+agi
+===
+
+This product, "agi", is a rebranded and Russian-localized derivative of
+"Fusion" by Runfusion (https://github.com/Runfusion/Fusion), used under the
+MIT License. The original copyright notice and the full MIT License text are
+retained in the LICENSE file, as required by the license.
+
+Modifications in this fork (agisota/agi):
+- Product rebranding from "Fusion" to "agi" on user-facing surfaces and the CLI
+  (the internal "@fusion/*" package scope and runtime directories are unchanged).
+- Full Russian ("ru") localization of the dashboard and CLI catalogs.
+- Russian set as the default UI language (an explicit user choice still wins;
+  English remains the source-of-truth fallback).
+
+Upstream project: Fusion (© Runfusion) — MIT License.

@@ -1,16 +1,18 @@
 <div align="center">
 
-# <img src="./demo/assets/fusion-logo-orange.svg" alt="" width="34" align="center" /> Fusion
+# <img src="./demo/assets/fusion-logo-orange.svg" alt="" width="34" align="center" /> agi
 
 ### From rough idea to production code — automatically.
 
 ### 🏭 A software factory, run by a multi-agent orchestrator.
 
-Describe what you want — a team of AI agents **plans, builds, reviews, and ships** it for you. Fusion is your software factory: an assembly line for code that runs across tasks, agents, missions, git, files, and worktrees, with any model, local or cloud.
+Describe what you want — a team of AI agents **plans, builds, reviews, and ships** it for you. agi is your software factory: an assembly line for code that runs across tasks, agents, missions, git, files, and worktrees, with any model, local or cloud.
 
-[**runfusion.ai →**](https://runfusion.ai) · [Docs](./docs/README.md) · [GitHub](https://github.com/Runfusion/Fusion) · [npm](https://www.npmjs.com/package/@runfusion/fusion) · [Discord](https://discord.gg/ksrfuy7WYR)
+> **A rebranded, Russian-localized fork of [Fusion](https://github.com/Runfusion/Fusion) (MIT).** See [NOTICE](./NOTICE) for attribution and the list of modifications.
 
-**English** · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Español](./README.es.md) · [한국어](./README.ko.md)
+[**runfusion.ai →**](https://runfusion.ai) · [Docs](./docs/README.md) · [GitHub](https://github.com/agisota/agi) · [npm](https://www.npmjs.com/package/@runfusion/fusion) · [Discord](https://discord.gg/ksrfuy7WYR)
+
+**English** · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Español](./README.es.md) · [한국어](./README.ko.md) · [Русский](./README.ru.md)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-3fb950.svg)](./LICENSE)
 [![npm](https://img.shields.io/npm/v/@runfusion/fusion.svg?color=58a6ff)](https://www.npmjs.com/package/@runfusion/fusion)
@@ -20,13 +22,13 @@ Describe what you want — a team of AI agents **plans, builds, reviews, and shi
 
 <br />
 
-<img src="./demo/assets/fusion-reel.gif" alt="Fusion reel: from rough idea to production code" width="900" />
+<img src="./demo/assets/fusion-reel.gif" alt="agi reel: from rough idea to production code" width="900" />
 
 <br />
 <br />
 
 <a href="https://runfusion.ai">
-  <img src="https://runfusion.ai/fusion-dashboard.png" alt="Fusion dashboard: Planning, Todo, In Progress, In Review, Done kanban columns with active task cards" width="900" />
+  <img src="https://runfusion.ai/fusion-dashboard.png" alt="agi dashboard: Planning, Todo, In Progress, In Review, Done kanban columns with active task cards" width="900" />
 </a>
 
 </div>
@@ -35,7 +37,7 @@ Describe what you want — a team of AI agents **plans, builds, reviews, and shi
 
 ## Your entire dev environment. On a single pane of glass.
 
-Describe a task in plain language. A planning agent reads your project, understands context, and writes a full `PROMPT.md` plan — steps, file scope, acceptance criteria. Then Fusion plans, reviews, executes, and reviews again, in an isolated git worktree, with a human approval gate wherever you want one.
+Describe a task in plain language. A planning agent reads your project, understands context, and writes a full `PROMPT.md` plan — steps, file scope, acceptance criteria. Then agi plans, reviews, executes, and reviews again, in an isolated git worktree, with a human approval gate wherever you want one.
 
 One board. Controlled from anywhere. Laptop, Mac mini, Linux server, cloud VM, phone — all connected.
 
@@ -57,7 +59,7 @@ That launches the dashboard. Subcommands forward through: `npx runfusion.ai task
 
 ```bash
 curl -fsSL https://runfusion.ai/install.sh | sh
-fusion dashboard
+agi dashboard
 ```
 
 **Homebrew** (macOS & Linux):
@@ -65,7 +67,7 @@ fusion dashboard
 ```bash
 brew tap runfusion/fusion
 brew install fusion
-fusion dashboard            # or: fn dashboard
+agi dashboard
 ```
 
 Or as a one-liner (auto-taps): `brew install runfusion/fusion/fusion`.
@@ -74,7 +76,7 @@ Or as a one-liner (auto-taps): `brew install runfusion/fusion/fusion`.
 
 ```bash
 npm install -g @runfusion/fusion
-fn dashboard                # or: fusion dashboard
+agi dashboard
 ```
 
 **From a clone** (for development):
@@ -86,16 +88,16 @@ pnpm dev dashboard
 Then click the `Open:` URL printed in the terminal. It embeds a bearer token
 (`http://localhost:4040/?token=fn_...`) that the browser captures to
 `localStorage` on first visit and reuses automatically thereafter. On the
-server side, Fusion now persists the dashboard/daemon token in
+server side, agi now persists the dashboard/daemon token in
 `~/.fusion/settings.json` on first authenticated run and reuses it on later
 starts unless you override it (`--token`, `FUSION_DASHBOARD_TOKEN`,
 `FUSION_DAEMON_TOKEN`) or disable auth with `--no-auth`. See
-[CLI reference → fn dashboard → Authentication](./docs/cli-reference.md#fn-dashboard)
+[CLI reference → agi dashboard → Authentication](./docs/cli-reference.md#fn-dashboard)
 for full precedence and reset/revocation options.
 
 ### First-run setup
 
-On first launch, Fusion opens the **onboarding wizard** with three guided steps:
+On first launch, agi opens the **onboarding wizard** with three guided steps:
 
 1. **AI Setup** — Use a simplified quick-start provider list (recommended providers plus any already-connected providers), then expand **Advanced provider settings** only if you need additional providers or setup details. You only need one provider to get started. Deprecated Google Gemini CLI / Antigravity provider entries are intentionally hidden; Google/Gemini API key, Google Generative AI, Vertex, and Cloud Code paths remain supported.
 2. **GitHub (Optional)** — Connect GitHub for issue import and PR management
@@ -123,7 +125,7 @@ For Capacitor + PWA workflow, see [MOBILE.md](./MOBILE.md).
 ### See every step, before the merge
 
 <div align="center">
-  <img src="https://runfusion.ai/screenshot-task-detail.png" alt="Fusion task detail: workflow steps visible on an in-progress task with diffs and file changes" width="820" />
+  <img src="https://runfusion.ai/screenshot-task-detail.png" alt="agi task detail: workflow steps visible on an in-progress task with diffs and file changes" width="820" />
 </div>
 
 Every task shows its plan, its reviews, its diffs, and its file changes in real time. Jump into an active task and nudge direction, tighten constraints, pause, or re-prompt.
@@ -137,7 +139,7 @@ Every task shows its plan, its reviews, its diffs, and its file changes in real 
 | 🧠 **AI planning** | Describe a task in plain language. Planning agents turn it into a `PROMPT.md` plan with steps, file scope, and acceptance criteria. |
 | 🔁 **Selectable workflows** | Built-ins cover coding, quick fixes, review-heavy work, stepwise execution, plugin-gated Compound Engineering, and PR lifecycle fragments. Pick a workflow per task or author custom ones in the [Workflow Editor](./docs/workflow-editor.md). |
 | 🌳 **Worktree isolation** | Each task runs in its own branch and worktree (`fusion/{task-id}`). Parallel tasks. Zero conflicts. Optional [worktrunk](https://github.com/max-sixty/worktrunk) delegation via [`worktrunk.enabled`](./docs/settings-reference.md#worktree-backend-settings) (see [WorktreeBackend abstraction](./docs/architecture.md#worktreebackend-abstraction)). |
-| ⚡ **Smart merge controls** | Passing every gate? Fusion squash-merges and moves on. Opt into manual approval anywhere, inherit the live global auto-merge default, or set explicit per-task auto/manual overrides. |
+| ⚡ **Smart merge controls** | Passing every gate? agi squash-merges and moves on. Opt into manual approval anywhere, inherit the live global auto-merge default, or set explicit per-task auto/manual overrides. |
 | 🛰️ **Multi-node mesh** | Laptop, Mac mini, Linux server, cloud VM, phone — all synced. Desktop, mobile, web. |
 | 🧩 **Any model** | Anthropic, OpenAI, Ollama, Google Generative AI, Z.ai, local runtimes, and user-defined [custom providers](./docs/dashboard-guide.md#custom-providers). Local and cloud coexist, with workflow model/fallback lanes configurable per project. |
 | 🏢 **Agent companies** | Import pre-built teams — 440+ agents across 16 companies — and run them autonomously for weeks. |
@@ -160,12 +162,12 @@ Media lives in demo/assets/ (committed, GitHub-inline GIFs); stat numbers are so
 Each feature keeps its original Tokyo Night capture and adds a Shadcn Light + Shadcn Dark Gray pair; the theme showcase is split into a light-themes grid and a dark-themes grid. Workflow GIFs feature the Stepwise coding graph with node-level zoom/pan.
 -->
 
-The newest surfaces in Fusion, at a glance — mission control, visual workflows, agent chat, multi-agent rooms, and inter-agent mail.
+The newest surfaces in agi, at a glance — mission control, visual workflows, agent chat, multi-agent rooms, and inter-agent mail.
 
 ### 🛰️ Command Center — mission control for your agent fleet
 
 <div align="center">
-  <img src="./demo/assets/command-center.gif" alt="Fusion Command Center: live concurrency gauges, token charts, and fleet telemetry across tabs" width="900" />
+  <img src="./demo/assets/command-center.gif" alt="agi Command Center: live concurrency gauges, token charts, and fleet telemetry across tabs" width="900" />
 </div>
 
 One screen for everything your agents are doing. Tune live scheduler capacity, watch token spend by model in real time, and prove the value with hard numbers.
@@ -205,7 +207,7 @@ One screen for everything your agents are doing. Tune live scheduler capacity, w
 ### 🔁 Selectable workflows, authored visually
 
 <div align="center">
-  <img src="./demo/assets/workflows.gif" alt="Fusion Workflow Editor: switching between built-in workflow graphs" width="820" />
+  <img src="./demo/assets/workflows.gif" alt="agi Workflow Editor: switching between built-in workflow graphs" width="820" />
 </div>
 
 A task's journey from idea to merge is a **workflow** — and it's yours to choose and shape. Pick a built-in (Coding, Quick fix, Review-heavy, Stepwise, PR lifecycle, Compound engineering, and more), inspect its graph, then duplicate and customize columns, gates, model lanes, and review policy in the visual [Workflow Editor](./docs/workflow-editor.md). No engine fork required.
@@ -222,7 +224,7 @@ Here's the **Stepwise coding** graph — plan, execute, and review every step be
 ### 🗨️ Agent chat — talk to your agents, mid-flight
 
 <div align="center">
-  <img src="./demo/assets/agent-chat.gif" alt="Fusion agent chat: a threaded conversation with an agent diagnosing a failed task" width="900" />
+  <img src="./demo/assets/agent-chat.gif" alt="agi agent chat: a threaded conversation with an agent diagnosing a failed task" width="900" />
 </div>
 
 Direct chat and per-task chat with any agent, on any model. Ask why a task failed, steer an approach, drop attachments, answer in-chat question cards, and resume streams where you left off — full markdown and code rendering throughout.
@@ -237,7 +239,7 @@ Direct chat and per-task chat with any agent, on any model. Ask why a task faile
 ### 👥 Multi-agent chat rooms
 
 <div align="center">
-  <img src="./demo/assets/chat-rooms.gif" alt="Fusion chat room: CEO, Product Manager, and CTO agents coordinating in #leads" width="900" />
+  <img src="./demo/assets/chat-rooms.gif" alt="agi chat room: CEO, Product Manager, and CTO agents coordinating in #leads" width="900" />
 </div>
 
 Put multiple agents in a room and let them coordinate. Mention a member and it responds directly; ambient members can join the conversation up to a cap. Here the **CEO**, **Product Manager**, and **CTO** agents align on task ownership in `#leads` — no human in the loop. ([Chat docs](./docs/dashboard-guide.md#chat-view))
@@ -252,7 +254,7 @@ Put multiple agents in a room and let them coordinate. Mention a member and it r
 ### 📬 Agent mail — an inbox between your agents
 
 <div align="center">
-  <img src="./demo/assets/agent-mail.gif" alt="Fusion mailbox: inter-agent messages with triage summaries and approvals" width="900" />
+  <img src="./demo/assets/agent-mail.gif" alt="agi mailbox: inter-agent messages with triage summaries and approvals" width="900" />
 </div>
 
 A built-in mailbox for delegation, clarification, and hand-offs. Agents file triage summaries, request approvals, and coordinate work across the fleet — with Inbox, Outbox, Agents, and Approvals views, so you can audit every exchange.
@@ -264,20 +266,20 @@ A built-in mailbox for delegation, clarification, and hand-offs. Agents file tri
 </tr>
 </table>
 
-### 📱 Fusion is an AI factory in your pocket
+### 📱 agi is an AI factory in your pocket
 
 The full board, Command Center, missions, agents, and chat travel with you — native **iOS** and **Android** apps (Capacitor) plus an installable PWA. Start a run on your laptop, steer it from your phone.
 
 <table>
 <tr>
-<td width="33%"><img src="./demo/assets/mobile-board.png" alt="Fusion mobile: board" /></td>
-<td width="33%"><img src="./demo/assets/mobile-command-center.png" alt="Fusion mobile: Command Center" /></td>
-<td width="33%"><img src="./demo/assets/mobile-missions.png" alt="Fusion mobile: missions" /></td>
+<td width="33%"><img src="./demo/assets/mobile-board.png" alt="agi mobile: board" /></td>
+<td width="33%"><img src="./demo/assets/mobile-command-center.png" alt="agi mobile: Command Center" /></td>
+<td width="33%"><img src="./demo/assets/mobile-missions.png" alt="agi mobile: missions" /></td>
 </tr>
 <tr>
-<td width="33%"><img src="./demo/assets/mobile-agents.png" alt="Fusion mobile: agents" /></td>
-<td width="33%"><img src="./demo/assets/mobile-chat.png" alt="Fusion mobile: agent chat" /></td>
-<td width="33%"><img src="./demo/assets/mobile-chat-list.png" alt="Fusion mobile: chat list" /></td>
+<td width="33%"><img src="./demo/assets/mobile-agents.png" alt="agi mobile: agents" /></td>
+<td width="33%"><img src="./demo/assets/mobile-chat.png" alt="agi mobile: agent chat" /></td>
+<td width="33%"><img src="./demo/assets/mobile-chat-list.png" alt="agi mobile: chat list" /></td>
 </tr>
 </table>
 
@@ -329,10 +331,13 @@ Tasks with dependencies are processed sequentially. Independent tasks run in par
 
 <!--
 FNXC:Docs 2026-06-16-23:10:
-Fusion now exposes workflow selection and authoring as public product surfaces, so the README must explain the high-level lifecycle and link to the canonical Workflow Steps and Workflow Editor docs instead of duplicating editor internals here.
+agi now exposes workflow selection and authoring as public product surfaces, so the README must explain the high-level lifecycle and link to the canonical Workflow Steps and Workflow Editor docs instead of duplicating editor internals here.
+
+FNXC:Docs 2026-06-24-03:30:
+Product rebranded from "Fusion" to "agi" on all user-facing README surfaces (titles, prose, image alt text) and CLI examples (`fn ` -> `agi `). The "@runfusion/fusion" npm package scope, "@fusion/*" internal scopes, runtime dirs (`~/.fusion`, `fusion/{task-id}` worktrees), FUSION_* env vars, the runfusion.ai host, and the MIT license are intentionally unchanged. Attribution to upstream Fusion (MIT) is retained near the top and in NOTICE.
 -->
 
-Fusion workflows define how a task moves from idea to delivery. The default coding path is still the familiar **Plan/Triage → Execute → Workflow steps → Review → Merge** loop, but the policy now lives in a selectable workflow rather than being only hard-coded engine behavior.
+agi workflows define how a task moves from idea to delivery. The default coding path is still the familiar **Plan/Triage → Execute → Workflow steps → Review → Merge** loop, but the policy now lives in a selectable workflow rather than being only hard-coded engine behavior.
 
 - **Select per task:** choose a workflow from the dashboard task/board workflow controls, or assign one through `fn_workflow_select` / `workflow_id` when creating tasks.
 - **Built-in catalog:** Coding (`builtin:coding`), Quick fix (`builtin:quick-fix`), Review-heavy (`builtin:review-heavy`), Compound engineering (`builtin:compound-engineering`, plugin-gated), Stepwise coding (`builtin:stepwise-coding`), and the PR lifecycle (`builtin:pr-workflow`, a reusable PR graph fragment).
@@ -346,7 +351,7 @@ Read [Workflow Steps](./docs/workflow-steps.md) for runtime semantics, built-in 
 
 <div align="center">
 
-<img src="./demo/assets/fusion-mesh.gif" alt="Fusion mesh: laptop, Mac mini, Linux server, cloud VM, phone — all synced" width="820" />
+<img src="./demo/assets/fusion-mesh.gif" alt="agi mesh: laptop, Mac mini, Linux server, cloud VM, phone — all synced" width="820" />
 
 <br />
 
@@ -359,12 +364,12 @@ Read [Workflow Steps](./docs/workflow-steps.md) for runtime semantics, built-in 
 
 </div>
 
-Laptop, Mac mini, Linux server, cloud VM, phone — every node is a peer. Your task state, agents, logs, and diffs stay synchronized across the mesh. The same Fusion ships as:
+Laptop, Mac mini, Linux server, cloud VM, phone — every node is a peer. Your task state, agents, logs, and diffs stay synchronized across the mesh. The same agi ships as:
 
 - 🖥️ **Desktop app** — Electron for **macOS** (Intel + Apple Silicon), **Windows** 10/11, and **Linux**
 - 📱 **Mobile app** — Capacitor for **iOS/iPadOS** and **Android** ([MOBILE.md](./MOBILE.md))
-- 🌐 **Web dashboard** — any modern browser, served from the `fn dashboard` daemon
-- 🔌 **CLI** — `fn` binary + extension for terminal-first workflows
+- 🌐 **Web dashboard** — any modern browser, served from the `agi dashboard` daemon
+- 🔌 **CLI** — `agi` binary + extension for terminal-first workflows
 
 Start the daemon on any node, connect your other devices, and the board follows you everywhere.
 
@@ -374,7 +379,7 @@ Start the daemon on any node, connect your other devices, and the board follows 
 
 <div align="center">
 
-<img src="./demo/assets/fusion-company-reel.gif" alt="Fusion agent company: import a team, run it autonomously for weeks" width="820" />
+<img src="./demo/assets/fusion-company-reel.gif" alt="agi agent company: import a team, run it autonomously for weeks" width="820" />
 
 </div>
 
@@ -388,7 +393,7 @@ npx companies.sh add paperclipai/companies/gstack
 
 ## Compatible with the tools you already use.
 
-Fusion integrates with the tools you love. **Hermes**, **Paperclip**, and **OpenClaw** all ship as first-class plugins — route any workspace to whichever runtime fits the task. And any Paperclip agent-company imports with a single command.
+agi integrates with the tools you love. **Hermes**, **Paperclip**, and **OpenClaw** all ship as first-class plugins — route any workspace to whichever runtime fits the task. And any Paperclip agent-company imports with a single command.
 
 <div align="center">
   <img src="./demo/assets/hermes-logo.svg" alt="Hermes" height="56" />
@@ -398,7 +403,7 @@ Fusion integrates with the tools you love. **Hermes**, **Paperclip**, and **Open
 
 <sub>Nous Research</sub>
 
-The open-source autonomous agent from **Nous Research**. Install the Hermes plugin and run agents through Hermes for long-running, context-growing work — route any Fusion workspace to it.
+The open-source autonomous agent from **Nous Research**. Install the Hermes plugin and run agents through Hermes for long-running, context-growing work — route any agi workspace to it.
 
 ### OpenClaw <sub>`experimental`</sub>
 
@@ -414,9 +419,9 @@ OpenClaw runtime support is available as an experimental plugin (`fusion-plugin-
 
 <sub>paperclip.ing</sub>
 
-The human control plane for AI labor. Install the Paperclip plugin to run agents through Paperclip inside Fusion.
+The human control plane for AI labor. Install the Paperclip plugin to run agents through Paperclip inside agi.
 
-Fusion also natively supports the **[`companies.sh`](https://github.com/paperclipai/companies)** agent-company standard: import a prebuilt team — **440+ agents across 16 companies** — and let them coordinate over Fusion's mailbox, missions, and workflow gates for weeks of autonomous work. Same company format, same agents, same skills as Paperclip.
+agi also natively supports the **[`companies.sh`](https://github.com/paperclipai/companies)** agent-company standard: import a prebuilt team — **440+ agents across 16 companies** — and let them coordinate over agi's mailbox, missions, and workflow gates for weeks of autonomous work. Same company format, same agents, same skills as Paperclip.
 
 ```bash
 npx companies.sh add paperclipai/companies/gstack
@@ -435,7 +440,7 @@ npx companies.sh add paperclipai/companies/gstack
 | [Getting Started](./docs/getting-started.md) | Installation, onboarding, first task, and workflow-selection basics |
 | [Dashboard Guide](./docs/dashboard-guide.md) | Board/list views, chat, workflow editor, git manager, settings, and UI tools |
 | [Task Management](./docs/task-management.md) | Task lifecycle, prompt specs, comments, archiving, and GitHub integration |
-| [CLI Reference](./docs/cli-reference.md) | Full `fn` command and daemon reference |
+| [CLI Reference](./docs/cli-reference.md) | Full `agi` command and daemon reference |
 | [Settings Reference](./docs/settings-reference.md) | Global/project settings, model hierarchy, workflow settings, and custom providers |
 | [Workflow Steps](./docs/workflow-steps.md) | Workflow runtime, built-in workflows, gates, templates, and phases |
 | [Workflow Editor](./docs/workflow-editor.md) | Visual authoring, importing/exporting, custom fields/columns/settings, and mobile editor |
@@ -470,18 +475,18 @@ npx companies.sh add paperclipai/companies/gstack
 
 ### Provider authentication
 
-Fusion supports OAuth-based authentication for AI providers configured via **Settings → Authentication**. For most OAuth providers, when the dashboard is accessed via a non-localhost host (remote node, LAN host/IP, or reverse proxy), provider login URLs are rewritten to route OAuth callbacks through a bridge endpoint (`/api/auth/oauth-callback`) so redirects reach the active browser session.
+agi supports OAuth-based authentication for AI providers configured via **Settings → Authentication**. For most OAuth providers, when the dashboard is accessed via a non-localhost host (remote node, LAN host/IP, or reverse proxy), provider login URLs are rewritten to route OAuth callbacks through a bridge endpoint (`/api/auth/oauth-callback`) so redirects reach the active browser session.
 
-- **Anthropic (Claude)** — Uses a pasted authorization-code flow in Settings/onboarding: sign in, then paste the final redirect URL (or code) back into Fusion to complete login
+- **Anthropic (Claude)** — Uses a pasted authorization-code flow in Settings/onboarding: sign in, then paste the final redirect URL (or code) back into agi to complete login
 - **OpenAI Codex** — Uses the same pasted authorization-code flow with secure state validation
-- **Factory AI — via Droid CLI** *(optional)* — requires local Droid CLI install + `droid auth login`; detection follows the effective runtime binary path (default `droid`, or plugin `droidBinaryPath` when configured), then enable in **Settings → Authentication** and restart Fusion
+- **Factory AI — via Droid CLI** *(optional)* — requires local Droid CLI install + `droid auth login`; detection follows the effective runtime binary path (default `droid`, or plugin `droidBinaryPath` when configured), then enable in **Settings → Authentication** and restart agi
 - **llama.cpp — via HTTP server** *(optional)* — configure your llama.cpp server URL (default `http://127.0.0.1:8080`) and optional API key, then enable in **Settings → Authentication**
 - **Other providers** — Authenticate via API key entry in Settings (including Google/Gemini API key, Google Generative AI, Vertex, and Cloud Code aliases)
 - **Custom providers** — Add user-defined OpenAI-compatible, OpenAI Responses, Anthropic-compatible, or Google Generative AI endpoints from **Settings → Authentication → Custom Providers**; saved model IDs become selectable in project and workflow model lanes ([Dashboard Guide](./docs/dashboard-guide.md#custom-providers))
 
 ### Model system
 
-Fusion uses a dual-scope model hierarchy with five independent lanes. Global settings define baseline defaults; project settings provide per-project overrides.
+agi uses a dual-scope model hierarchy with five independent lanes. Global settings define baseline defaults; project settings provide per-project overrides.
 
 | Lane | Purpose | Global Baseline Keys | Project Override Keys |
 |------|---------|---------------------|----------------------|
@@ -501,7 +506,7 @@ For full settings documentation, see [Settings Reference](./docs/settings-refere
 
 ### Scheduled tasks / automations
 
-Fusion supports scheduled task automation via the `/api/automations` endpoints. Automations can run shell commands or multi-step workflows on a configurable schedule.
+agi supports scheduled task automation via the `/api/automations` endpoints. Automations can run shell commands or multi-step workflows on a configurable schedule.
 
 #### Scheduling scope
 
@@ -510,7 +515,7 @@ Automations and routines can run in two scopes:
 - **Global** — Runs across all projects. Use this for cross-project maintenance, backups, or unified reporting.
 - **Project** — Runs only within a specific project. Use this for project-specific CI, testing, or deployment tasks.
 
-When you create a schedule without choosing a scope, Fusion defaults to **project scope** with the `default` project ID for backward compatibility.
+When you create a schedule without choosing a scope, agi defaults to **project scope** with the `default` project ID for backward compatibility.
 
 To explicitly target a scope:
 - In the dashboard **Scheduled Tasks** modal, use the **Global / Project** toggle.
@@ -560,24 +565,24 @@ Routines are AI agent tasks triggered by cron schedules, webhooks, or manual exe
 ## CLI quick examples
 
 ```bash
-fn task create "Fix the login bug"                    # Quick entry → planning
-fn task plan "Build auth system"                      # AI-guided planning
-fn task import owner/repo --labels bug                # Import GitHub issues
-fn task show FN-001                                   # View task details
-fn task logs FN-001 --follow                          # Stream execution logs
-fn task steer FN-001 "Use TypeScript"                 # Guide the agent mid-execution
+agi task create "Fix the login bug"                   # Quick entry → planning
+agi task plan "Build auth system"                     # AI-guided planning
+agi task import owner/repo --labels bug               # Import GitHub issues
+agi task show FN-001                                  # View task details
+agi task logs FN-001 --follow                         # Stream execution logs
+agi task steer FN-001 "Use TypeScript"               # Guide the agent mid-execution
 
-fn project add my-app /path/to/app                    # Register a project
-fn project list                                       # List all projects
+agi project add my-app /path/to/app                   # Register a project
+agi project list                                      # List all projects
 
-fn settings set maxConcurrent 4                       # Configure settings
-fn settings export                                    # Export configuration
+agi settings set maxConcurrent 4                      # Configure settings
+agi settings export                                   # Export configuration
 
-fn mission create "Auth System" "Build auth"          # Create mission
-fn mission activate-slice <slice-id>                  # Activate a slice
+agi mission create "Auth System" "Build auth"         # Create mission
+agi mission activate-slice <slice-id>                 # Activate a slice
 
-fn skills search react                                # Search skills.sh
-fn skills install firebase/agent-skills               # Install agent skills
+agi skills search react                               # Search skills.sh
+agi skills install firebase/agent-skills              # Install agent skills
 ```
 
 ---
@@ -610,7 +615,7 @@ pnpm test                     # Run all tests
 
 ### Build a standalone executable
 
-Build a single self-contained `fn` binary using [Bun](https://bun.sh/):
+Build a single self-contained `agi` binary using [Bun](https://bun.sh/):
 
 ```bash
 pnpm build:exe                # Build for current platform

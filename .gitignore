@@ -98,3 +98,7 @@ packages/mobile/android/
 # Dolt database files
 .dolt/
 *.db
+
+# agi: local secret material (PEM keys, etc.) — never commit
+secrets/
+!.env.example

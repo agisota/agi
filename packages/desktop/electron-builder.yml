@@ -1,5 +1,6 @@
-appId: com.gsxdsm.fusion.desktop
-productName: Fusion
+# FNXC:Branding 2026-06-24-03:11: agi rebrand — productName/appId/publisher point at the agisota/agi fork. Deep-link scheme/ext stay "fusion" (internal plumbing, like the @fusion/* package scope) to avoid breaking deep-link handlers.
+appId: com.agisota.agi.desktop
+productName: agi
 artifactName: "${productName}-${version}-${os}-${arch}.${ext}"
 
 directories:
@@ -97,21 +98,21 @@ extraResources:
       - "tray-*.png"
 
 protocols:
-  - name: Fusion Deep Links
+  - name: agi Deep Links
     schemes:
       - fusion
 
 fileAssociations:
   - ext: fusion
-    name: Fusion Task Link
-    description: Fusion desktop deep link
+    name: agi Task Link
+    description: agi desktop deep link
     role: Viewer
     mimeType: x-scheme-handler/fusion
 
 publish:
   provider: github
-  owner: gsxdsm
-  repo: fusion
+  owner: agisota
+  repo: agi
 
 mac:
   category: public.app-category.developer-tools
@@ -139,7 +140,7 @@ win:
     signingHashAlgorithms:
       - sha256
     rfc3161TimeStampServer: http://timestamp.digicert.com
-    publisherName: Fusion
+    publisherName: agi
 
 nsis:
   oneClick: false

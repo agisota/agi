@@ -272,176 +272,177 @@ async function loadCommandHandlers() {
   };
 }
 
+// FNXC:Branding 2026-06-24-03:11: CLI help rebranded fn/Fusion → agi (user-facing strings only; FUSION_* env vars, .fusion paths, and @runfusion/fusion package name are unchanged).
 const HELP = `
-fn — AI-orchestrated task board
+agi — AI-orchestrated task board
 
 Usage:
-  fn                                  Launch the dashboard (same as fn dashboard)
-  fn init [opts]                      Initialize a new fn project (--name, --path, --git)
-  fn onboard [--force] [--skip-onboarding]
+  agi                                  Launch the dashboard (same as agi dashboard)
+  agi init [opts]                      Initialize a new agi project (--name, --path, --git)
+  agi onboard [--force] [--skip-onboarding]
                                       Run onboarding on demand; auto-launch runs before interactive commands when central DB is missing,
                                       and auto-skips for serve/daemon, non-TTY, --skip-onboarding, and FUSION_SKIP_ONBOARDING
-  fn dashboard                        Start the board web UI
-  fn dashboard --paused               Start with automation paused
-  fn dashboard --dev                  Start dashboard in development mode
-  fn dashboard --no-engine            Start web UI only (no AI engine)
-  fn dashboard --interactive          Start with interactive port selection
-  fn serve [--port <port>] [--host <host>] [--paused] [--daemon] [--project <id|name>] [--no-auto-register]
-                                      Start Fusion as a headless node (API + engine, no UI)
+  agi dashboard                        Start the board web UI
+  agi dashboard --paused               Start with automation paused
+  agi dashboard --dev                  Start dashboard in development mode
+  agi dashboard --no-engine            Start web UI only (no AI engine)
+  agi dashboard --interactive          Start with interactive port selection
+  agi serve [--port <port>] [--host <host>] [--paused] [--daemon] [--project <id|name>] [--no-auto-register]
+                                      Start agi as a headless node (API + engine, no UI)
                                       Auto-registers cwd project on first run (use --no-auto-register to disable)
-  fn daemon [--port <port>] [--host <host>] [--token <token>] [--paused] [--token-only] [--project <id|name>] [--no-auto-register]
-                                      Start Fusion daemon (API + engine, auth required)
-  fn desktop                          Launch the Fusion desktop app (Electron)
-  fn desktop --dev                    Launch with hot-reload (connects to Vite dev server)
-  fn desktop --paused                 Launch with automation paused
-  fn update [--check] [--global] [--json]   Update Fusion to the latest version
-  fn upgrade                           Alias for fn update
-  fn task create [desc] [opts]         Create a new task (goes to triage; supports --node <name>, --no-dedup)
-  fn task plan [description] [opts]    Create task via AI-guided planning
-  fn task list                        List all tasks
-  fn task show <id>                   Show task details, steps, log
-  fn task logs <id> [--follow] [--limit <n>] [--type <type>]
+  agi daemon [--port <port>] [--host <host>] [--token <token>] [--paused] [--token-only] [--project <id|name>] [--no-auto-register]
+                                      Start agi daemon (API + engine, auth required)
+  agi desktop                          Launch the agi desktop app (Electron)
+  agi desktop --dev                    Launch with hot-reload (connects to Vite dev server)
+  agi desktop --paused                 Launch with automation paused
+  agi update [--check] [--global] [--json]   Update agi to the latest version
+  agi upgrade                           Alias for agi update
+  agi task create [desc] [opts]         Create a new task (goes to triage; supports --node <name>, --no-dedup)
+  agi task plan [description] [opts]    Create task via AI-guided planning
+  agi task list                        List all tasks
+  agi task show <id>                   Show task details, steps, log
+  agi task logs <id> [--follow] [--limit <n>] [--type <type>]
                                       Show task agent execution logs
-  fn task move <id> <col>             Move a task to a column
-  fn task update <id> <step> <status> Update step status (pending|in-progress|done|skipped)
-  fn task deps <op> <id> ...        Add/remove/replace/set task dependencies
-  fn task log <id> <message>          Add a log entry
-  fn task merge <id>                  Merge an in-review task and close it
-  fn task duplicate <id>              Duplicate a task (creates copy in triage)
-  fn task refine <id> [opts]          Create a refinement task from done/in-review
-  fn task archive <id>                Archive a task (from any column)
-  fn task unarchive <id>              Unarchive an archived task
-  fn task delete <id> [--force] [--allow-resurrection]
+  agi task move <id> <col>             Move a task to a column
+  agi task update <id> <step> <status> Update step status (pending|in-progress|done|skipped)
+  agi task deps <op> <id> ...        Add/remove/replace/set task dependencies
+  agi task log <id> <message>          Add a log entry
+  agi task merge <id>                  Merge an in-review task and close it
+  agi task duplicate <id>              Duplicate a task (creates copy in triage)
+  agi task refine <id> [opts]          Create a refinement task from done/in-review
+  agi task archive <id>                Archive a task (from any column)
+  agi task unarchive <id>              Unarchive an archived task
+  agi task delete <id> [--force] [--allow-resurrection]
                                       Delete a task (use --force to skip confirmation; --allow-resurrection permits intentional ID recreation)
-  fn task attach <id> <file>          Attach a file to a task
-  fn task pause <id>                  Pause a task (stops all automation)
-  fn task unpause <id>                Unpause a task (resumes automation)
-  fn task comment <id> [message]      Add task comment (prompts if message omitted)
-  fn task comments <id>               List task comments
-  fn task steer <id> [message]        Add steering comment (prompts if message omitted)
-  fn task set-node <id> <node-name-or-id>  Set a per-task node override
-  fn task clear-node <id>                Clear a per-task node override
-  fn task retry <id>                  Retry a failed task (clears error, moves to todo)
-  fn task import <owner/repo> [opts]  Import GitHub issues as tasks
+  agi task attach <id> <file>          Attach a file to a task
+  agi task pause <id>                  Pause a task (stops all automation)
+  agi task unpause <id>                Unpause a task (resumes automation)
+  agi task comment <id> [message]      Add task comment (prompts if message omitted)
+  agi task comments <id>               List task comments
+  agi task steer <id> [message]        Add steering comment (prompts if message omitted)
+  agi task set-node <id> <node-name-or-id>  Set a per-task node override
+  agi task clear-node <id>                Clear a per-task node override
+  agi task retry <id>                  Retry a failed task (clears error, moves to todo)
+  agi task import <owner/repo> [opts]  Import GitHub issues as tasks
 
 PR:
-  fn pr create <task-id> [--title <title>] [--base <branch>] [--body <body>] [--draft] [--no-ai] [--reviewer <login>]
+  agi pr create <task-id> [--title <title>] [--base <branch>] [--body <body>] [--draft] [--no-ai] [--reviewer <login>]
                                       Create a GitHub PR for a task (default: AI-generated title/body)
-  fn pr list | ls                     List active PR entities with state + auto-merge
-  fn pr show <pr-id>                  Show a PR entity (state, checks, review, threads)
-  fn pr approve <pr-id>               Release the PR's review gate (approve)
-  fn pr respond <pr-id>               Request another review-response round
-  fn pr retry <pr-id>                 Retry the PR (rework release)
-  fn pr merge <pr-id>                 Force-merge the PR via its merge release
-  fn pr close <pr-id>                 Close the PR terminally
-  fn pr automerge <pr-id> [on|off]    Toggle auto-merge for the PR
-  fn pr automerge-cleanup [--apply] [--json]
+  agi pr list | ls                     List active PR entities with state + auto-merge
+  agi pr show <pr-id>                  Show a PR entity (state, checks, review, threads)
+  agi pr approve <pr-id>               Release the PR's review gate (approve)
+  agi pr respond <pr-id>               Request another review-response round
+  agi pr retry <pr-id>                 Retry the PR (rework release)
+  agi pr merge <pr-id>                 Force-merge the PR via its merge release
+  agi pr close <pr-id>                 Close the PR terminally
+  agi pr automerge <pr-id> [on|off]    Toggle auto-merge for the PR
+  agi pr automerge-cleanup [--apply] [--json]
                                       Dry-run or apply legacy auto-merge stamp cleanup
-  fn research create --query <text> [--wait] [--max-wait-ms <ms>] [--json]
+  agi research create --query <text> [--wait] [--max-wait-ms <ms>] [--json]
                                       Create and optionally wait for a cited-research run (search/fetch/synthesis)
-  fn research list | ls [--status <status>] [--limit <n>] [--json]
+  agi research list | ls [--status <status>] [--limit <n>] [--json]
                                       List cited-research runs
-  fn research show <run-id> [--json]  Show cited-research run details
-  fn research export <run-id> [--format <json|markdown|pdf>] [--output <path>] [--json]
+  agi research show <run-id> [--json]  Show cited-research run details
+  agi research export <run-id> [--format <json|markdown|pdf>] [--output <path>] [--json]
                                       Export cited-research run results
-  fn research cancel <run-id> [--json]
+  agi research cancel <run-id> [--json]
                                       Cancel an active cited-research run
-  fn research retry <run-id> [--json]
+  agi research retry <run-id> [--json]
                                       Retry a failed/cancelled cited-research run
-  fn mission create [title] [desc] [--goal <id>] [--base-branch <branch>]
+  agi mission create [title] [desc] [--goal <id>] [--base-branch <branch>]
                                       Create a new mission (repeat --goal to link goals)
-  fn mission list | ls                List missions
-  fn mission show | info <id>         Show mission details
-  fn mission goals <id>               List linked goals for a mission
-  fn mission link-goal <mission-id> <goal-id>
+  agi mission list | ls                List missions
+  agi mission show | info <id>         Show mission details
+  agi mission goals <id>               List linked goals for a mission
+  agi mission link-goal <mission-id> <goal-id>
                                       Link a goal to a mission
-  fn mission unlink-goal <mission-id> <goal-id>
+  agi mission unlink-goal <mission-id> <goal-id>
                                       Unlink a goal from a mission
-  fn mission delete <id> [--force]    Delete a mission
-  fn mission activate-slice <id>      Mark a slice active
-  fn goals list [--status STATE]      List goals (default: active)
-  fn goals create [title] [desc]      Create a new goal
-  fn goals archive <id>               Archive a goal
-  fn goals citations [flags]          List recorded goal-ID citations across agent logs and task documents (Slice 2 success signal)
-  fn project list | ls [--json]       List all registered projects
-  fn project add [name] [path] [opts]  Register a new project
-  fn project remove | rm <name> [--force]
+  agi mission delete <id> [--force]    Delete a mission
+  agi mission activate-slice <id>      Mark a slice active
+  agi goals list [--status STATE]      List goals (default: active)
+  agi goals create [title] [desc]      Create a new goal
+  agi goals archive <id>               Archive a goal
+  agi goals citations [flags]          List recorded goal-ID citations across agent logs and task documents (Slice 2 success signal)
+  agi project list | ls [--json]       List all registered projects
+  agi project add [name] [path] [opts]  Register a new project
+  agi project remove | rm <name> [--force]
                                       Unregister a project
-  fn project show <name>               Show project details with health
-  fn project info [name]               Show project details (alias for show)
-  fn project set-default | default <name>
+  agi project show <name>               Show project details with health
+  agi project info [name]               Show project details (alias for show)
+  agi project set-default | default <name>
                                       Set default project
-  fn project detect                    Detect project from current directory
-  fn node list | ls [--json]          List all nodes with status and type
-  fn node connect <name> --url <url> [--api-key <key>] [--max-concurrent <n>]
+  agi project detect                    Detect project from current directory
+  agi node list | ls [--json]          List all nodes with status and type
+  agi node connect <name> --url <url> [--api-key <key>] [--max-concurrent <n>]
                                       Connect to a remote node
-  fn node disconnect <name> [--force]  Remove a node connection
-  fn node show | info [name] [--json] Show node details
-  fn node health <name>               Health check a node
-  fn mesh status [--json]              Show full mesh state
-  fn settings                          Show current Fusion configuration
-  fn settings set <key> <value>        Update a configuration setting
-  fn settings set defaultNodeId <node-id>
-  fn settings set unavailableNodePolicy <block|fallback-local>
-  fn settings set worktrunk.enabled <true|false>
-  fn settings set worktrunk.onFailure <fail|fallback-native>
-  fn settings export [opts]              Export settings to a JSON file
-  fn settings import <file> [opts]       Import settings from a JSON file
+  agi node disconnect <name> [--force]  Remove a node connection
+  agi node show | info [name] [--json] Show node details
+  agi node health <name>               Health check a node
+  agi mesh status [--json]              Show full mesh state
+  agi settings                          Show current agi configuration
+  agi settings set <key> <value>        Update a configuration setting
+  agi settings set defaultNodeId <node-id>
+  agi settings set unavailableNodePolicy <block|fallback-local>
+  agi settings set worktrunk.enabled <true|false>
+  agi settings set worktrunk.onFailure <fail|fallback-native>
+  agi settings export [opts]              Export settings to a JSON file
+  agi settings import <file> [opts]       Import settings from a JSON file
 
-  fn git status              Show current branch, commit, dirty state, ahead/behind
-  fn git push                Push current branch
-  fn git pull                Pull current branch
-  fn git fetch [remote]      Fetch from remote (default: origin)
-  fn branch-group list       List branch groups with completion + PR state
-  fn branch-group show <id>  Show a branch group's members and completion gate
-  fn branch-group promote <id>
+  agi git status              Show current branch, commit, dirty state, ahead/behind
+  agi git push                Push current branch
+  agi git pull                Pull current branch
+  agi git fetch [remote]      Fetch from remote (default: origin)
+  agi branch-group list       List branch groups with completion + PR state
+  agi branch-group show <id>  Show a branch group's members and completion gate
+  agi branch-group promote <id>
                              Promote a complete group (opens/links the single managed PR)
-  fn branch-group abandon <id>
+  agi branch-group abandon <id>
                              Abandon a group (best-effort closes the managed PR)
-  fn agent stop <id>                Stop a running agent (pause execution)
-  fn agent start <id>               Start a stopped agent (resume execution)
-  fn agent import <path> [--dry-run] [--skip-existing]
+  agi agent stop <id>                Stop a running agent (pause execution)
+  agi agent start <id>               Start a stopped agent (resume execution)
+  agi agent import <path> [--dry-run] [--skip-existing]
                                       Import agents from an Agent Companies package (directory, archive, or AGENTS.md file)
-  fn agent export <dir> [--company-name <name>] [--company-slug <slug>]
-                                      Export Fusion agents to an Agent Companies package directory
+  agi agent export <dir> [--company-name <name>] [--company-slug <slug>]
+                                      Export agi agents to an Agent Companies package directory
                                       (agent skills assigned via metadata.skills affect execution-time tools)
-  fn agent mailbox <id>             View an agent's mailbox
-  fn message inbox                  List inbox messages
-  fn message outbox                 List sent messages
-  fn message send <agent-id> <msg>  Send a message to an agent
-  fn message read <id>              Read a specific message
-  fn message delete <id>            Delete a message
-  fn chat <agent-id> [message…] [--once] [--non-interactive] [--poll-ms <n>]
+  agi agent mailbox <id>             View an agent's mailbox
+  agi message inbox                  List inbox messages
+  agi message outbox                 List sent messages
+  agi message send <agent-id> <msg>  Send a message to an agent
+  agi message read <id>              Read a specific message
+  agi message delete <id>            Delete a message
+  agi chat <agent-id> [message…] [--once] [--non-interactive] [--poll-ms <n>]
                                     Interactive or one-shot chat with an agent
-  fn backup --create         Create a database backup immediately
-  fn backup --list           List all database backups
-  fn backup --restore <file> Restore database from a backup file
-  fn backup --cleanup        Remove old backups exceeding retention limit
-  fn memory-backup --create [--scope <project|agents|all>]
+  agi backup --create         Create a database backup immediately
+  agi backup --list           List all database backups
+  agi backup --restore <file> Restore database from a backup file
+  agi backup --cleanup        Remove old backups exceeding retention limit
+  agi memory-backup --create [--scope <project|agents|all>]
                              Create a memory backup immediately
-  fn memory-backup --list    List all memory backups
-  fn memory-backup --restore <dir>
+  agi memory-backup --list    List all memory backups
+  agi memory-backup --restore <dir>
                              Restore memory from a backup directory snapshot
-  fn plugin list | ls                List installed plugins
-  fn plugin install <path-or-package> [--ai-scan] Install a plugin from path or package
-  fn plugin add <path-or-package>     Alias for plugin install
-  fn plugin uninstall <id> [--force] Uninstall a plugin
-  fn plugin enable <id>             Enable a plugin
-  fn plugin disable <id>             Disable a plugin
-  fn plugin available                List built-in plugin catalog entries
-  fn plugin settings <id> [key] [value]
+  agi plugin list | ls                List installed plugins
+  agi plugin install <path-or-package> [--ai-scan] Install a plugin from path or package
+  agi plugin add <path-or-package>     Alias for plugin install
+  agi plugin uninstall <id> [--force] Uninstall a plugin
+  agi plugin enable <id>             Enable a plugin
+  agi plugin disable <id>             Disable a plugin
+  agi plugin available                List built-in plugin catalog entries
+  agi plugin settings <id> [key] [value]
                                       Read/update installed plugin settings
-  fn plugin rescan <id>              Rescan and reload a plugin
-  fn plugin setup-status <id>        Check plugin setup binary/runtime status
-  fn plugin setup <id> [--action install|uninstall]
+  agi plugin rescan <id>              Rescan and reload a plugin
+  agi plugin setup-status <id>        Check plugin setup binary/runtime status
+  agi plugin setup <id> [--action install|uninstall]
                                       Install or uninstall plugin setup binaries/runtimes
-  fn plugin create <name>           Scaffold a new plugin project
-  fn plugin new <name>              Scaffold a standalone publishable plugin project
-  fn plugin dev <path>              Build, install, and hot-reload a plugin locally
-  fn skills search <query>            Search skills.sh for agent skills
-  fn skills search <query> --limit 5  Limit results
-  fn skills install <owner/repo>      Install skills from a source
-  fn skills install <owner/repo> --skill <name>
+  agi plugin create <name>           Scaffold a new plugin project
+  agi plugin new <name>              Scaffold a standalone publishable plugin project
+  agi plugin dev <path>              Build, install, and hot-reload a plugin locally
+  agi skills search <query>            Search skills.sh for agent skills
+  agi skills search <query> --limit 5  Limit results
+  agi skills install <owner/repo>      Install skills from a source
+  agi skills install <owner/repo> --skill <name>
                                       Install a specific skill
 
 Options:
@@ -871,7 +872,7 @@ async function main() {
           case "create": {
             const id = args[2];
             if (!id) {
-              console.error("Usage: fn pr create <task-id> [--title <title>] [--base <branch>] [--body <body>] [--draft] [--no-ai] [--reviewer <login>]");
+              console.error("Usage: agi pr create <task-id> [--title <title>] [--base <branch>] [--body <body>] [--draft] [--no-ai] [--reviewer <login>]");
               process.exit(1);
             }
             await runPrCreate(id, parsePrCreateOptions(args.slice(3)), projectName);
@@ -918,7 +919,7 @@ async function main() {
             break;
           default:
             console.error(`Unknown subcommand: pr ${subcommand || ""}`);
-            console.error("Try: fn pr create <task-id> | list | show <id> | approve <id> | respond <id> | retry <id> | merge <id> | close <id> | automerge <id> [on|off] | automerge-cleanup [--apply] [--json]");
+            console.error("Try: agi pr create <task-id> | list | show <id> | approve <id> | respond <id> | retry <id> | merge <id> | close <id> | automerge <id> [on|off] | automerge-cleanup [--apply] [--json]");
             process.exit(1);
         }
         break;
@@ -974,7 +975,7 @@ async function main() {
             break;
           default:
             console.error(`Unknown subcommand: project ${subcommand || ""}`);
-            console.log("Try: fn project list | add | remove | show | info | set-default | detect");
+            console.log("Try: agi project list | add | remove | show | info | set-default | detect");
             process.exit(1);
         }
         break;
@@ -992,7 +993,7 @@ async function main() {
             const name = args[2];
             const url = getFlagValue(args, "--url");
             if (!url) {
-              console.error("Usage: fn node connect <name> --url <url> [--api-key <key>] [--max-concurrent <n>]");
+              console.error("Usage: agi node connect <name> --url <url> [--api-key <key>] [--max-concurrent <n>]");
               process.exit(1);
             }
             await runNodeConnect(name, {
@@ -1018,7 +1019,7 @@ async function main() {
                 maxConcurrent: getFlagValueNumber(args, "--max-concurrent"),
               });
             } else {
-              console.error("Usage: fn node add <name> --url <url> [--api-key <key>] [--max-concurrent <n>]");
+              console.error("Usage: agi node add <name> --url <url> [--api-key <key>] [--max-concurrent <n>]");
               process.exit(1);
             }
             break;
@@ -1041,7 +1042,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: node ${subcommand || ""}`);
-            console.log("Try: fn node list | connect | disconnect | show | health");
+            console.log("Try: agi node list | connect | disconnect | show | health");
             process.exit(1);
         }
         break;
@@ -1056,7 +1057,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: mesh ${subcommand || ""}`);
-            console.log("Try: fn mesh status");
+            console.log("Try: agi mesh status");
             process.exit(1);
         }
         break;
@@ -1068,7 +1069,7 @@ async function main() {
           case "create": {
             const query = getFlagValue(args, "--query") ?? args.slice(2).filter((value) => !value.startsWith("--")).join(" ").trim();
             if (!query) {
-              console.error("Usage: fn research create --query <text> [--wait] [--max-wait-ms <ms>] [--json]");
+              console.error("Usage: agi research create --query <text> [--wait] [--max-wait-ms <ms>] [--json]");
               process.exit(1);
             }
             await runResearchCreate({
@@ -1094,7 +1095,7 @@ async function main() {
           case "show": {
             const runId = args[2];
             if (!runId) {
-              console.error("Usage: fn research show <run-id> [--json]");
+              console.error("Usage: agi research show <run-id> [--json]");
               process.exit(1);
             }
             await runResearchShow(runId, { json: args.includes("--json"), projectName });
@@ -1103,7 +1104,7 @@ async function main() {
           case "export": {
             const runId = args[2];
             if (!runId) {
-              console.error("Usage: fn research export <run-id> [--format <json|markdown|pdf>] [--output <path>] [--json]");
+              console.error("Usage: agi research export <run-id> [--format <json|markdown|pdf>] [--output <path>] [--json]");
               process.exit(1);
             }
             await runResearchExport({
@@ -1118,7 +1119,7 @@ async function main() {
           case "cancel": {
             const runId = args[2];
             if (!runId) {
-              console.error("Usage: fn research cancel <run-id> [--json]");
+              console.error("Usage: agi research cancel <run-id> [--json]");
               process.exit(1);
             }
             await runResearchCancel(runId, { json: args.includes("--json"), projectName });
@@ -1127,7 +1128,7 @@ async function main() {
           case "retry": {
             const runId = args[2];
             if (!runId) {
-              console.error("Usage: fn research retry <run-id> [--json]");
+              console.error("Usage: agi research retry <run-id> [--json]");
               process.exit(1);
             }
             await runResearchRetry(runId, { json: args.includes("--json"), projectName });
@@ -1135,7 +1136,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: research ${subcommand || ""}`);
-            console.log("Try: fn research create | list | show | export | cancel | retry");
+            console.log("Try: agi research create | list | show | export | cancel | retry");
             process.exit(1);
         }
         break;
@@ -1147,7 +1148,7 @@ async function main() {
           case "finalize": {
             const sessionId = args[2];
             if (!sessionId) {
-              console.error("Usage: fn experiment finalize <sessionId> [--integration-branch <name>] [--dry-run] [--json] [--summary <text>] [--plan-file <path>]");
+              console.error("Usage: agi experiment finalize <sessionId> [--integration-branch <name>] [--dry-run] [--json] [--summary <text>] [--plan-file <path>]");
               process.exit(1);
             }
             await runExperimentFinalize({
@@ -1163,7 +1164,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: experiment ${subcommand || ""}`);
-            console.log("Try: fn experiment finalize <session-id>");
+            console.log("Try: agi experiment finalize <session-id>");
             process.exit(1);
         }
         break;
@@ -1226,7 +1227,7 @@ async function main() {
             const id = args[2];
             const column = args[3];
             if (!id || !column) {
-              console.error("Usage: fn task move <id> <column>");
+              console.error("Usage: agi task move <id> <column>");
               process.exit(1);
             }
             await runTaskMove(id, column, projectName);
@@ -1234,14 +1235,14 @@ async function main() {
           }
           case "show": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task show <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task show <id>"); process.exit(1); }
             await runTaskShow(id, projectName);
             break;
           }
           case "update": {
             const id = args[2], step = args[3], status = args[4];
             if (!id || !step || !status) {
-              console.error("Usage: fn task update <id> <step> <status>");
+              console.error("Usage: agi task update <id> <step> <status>");
               console.error("Status: pending | in-progress | done | skipped");
               process.exit(1);
             }
@@ -1253,10 +1254,10 @@ async function main() {
             const id = args[3];
             const dependencyArgs = args.slice(4);
             if (!operation || !id || !["add", "remove", "replace", "set"].includes(operation)) {
-              console.error("Usage: fn task deps add <id> <dependency>");
-              console.error("       fn task deps remove <id> <dependency>");
-              console.error("       fn task deps replace <id> <old> <new>");
-              console.error("       fn task deps set <id> [dependency ...]");
+              console.error("Usage: agi task deps add <id> <dependency>");
+              console.error("       agi task deps remove <id> <dependency>");
+              console.error("       agi task deps replace <id> <old> <new>");
+              console.error("       agi task deps set <id> [dependency ...]");
               process.exit(1);
             }
             await runTaskDeps(operation as "add" | "remove" | "replace" | "set", id, dependencyArgs, projectName);
@@ -1264,13 +1265,13 @@ async function main() {
           }
           case "log": {
             const id = args[2], message = args.slice(3).join(" ");
-            if (!id || !message) { console.error("Usage: fn task log <id> <message>"); process.exit(1); }
+            if (!id || !message) { console.error("Usage: agi task log <id> <message>"); process.exit(1); }
             await runTaskLog(id, message, undefined, projectName);
             break;
           }
           case "logs": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task logs <id> [--follow] [--limit <n>] [--type <type>]"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task logs <id> [--follow] [--limit <n>] [--type <type>]"); process.exit(1); }
             
             // Parse flags
             const follow = args.includes("--follow");
@@ -1295,19 +1296,19 @@ async function main() {
           }
           case "merge": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task merge <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task merge <id>"); process.exit(1); }
             await runTaskMerge(id, projectName);
             break;
           }
           case "duplicate": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task duplicate <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task duplicate <id>"); process.exit(1); }
             await runTaskDuplicate(id, projectName);
             break;
           }
           case "refine": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task refine <id> [--feedback <text>]"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task refine <id> [--feedback <text>]"); process.exit(1); }
             // Parse optional --feedback flag
             const feedbackIdx = args.indexOf("--feedback");
             const feedback = feedbackIdx !== -1 && feedbackIdx + 1 < args.length
@@ -1318,19 +1319,19 @@ async function main() {
           }
           case "archive": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task archive <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task archive <id>"); process.exit(1); }
             await runTaskArchive(id, projectName);
             break;
           }
           case "unarchive": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task unarchive <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task unarchive <id>"); process.exit(1); }
             await runTaskUnarchive(id, projectName);
             break;
           }
           case "delete": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task delete <id> [--force] [--allow-resurrection]"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task delete <id> [--force] [--allow-resurrection]"); process.exit(1); }
             const force = args.includes("--force");
             const allowResurrection = args.includes("--allow-resurrection");
             await runTaskDelete(id, force, allowResurrection, projectName);
@@ -1339,7 +1340,7 @@ async function main() {
           case "attach": {
             const id = args[2], file = args[3];
             if (!id || !file) {
-              console.error("Usage: fn task attach <id> <file>");
+              console.error("Usage: agi task attach <id> <file>");
               process.exit(1);
             }
             await runTaskAttach(id, file, projectName);
@@ -1347,19 +1348,19 @@ async function main() {
           }
           case "pause": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task pause <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task pause <id>"); process.exit(1); }
             await runTaskPause(id, projectName);
             break;
           }
           case "unpause": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task unpause <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task unpause <id>"); process.exit(1); }
             await runTaskUnpause(id, projectName);
             break;
           }
           case "comment": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task comment <id> [message] [--author <name>]"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task comment <id> [message] [--author <name>]"); process.exit(1); }
             const authorIdx = args.indexOf("--author");
             const author = authorIdx !== -1 && authorIdx + 1 < args.length ? args[authorIdx + 1] : undefined;
             const messageParts = args.slice(3).filter((arg, index) => {
@@ -1372,14 +1373,14 @@ async function main() {
           }
           case "comments": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn task comments <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task comments <id>"); process.exit(1); }
             await runTaskComments(id, projectName);
             break;
           }
           case "steer": {
             const id = args[2];
             const message = args.slice(3).join(" ");
-            if (!id) { console.error("Usage: fn task steer <id> [message]"); process.exit(1); }
+            if (!id) { console.error("Usage: agi task steer <id> [message]"); process.exit(1); }
             await runTaskSteer(id, message || undefined, projectName);
             break;
           }
@@ -1387,7 +1388,7 @@ async function main() {
             const id = args[2];
             const nodeName = args[3];
             if (!id || !nodeName) {
-              console.error("Usage: fn task set-node <id> <node-name-or-id>");
+              console.error("Usage: agi task set-node <id> <node-name-or-id>");
               process.exit(1);
             }
             await runTaskSetNode(id, nodeName, projectName);
@@ -1396,7 +1397,7 @@ async function main() {
           case "clear-node": {
             const id = args[2];
             if (!id) {
-              console.error("Usage: fn task clear-node <id>");
+              console.error("Usage: agi task clear-node <id>");
               process.exit(1);
             }
             await runTaskClearNode(id, projectName);
@@ -1405,7 +1406,7 @@ async function main() {
           case "retry": {
             const id = args[2];
             if (!id) {
-              console.error("Usage: fn task retry <id>");
+              console.error("Usage: agi task retry <id>");
               process.exit(1);
             }
             await runTaskRetry(id, projectName);
@@ -1414,7 +1415,7 @@ async function main() {
           case "import": {
             const ownerRepo = args[2];
             if (!ownerRepo) {
-              console.error("Usage: fn task import <owner/repo> [options]");
+              console.error("Usage: agi task import <owner/repo> [options]");
               console.error("Options: --limit <n>, -l <n>  (default: 30, max: 100)");
               console.error("         --labels <labels>, -L <labels>  (comma-separated)");
               console.error("         --interactive, -i  (interactive mode)");
@@ -1454,7 +1455,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: task ${subcommand || ""}`);
-            console.log("Try: fn task create | list | move | set-node | clear-node");
+            console.log("Try: agi task create | list | move | set-node | clear-node");
             process.exit(1);
         }
         break;
@@ -1525,7 +1526,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: mission ${subcommand || ""}`);
-            console.log("Try: fn mission create | list | show | goals | link-goal | unlink-goal | delete | activate-slice");
+            console.log("Try: agi mission create | list | show | goals | link-goal | unlink-goal | delete | activate-slice");
             process.exit(1);
         }
         break;
@@ -1568,7 +1569,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: goals ${subcommand || ""}`);
-            console.log("Try: fn goals list | create | archive | citations");
+            console.log("Try: agi goals list | create | archive | citations");
             process.exit(1);
         }
         break;
@@ -1584,8 +1585,8 @@ async function main() {
           const key = args[2];
           const value = args.slice(3).join(" ");
           if (!key || value === undefined) {
-            console.error("Usage: fn settings set <key> <value>");
-            console.error("Example: fn settings set maxConcurrent 4");
+            console.error("Usage: agi settings set <key> <value>");
+            console.error("Example: agi settings set maxConcurrent 4");
             process.exit(1);
           }
           await runSettingsSet(key, value, projectName);
@@ -1609,8 +1610,8 @@ async function main() {
         if (subcommand === "import") {
           const file = args[2];
           if (!file) {
-            console.error("Usage: fn settings import <file> [--scope global|project|both] [--merge] [--yes]");
-            console.error("Example: fn settings import fusion-settings-2026-03-31.json --yes");
+            console.error("Usage: agi settings import <file> [--scope global|project|both] [--merge] [--yes]");
+            console.error("Example: agi settings import fusion-settings-2026-03-31.json --yes");
             process.exit(1);
           }
 
@@ -1627,7 +1628,7 @@ async function main() {
           break;
         }
         console.error(`Unknown settings subcommand: ${subcommand}`);
-        console.error("Try: fn settings | fn settings set <key> <value> | fn settings export | fn settings import <file>");
+        console.error("Try: agi settings | agi settings set <key> <value> | agi settings export | agi settings import <file>");
         process.exit(1);
         break;
       }
@@ -1656,7 +1657,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: git ${subcommand || ""}`);
-            console.log("Try: fn git status | fetch | pull | push");
+            console.log("Try: agi git status | fetch | pull | push");
             process.exit(1);
         }
         break;
@@ -1673,7 +1674,7 @@ async function main() {
           case "show": {
             const id = args[2];
             if (!id) {
-              console.error("Usage: fn branch-group show <group-id>");
+              console.error("Usage: agi branch-group show <group-id>");
               process.exit(1);
             }
             await runBranchGroupShow(id, projectName);
@@ -1682,7 +1683,7 @@ async function main() {
           case "promote": {
             const id = args[2];
             if (!id) {
-              console.error("Usage: fn branch-group promote <group-id>");
+              console.error("Usage: agi branch-group promote <group-id>");
               process.exit(1);
             }
             await runBranchGroupPromote(id, projectName);
@@ -1691,7 +1692,7 @@ async function main() {
           case "abandon": {
             const id = args[2];
             if (!id) {
-              console.error("Usage: fn branch-group abandon <group-id>");
+              console.error("Usage: agi branch-group abandon <group-id>");
               process.exit(1);
             }
             await runBranchGroupAbandon(id, projectName);
@@ -1699,7 +1700,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: branch-group ${subcommand || ""}`);
-            console.log("Try: fn branch-group list | show <id> | promote <id> | abandon <id>");
+            console.log("Try: agi branch-group list | show <id> | promote <id> | abandon <id>");
             process.exit(1);
         }
         break;
@@ -1721,7 +1722,7 @@ async function main() {
         } else if (restoreFile) {
           await runBackupRestore(restoreFile, projectName);
         } else {
-          console.error("Usage: fn backup --create | --list | --cleanup | --restore <filename>");
+          console.error("Usage: agi backup --create | --list | --cleanup | --restore <filename>");
           process.exit(1);
         }
         break;
@@ -1737,7 +1738,7 @@ async function main() {
 
         if (create) {
           if (scope && !["project", "agents", "all"].includes(scope)) {
-            console.error("Usage: fn memory-backup --create [--scope <project|agents|all>]");
+            console.error("Usage: agi memory-backup --create [--scope <project|agents|all>]");
             process.exit(1);
           }
           await runMemoryBackupCreate({ projectName, scope: scope as "project" | "agents" | "all" | undefined });
@@ -1746,7 +1747,7 @@ async function main() {
         } else if (restoreFile) {
           await runMemoryBackupRestore(restoreFile, projectName);
         } else {
-          console.error("Usage: fn memory-backup --create [--scope <project|agents|all>] | --list | --restore <filename>");
+          console.error("Usage: agi memory-backup --create [--scope <project|agents|all>] | --list | --restore <filename>");
           process.exit(1);
         }
         break;
@@ -1757,25 +1758,25 @@ async function main() {
         switch (subcommand) {
           case "stop": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn agent stop <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi agent stop <id>"); process.exit(1); }
             await runAgentStop(id, projectName);
             break;
           }
           case "start": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn agent start <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi agent start <id>"); process.exit(1); }
             await runAgentStart(id, projectName);
             break;
           }
           case "mailbox": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn agent mailbox <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi agent mailbox <id>"); process.exit(1); }
             await runAgentMailbox(id, projectName);
             break;
           }
           case "import": {
             const source = args[2];
-            if (!source) { console.error("Usage: fn agent import <path> [--dry-run] [--skip-existing]"); process.exit(1); }
+            if (!source) { console.error("Usage: agi agent import <path> [--dry-run] [--skip-existing]"); process.exit(1); }
             const importArgs = args.slice(3);
             const dryRun = importArgs.includes("--dry-run");
             const skipExisting = importArgs.includes("--skip-existing");
@@ -1785,7 +1786,7 @@ async function main() {
           case "export": {
             const outputDir = args[2];
             if (!outputDir) {
-              console.error("Usage: fn agent export <dir> [--company-name <name>] [--company-slug <slug>]");
+              console.error("Usage: agi agent export <dir> [--company-name <name>] [--company-slug <slug>]");
               process.exit(1);
             }
 
@@ -1797,7 +1798,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: agent ${subcommand || ""}`);
-            console.log("Try: fn agent stop <id> | fn agent start <id> | fn agent mailbox <id> | fn agent import <path> | fn agent export <dir>");
+            console.log("Try: agi agent stop <id> | agi agent start <id> | agi agent mailbox <id> | agi agent import <path> | agi agent export <dir>");
             process.exit(1);
         }
         break;
@@ -1818,7 +1819,7 @@ async function main() {
             const toId = args[2];
             const content = args.slice(3).join(" ").trim();
             if (!toId || !content) {
-              console.error("Usage: fn message send <agent-id> <content>");
+              console.error("Usage: agi message send <agent-id> <content>");
               process.exit(1);
             }
             await runMessageSend(toId, content, projectName);
@@ -1826,26 +1827,26 @@ async function main() {
           }
           case "read": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn message read <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi message read <id>"); process.exit(1); }
             await runMessageRead(id, projectName);
             break;
           }
           case "delete": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn message delete <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi message delete <id>"); process.exit(1); }
             await runMessageDelete(id, projectName);
             break;
           }
           default:
             console.error(`Unknown subcommand: message ${subcommand || ""}`);
-            console.log("Try: fn message inbox | fn message outbox | fn message send | fn message read | fn message delete");
+            console.log("Try: agi message inbox | agi message outbox | agi message send | agi message read | agi message delete");
             process.exit(1);
         }
         break;
       }
 
       case "chat": {
-        const usage = "Usage: fn chat <agent-id> [message…] [--once] [--non-interactive] [--poll-ms <n>]";
+        const usage = "Usage: agi chat <agent-id> [message…] [--once] [--non-interactive] [--poll-ms <n>]";
         const agentId = args[1];
         if (!agentId) {
           console.error(usage);
@@ -1894,7 +1895,7 @@ async function main() {
           case "add": {
             const source = args[2];
             if (!source) {
-              console.error("Usage: fn plugin install <path-or-package> [--ai-scan] (alias: fn plugin add <path-or-package>)");
+              console.error("Usage: agi plugin install <path-or-package> [--ai-scan] (alias: agi plugin add <path-or-package>)");
               process.exit(1);
             }
             await runPluginInstall(source, { projectName, aiScan: args.includes("--ai-scan") });
@@ -1902,20 +1903,20 @@ async function main() {
           }
           case "uninstall": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn plugin uninstall <id> [--force]"); process.exit(1); }
+            if (!id) { console.error("Usage: agi plugin uninstall <id> [--force]"); process.exit(1); }
             const force = args.includes("--force");
             await runPluginUninstall(id, { force, projectName });
             break;
           }
           case "enable": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn plugin enable <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi plugin enable <id>"); process.exit(1); }
             await runPluginEnable(id, { projectName });
             break;
           }
           case "disable": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn plugin disable <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi plugin disable <id>"); process.exit(1); }
             await runPluginDisable(id, { projectName });
             break;
           }
@@ -1925,25 +1926,25 @@ async function main() {
           }
           case "settings": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn plugin settings <id> [key] [value]"); process.exit(1); }
+            if (!id) { console.error("Usage: agi plugin settings <id> [key] [value]"); process.exit(1); }
             await runPluginSettings(id, args[3], args[4], { projectName });
             break;
           }
           case "rescan": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn plugin rescan <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi plugin rescan <id>"); process.exit(1); }
             await runPluginRescan(id, { projectName });
             break;
           }
           case "setup-status": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn plugin setup-status <id>"); process.exit(1); }
+            if (!id) { console.error("Usage: agi plugin setup-status <id>"); process.exit(1); }
             await runPluginSetupStatus(id, { projectName });
             break;
           }
           case "setup": {
             const id = args[2];
-            if (!id) { console.error("Usage: fn plugin setup <id> [--action install|uninstall]"); process.exit(1); }
+            if (!id) { console.error("Usage: agi plugin setup <id> [--action install|uninstall]"); process.exit(1); }
             const actionIndex = args.indexOf("--action");
             const action = actionIndex >= 0 ? args[actionIndex + 1] : "install";
             if (action !== "install" && action !== "uninstall") {
@@ -1955,13 +1956,13 @@ async function main() {
           }
           case "create": {
             const pluginName = args[2];
-            if (!pluginName) { console.error("Usage: fn plugin create <name>"); process.exit(1); }
+            if (!pluginName) { console.error("Usage: agi plugin create <name>"); process.exit(1); }
             await runPluginCreate(pluginName, { output: getFlagValue(args.slice(3), "--output") });
             break;
           }
           case "new": {
             const pluginName = args[2];
-            if (!pluginName) { console.error("Usage: fn plugin new <name> [--output <dir>] [--scope <scope>]"); process.exit(1); }
+            if (!pluginName) { console.error("Usage: agi plugin new <name> [--output <dir>] [--scope <scope>]"); process.exit(1); }
             await runPluginNew(pluginName, {
               output: getFlagValue(args.slice(3), "--output"),
               scope: getFlagValue(args.slice(3), "--scope"),
@@ -1970,7 +1971,7 @@ async function main() {
           }
           case "dev": {
             const pluginPath = args[2];
-            if (!pluginPath) { console.error("Usage: fn plugin dev <path> [--once] [--ai-scan]"); process.exit(1); }
+            if (!pluginPath) { console.error("Usage: agi plugin dev <path> [--once] [--ai-scan]"); process.exit(1); }
             await runPluginDev(pluginPath, {
               once: args.includes("--once"),
               aiScan: args.includes("--ai-scan"),
@@ -1980,7 +1981,7 @@ async function main() {
           }
           default:
             console.error(`Unknown subcommand: plugin ${sub || ""}`);
-            console.log("Try: fn plugin list | install | add (alias for install) | uninstall | enable | disable | available | settings | rescan | setup-status | setup | create | new | dev");
+            console.log("Try: agi plugin list | install | add (alias for install) | uninstall | enable | disable | available | settings | rescan | setup-status | setup | create | new | dev");
             process.exit(1);
         }
         break;
@@ -1990,18 +1991,18 @@ async function main() {
         const subcommand = args[1];
 
         if (!subcommand || subcommand === "--help" || subcommand === "-h") {
-          console.log("fn skills — Browse and install skills from skills.sh\n");
+          console.log("agi skills — Browse and install skills from skills.sh\n");
           console.log("Usage:");
-          console.log("  fn skills search <query>            Search skills.sh for agent skills");
-          console.log("  fn skills search <query> --limit 5  Limit results (default: 10, max: 50)");
-          console.log("  fn skills install <owner/repo>      Install skills from a source");
-          console.log("  fn skills install <owner/repo> --skill <name>");
+          console.log("  agi skills search <query>            Search skills.sh for agent skills");
+          console.log("  agi skills search <query> --limit 5  Limit results (default: 10, max: 50)");
+          console.log("  agi skills install <owner/repo>      Install skills from a source");
+          console.log("  agi skills install <owner/repo> --skill <name>");
           console.log("                                      Install a specific skill");
           console.log("\nExamples:");
-          console.log("  fn skills search react");
-          console.log("  fn skills search firebase --limit 5");
-          console.log("  fn skills install firebase/agent-skills");
-          console.log("  fn skills install firebase/agent-skills --skill firebase-basics");
+          console.log("  agi skills search react");
+          console.log("  agi skills search firebase --limit 5");
+          console.log("  agi skills install firebase/agent-skills");
+          console.log("  agi skills install firebase/agent-skills --skill firebase-basics");
           break;
         }
 
@@ -2049,7 +2050,7 @@ async function main() {
         }
 
         console.error(`Unknown subcommand: skills ${subcommand}`);
-        console.log("Try: fn skills search | install");
+        console.log("Try: agi skills search | install");
         process.exit(1);
         break;
       }

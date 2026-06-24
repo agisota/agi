@@ -358,7 +358,8 @@ export type ColorTheme = (typeof COLOR_THEMES)[number];
  *  here (plus translated catalogs) is the only code change a new language
  *  needs — see `@fusion/i18n`. zh-CN and zh-TW are independent catalogs and
  *  are never auto-converted between scripts. */
-export const SUPPORTED_LOCALES = ["en", "zh-CN", "zh-TW", "fr", "es", "ko"] as const;
+// FNXC:i18n-Locale 2026-06-24-03:11: Added Russian ("ru") as a first-class UI locale for the agi rebrand (full RU localization is the headline product requirement of this fork). DEFAULT_LOCALE stays "en" as the source-of-truth fallback so any key missing from any locale resolves to English instead of rendering blank or raw keys.
+export const SUPPORTED_LOCALES = ["en", "ru", "zh-CN", "zh-TW", "fr", "es", "ko"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 /** Source-of-truth language and the fallback for all locales. */
 export const DEFAULT_LOCALE: Locale = "en";

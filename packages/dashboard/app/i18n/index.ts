@@ -24,6 +24,25 @@ import { initReactI18next } from "react-i18next";
  *  belongs to the brand-rename track. */
 export const LANGUAGE_STORAGE_KEY = "kb-dashboard-language";
 
+/**
+ * FNXC:i18n-DefaultLocale 2026-06-24-03:11:
+ * agi is a Russian-first product (full RU localization is this fork's headline requirement), so a
+ * first-time user with no saved preference opens the dashboard in Russian rather than following the
+ * browser locale. An explicit saved choice always wins, and the Settings "Auto" control
+ * (clearLanguage) still reverts to browser auto-detection. DEFAULT_LOCALE ("en") remains the
+ * translation fallback, so a missing `ru` key renders English, never a raw key.
+ */
+function initialPreferredLanguage(): string {
+  try {
+    const saved =
+      typeof localStorage !== "undefined" ? localStorage.getItem(LANGUAGE_STORAGE_KEY) : null;
+    if (saved) return saved;
+  } catch {
+    /* localStorage unavailable (SSR/private mode) — fall through to the RU default */
+  }
+  return "ru";
+}
+
 i18next
   .use(LanguageDetector)
   .use(
@@ -36,6 +55,8 @@ i18next
 
 export const i18nReady = i18next.init({
   ...baseInitOptions(),
+  // FNXC:i18n-DefaultLocale 2026-06-24-03:11: RU-by-default for new users; saved choice honored (see initialPreferredLanguage).
+  lng: initialPreferredLanguage(),
   ns: [...DASHBOARD_NAMESPACES],
   defaultNS: DEFAULT_NAMESPACE,
   detection: {

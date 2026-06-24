@@ -184,7 +184,7 @@
       "zai": "Create an API key in the Zhipu AI open platform account settings."
     },
     "apiKeyUsage": {
-      "fallback": "Used by Fusion to authenticate requests to this provider",
+      "fallback": "Used by agi to authenticate requests to this provider",
       "kimiCoding": "Used for Kimi/Moonshot AI models in task execution and planning",
       "minimax": "Used for MiniMax models in task execution",
       "ollama": "Connects to your local Ollama instance",

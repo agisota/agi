@@ -1,7 +1,7 @@
 {
-  "name": "Fusion",
-  "short_name": "Fusion",
-  "description": "AI-orchestrated task board",
+  "name": "agi",
+  "short_name": "agi",
+  "description": "Доска задач с ИИ-оркестрацией",
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#1a1a2e",

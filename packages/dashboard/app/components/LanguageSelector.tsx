@@ -6,6 +6,8 @@ import { useLanguage } from "../hooks/useLanguage";
 /** Each language names itself (endonyms), intentionally untranslated. */
 const ENDONYMS: Record<Locale, string> = {
   en: "English",
+  // FNXC:i18n-Locale 2026-06-24-03:11: Russian endonym for the agi RU localization; endonyms stay untranslated by design.
+  ru: "Русский",
   "zh-CN": "简体中文",
   "zh-TW": "繁體中文",
   fr: "Français",

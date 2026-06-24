@@ -2,17 +2,18 @@
   "name": "runfusion.ai",
   "version": "0.46.0",
   "license": "MIT",
-  "description": "Launch Fusion with `npx runfusion.ai` — tiny alias for @runfusion/fusion.",
-  "homepage": "https://runfusion.ai",
+  "description": "Launch agi with `npx runfusion.ai` — tiny alias for @runfusion/fusion.",
+  "homepage": "https://github.com/agisota/agi#readme",
   "bugs": {
-    "url": "https://github.com/Runfusion/Fusion/issues"
+    "url": "https://github.com/agisota/agi/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Runfusion/Fusion.git",
+    "url": "git+https://github.com/agisota/agi.git",
     "directory": "packages/cli-alias"
   },
   "keywords": [
+    "agi",
     "fusion",
     "runfusion",
     "ai",
@@ -22,6 +23,7 @@
   ],
   "type": "module",
   "bin": {
+    "agi": "index.js",
     "runfusion.ai": "index.js",
     "runfusion": "index.js",
     "fn": "index.js",

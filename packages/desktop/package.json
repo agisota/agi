@@ -1,21 +1,21 @@
 {
   "name": "@fusion/desktop",
-  "productName": "Fusion",
+  "productName": "agi",
   "version": "0.46.0",
   "license": "MIT",
   "author": {
-    "name": "Runfusion",
-    "email": "support@runfusion.ai"
+    "name": "agisota",
+    "email": "ai@rox.one"
   },
-  "description": "Fusion desktop: Electron wrapper around the Fusion dashboard for macOS, Windows, and Linux.",
-  "homepage": "https://github.com/Runfusion/Fusion#readme",
+  "description": "agi desktop: Electron wrapper around the agi dashboard for macOS, Windows, and Linux (Russian-localized fork of Fusion).",
+  "homepage": "https://github.com/agisota/agi#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Runfusion/Fusion",
+    "url": "https://github.com/agisota/agi",
     "directory": "packages/desktop"
   },
   "bugs": {
-    "url": "https://github.com/Runfusion/Fusion/issues"
+    "url": "https://github.com/agisota/agi/issues"
   },
   "private": true,
   "type": "module",
